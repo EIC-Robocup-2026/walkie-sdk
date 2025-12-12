@@ -1,0 +1,39 @@
+[project]
+name = "walkie-sdk"
+version = "0.1.0"
+description = "Python SDK for controlling Walkie robots via WebSocket (ROSBridge) and WebRTC"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Walkie Team"}
+]
+keywords = ["robotics", "ros2", "sdk", "rosbridge", "webrtc", "navigation"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "aiohttp>=3.13.2",
+    "aiortc>=1.14.0",
+    "av>=16.0.1",
+    "numpy>=2.3.5",
+    "opencv-python-headless>=4.11.0.86",
+    "roslibpy>=2.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/walkie-team/walkie-sdk"
+Documentation = "https://github.com/walkie-team/walkie-sdk#readme"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["walkie_sdk"]
