@@ -84,7 +84,6 @@ frame = bot.camera.get_frame()
 if frame is not None:
     cv2.imshow("Robot Camera", frame)
     cv2.waitKey(1)
-    # ... Run your AI model on frame ...
 
 # 4. Navigate to Target
 print("Moving to target...")

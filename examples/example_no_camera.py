@@ -34,7 +34,7 @@ def main():
             ip=ROBOT_IP,
             ws_port=9090,
             timeout=10.0,
-            enable_camera=False,  # <-- Camera disabled
+            enable_camera=False,
             namespace=NAMESPACE,
         )
     except ConnectionError as e:
@@ -65,7 +65,7 @@ def main():
     print("  bot.nav.stop()")
 
     print("\n  Navigating to (1.0, 0.0)...")
-    result = bot.nav.go_to(x=0.0, y=0.0, heading=0.0, blocking=False)
+    result = bot.nav.go_to(x=1.0, y=0.0, heading=0.0, blocking=False)
     print(f"  Result: {result}")
 
     # 4. Monitor Loop
