@@ -6,6 +6,5 @@ Core clients for robot communication.
 """
 
 from walkie_sdk.core.bridge_client import BridgeClient
-from walkie_sdk.core.webrtc_client import WebRTCClient
 
-__all__ = ["BridgeClient", "WebRTCClient"]
+__all__ = ["BridgeClient"]

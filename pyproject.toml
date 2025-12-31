@@ -23,9 +23,10 @@ dependencies = [
     "aiortc>=1.14.0",
     "av>=16.0.1",
     "numpy>=2.3.5",
-    "opencv-python-headless>=4.11.0.86",
+    "opencv-python>=4.11.0.86",
     "roslibpy>=2.0.0",
-]
+    "pyyaml"
+    ]
 
 [project.urls]
 Homepage = "https://github.com/walkie-team/walkie-sdk"
