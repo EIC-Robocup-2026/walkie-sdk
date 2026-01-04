@@ -3,15 +3,15 @@ Navigation - Robot navigation control module.
 
 Provides go_to(), cancel(), and stop() functions for controlling
 the robot's navigation via Nav2 action server.
+
+This module uses the ROSTransportInterface abstraction, allowing it
+to work with any transport implementation (rosbridge, rclpy, zenoh).
 """
 
 import threading
-import time
 from typing import Any, Callable, Dict, Optional
 
-from cv2.typing import Prim
-
-from walkie_sdk.core.bridge_client import BridgeClient
+from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.converters import euler_to_quaternion
 from walkie_sdk.utils.namespace import apply_namespace
 
@@ -29,13 +29,16 @@ class Navigation:
     Provides methods to send navigation goals, cancel navigation,
     and perform emergency stops.
 
+    This class works with any transport that implements ROSTransportInterface,
+    making it protocol-agnostic (works with rosbridge, rclpy, zenoh, etc.).
+
     Args:
-        bridge: BridgeClient instance for ROSBridge communication
+        transport: Transport instance implementing ROSTransportInterface
         namespace: ROS namespace prefix for topics/actions (default: "" = no namespace)
     """
 
-    def __init__(self, bridge: BridgeClient, namespace: str = ""):
-        self._bridge = bridge
+    def __init__(self, transport: ROSTransportInterface, namespace: str = ""):
+        self._transport = transport
         self._namespace = namespace
         self._current_goal_id: Optional[str] = None
         self._goal_lock = threading.Lock()
@@ -87,7 +90,7 @@ class Navigation:
             Status string: "SUCCEEDED", "FAILED", "CANCELED", or "IN_PROGRESS"
 
         Raises:
-            ConnectionError: If not connected to ROSBridge
+            ConnectionError: If not connected to ROS
             TimeoutError: If blocking and navigation times out
 
         Example:
@@ -96,7 +99,7 @@ class Navigation:
             >>> bot.nav.go_to(x=5.0, y=3.0, heading=1.57, blocking=False)
             'IN_PROGRESS'
         """
-        if not self._bridge.is_connected:
+        if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
 
         # Convert heading to quaternion (roll=0, pitch=0, yaw=heading)
@@ -133,20 +136,12 @@ class Navigation:
         feedback_callback: Optional[Callable[[Dict[str, Any]], None]],
     ) -> str:
         """Send goal and block until complete."""
-        result_event = threading.Event()
-        result_status = {"status": "FAILED"}
-
-        def on_feedback(feedback: Dict[str, Any]) -> None:
-            if feedback_callback:
-                # Extract useful info from feedback
-                feedback_callback(feedback)
-
         try:
-            result = self._bridge.call_action(
+            result = self._transport.call_action(
                 action_name=self.nav2_action_name,
                 action_type=NAV2_ACTION_TYPE,
                 goal=goal_msg,
-                feedback_callback=on_feedback,
+                feedback_callback=feedback_callback,
                 timeout=timeout,
             )
 
@@ -173,7 +168,7 @@ class Navigation:
     ) -> None:
         """Send goal in background thread."""
         try:
-            result = self._bridge.call_action(
+            result = self._transport.call_action(
                 action_name=self.nav2_action_name,
                 action_type=NAV2_ACTION_TYPE,
                 goal=goal_msg,
@@ -181,7 +176,6 @@ class Navigation:
                 timeout=None,
             )
 
-            print(result.get("status"))
             if result.get("status") == "SUCCEEDED":
                 self._navigation_status = "SUCCEEDED"
             else:
@@ -203,11 +197,11 @@ class Navigation:
             >>> bot.nav.cancel()
             True
         """
-        if not self._bridge.is_connected:
+        if not self._transport.is_connected:
             return False
 
         try:
-            self._bridge.cancel_action()
+            self._transport.cancel_action()
             self._navigation_status = "CANCELED"
             return True
         except Exception:
@@ -227,7 +221,7 @@ class Navigation:
             >>> bot.nav.stop()
             True
         """
-        if not self._bridge.is_connected:
+        if not self._transport.is_connected:
             return False
 
         # Zero velocity Twist message
@@ -237,9 +231,9 @@ class Navigation:
         }
 
         try:
-            self._bridge.publish(self.cmd_vel_topic, CMD_VEL_TYPE, zero_twist)
+            self._transport.publish(self.cmd_vel_topic, CMD_VEL_TYPE, zero_twist)
             # Also cancel any ongoing navigation
-            self._bridge.cancel_action()
+            self._transport.cancel_action()
             self._navigation_status = "STOPPED"
             return True
         except Exception:

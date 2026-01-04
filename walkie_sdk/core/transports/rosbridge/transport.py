@@ -1,9 +1,11 @@
 """
-BridgeClient - WebSocket connection manager for ROSBridge.
+ROSBridgeTransport - WebSocket-based ROS transport using roslibpy.
 
-Wraps roslibpy to provide a simple interface for connecting to the robot's
-ROSBridge server and accessing ROS topics, services, and actions.
+This transport communicates with ROS2 via the rosbridge_suite WebSocket server.
+It does not require ROS2 to be installed on the client machine.
 """
+
+from __future__ import annotations
 
 import threading
 import time
@@ -11,21 +13,39 @@ from typing import Any, Callable, Dict, Optional
 
 import roslibpy
 
+from walkie_sdk.core.interfaces import ROSTransportInterface
 
-class BridgeClient:
+
+class ROSBridgeTransport(ROSTransportInterface[roslibpy.Topic]):
     """
-    Manages WebSocket connection to ROSBridge server.
+    ROS transport implementation using WebSocket via roslibpy.
 
-    Provides synchronous interface with internal threading for async operations.
-    Auto-connects on initialization with status feedback.
+    Connects to a rosbridge_server running on the robot and provides
+    topic subscription/publishing, action calls, and service calls
+    over WebSocket.
 
     Args:
         host: Robot IP address or hostname
         port: ROSBridge WebSocket port (default: 9090)
         timeout: Connection timeout in seconds (default: 10.0)
 
-    Raises:
-        ConnectionError: If connection fails or times out
+    Example:
+        transport = ROSBridgeTransport(host="192.168.1.100", port=9090)
+        transport.connect()
+
+        # Subscribe to odometry
+        def on_odom(msg):
+            print(f"Position: {msg['pose']['pose']['position']}")
+
+        handle = transport.subscribe("/odom", "nav_msgs/msg/Odometry", on_odom)
+
+        # Publish velocity
+        transport.publish("/cmd_vel", "geometry_msgs/msg/Twist", {
+            "linear": {"x": 0.5, "y": 0.0, "z": 0.0},
+            "angular": {"x": 0.0, "y": 0.0, "z": 0.1},
+        })
+
+        transport.disconnect()
     """
 
     def __init__(self, host: str, port: int = 9090, timeout: float = 10.0):
@@ -34,6 +54,10 @@ class BridgeClient:
         self._timeout = timeout
         self._ros: Optional[roslibpy.Ros] = None
         self._lock = threading.Lock()
+
+        # Track current action for cancellation
+        self._current_goal: Optional[Any] = None
+        self._current_action_client: Optional[Any] = None
 
     @property
     def host(self) -> str:
@@ -48,25 +72,15 @@ class BridgeClient:
     @property
     def is_connected(self) -> bool:
         """Check if connected to ROSBridge."""
-        return self._ros is not None and self._ros.is_connected
-
-    @property
-    def ros(self) -> roslibpy.Ros:
-        """
-        Get the underlying roslibpy.Ros client.
-
-        Raises:
-            ConnectionError: If not connected
-        """
-        if self._ros is None or not self._ros.is_connected:
-            raise ConnectionError("Not connected to ROSBridge")
-        return self._ros
+        if self._ros is None:
+            return False
+        return bool(self._ros.is_connected)
 
     def connect(self) -> None:
         """
         Connect to the ROSBridge server.
 
-        Blocks until connected or timeout. Prints status feedback.
+        Blocks until connected or timeout.
 
         Raises:
             ConnectionError: If connection fails or times out
@@ -89,7 +103,7 @@ class BridgeClient:
                     )
                 time.sleep(0.1)
 
-            print(f"  ✓ ROSBridge connected")
+            print("  ✓ ROSBridge connected")
 
         except Exception as e:
             self._ros = None
@@ -107,7 +121,13 @@ class BridgeClient:
             except Exception:
                 pass
             self._ros = None
-            print(f"  ✓ ROSBridge disconnected")
+            print("  ✓ ROSBridge disconnected")
+
+    def _ensure_connected(self) -> roslibpy.Ros:
+        """Get the ROS client, raising if not connected."""
+        if self._ros is None or not self._ros.is_connected:
+            raise ConnectionError("Not connected to ROSBridge")
+        return self._ros
 
     def subscribe(
         self,
@@ -122,19 +142,21 @@ class BridgeClient:
 
         Args:
             topic: Topic name (e.g., "/odom")
-            message_type: ROS message type (e.g., "nav_msgs/Odometry")
+            message_type: ROS message type (e.g., "nav_msgs/msg/Odometry")
             callback: Function to call with each message
             throttle_rate: Minimum interval between messages in ms (0 = no throttle)
             queue_size: Message queue size
 
         Returns:
-            roslibpy.Topic instance for the subscription
+            roslibpy.Topic instance (subscription handle)
 
         Raises:
             ConnectionError: If not connected
         """
+        ros = self._ensure_connected()
+
         topic_obj = roslibpy.Topic(
-            self.ros,
+            ros,
             topic,
             message_type,
             throttle_rate=throttle_rate,
@@ -143,19 +165,38 @@ class BridgeClient:
         topic_obj.subscribe(callback)
         return topic_obj
 
-    def publish(self, topic: str, message_type: str, message: Dict[str, Any]) -> None:
+    def unsubscribe(self, handle: roslibpy.Topic) -> None:
+        """
+        Unsubscribe from a topic.
+
+        Args:
+            handle: The topic handle returned by subscribe()
+        """
+        try:
+            handle.unsubscribe()
+        except Exception:
+            pass
+
+    def publish(
+        self,
+        topic: str,
+        message_type: str,
+        message: Dict[str, Any],
+    ) -> None:
         """
         Publish a message to a ROS topic.
 
         Args:
             topic: Topic name (e.g., "/cmd_vel")
-            message_type: ROS message type (e.g., "geometry_msgs/Twist")
+            message_type: ROS message type (e.g., "geometry_msgs/msg/Twist")
             message: Message data as dictionary
 
         Raises:
             ConnectionError: If not connected
         """
-        topic_obj = roslibpy.Topic(self.ros, topic, message_type)
+        ros = self._ensure_connected()
+
+        topic_obj = roslibpy.Topic(ros, topic, message_type)
         topic_obj.publish(roslibpy.Message(message))
 
     def call_action(
@@ -163,7 +204,6 @@ class BridgeClient:
         action_name: str,
         action_type: str,
         goal: Dict[str, Any],
-        callback: Optional[Callable[[Dict[str, Any]], None]] = None,
         feedback_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
         timeout: Optional[float] = None,
     ) -> Dict[str, Any]:
@@ -172,27 +212,26 @@ class BridgeClient:
 
         Args:
             action_name: Action server name (e.g., "/navigate_to_pose")
-            action_type: Action type (e.g., "nav2_msgs/NavigateToPose")
+            action_type: Action type (e.g., "nav2_msgs/action/NavigateToPose")
             goal: Goal message as dictionary
-            callback: Optional callback for result
             feedback_callback: Optional callback for feedback
             timeout: Optional timeout in seconds (None = wait forever)
 
         Returns:
-            Action result as dictionary
+            Dict with 'result' and 'status' keys
 
         Raises:
             ConnectionError: If not connected
             TimeoutError: If action times out
         """
+        ros = self._ensure_connected()
+
         result_event = threading.Event()
         result_data: Dict[str, Any] = {"result": None, "status": None}
 
         def on_result(result: Dict[str, Any]) -> None:
             result_data["result"] = result
             result_data["status"] = "SUCCEEDED"
-            if callback:
-                callback(result)
             result_event.set()
 
         def on_feedback(feedback: Dict[str, Any]) -> None:
@@ -201,35 +240,54 @@ class BridgeClient:
 
         def on_error(error: Exception) -> None:
             result_data["status"] = "FAILED"
+            result_data["error"] = str(error)
             result_event.set()
 
-        action_client = roslibpy.ActionClient(self.ros, action_name, action_type)
-
+        action_client = roslibpy.ActionClient(ros, action_name, action_type)
         goal_message = roslibpy.Message(goal)
 
+        # Send goal and get handle
         goal_handle = action_client.send_goal(
             goal_message, on_result, feedback=on_feedback, errback=on_error
         )
 
         # Store for cancellation
-        self._current_goal = goal_handle
-        self._current_action_client = action_client
+        with self._lock:
+            self._current_goal = goal_handle
+            self._current_action_client = action_client
 
         # Wait for result
         if result_event.wait(timeout=timeout):
+            with self._lock:
+                self._current_goal = None
+                self._current_action_client = None
             return result_data
         else:
-            self._current_action_client.cancel_goal(self._current_goal)
+            # Timeout - cancel the goal
+            try:
+                action_client.cancel_goal(goal_handle)
+            except Exception:
+                pass
+
+            with self._lock:
+                self._current_goal = None
+                self._current_action_client = None
+
             raise TimeoutError(f"Action {action_name} timed out after {timeout}s")
 
     def cancel_action(self) -> None:
         """Cancel the current action goal if any."""
-        if hasattr(self, "_current_goal") and self._current_goal is not None:
-            try:
-                self._current_action_client.cancel_goal(self._current_goal)
-            except Exception:
-                pass
-            self._current_goal = None
+        with self._lock:
+            if (
+                self._current_goal is not None
+                and self._current_action_client is not None
+            ):
+                try:
+                    self._current_action_client.cancel_goal(self._current_goal)
+                except Exception:
+                    pass
+                self._current_goal = None
+                self._current_action_client = None
 
     def call_service(
         self,
@@ -254,7 +312,9 @@ class BridgeClient:
             ConnectionError: If not connected
             TimeoutError: If service call times out
         """
-        service = roslibpy.Service(self.ros, service_name, service_type)
+        ros = self._ensure_connected()
+
+        service = roslibpy.Service(ros, service_name, service_type)
         request_msg = roslibpy.ServiceRequest(request)
 
         result_event = threading.Event()
@@ -271,7 +331,7 @@ class BridgeClient:
         else:
             raise TimeoutError(f"Service {service_name} timed out after {timeout}s")
 
-    def __enter__(self) -> "BridgeClient":
+    def __enter__(self) -> "ROSBridgeTransport":
         """Context manager entry."""
         self.connect()
         return self
@@ -279,3 +339,7 @@ class BridgeClient:
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit."""
         self.disconnect()
+
+    def __repr__(self) -> str:
+        status = "connected" if self.is_connected else "disconnected"
+        return f"ROSBridgeTransport(host='{self._host}', port={self._port}, status={status})"
