@@ -18,7 +18,6 @@ NAMESPACE = ""  # Optional: "robot1" for namespaced topics
 
 # Protocol selection:
 # - "rosbridge": WebSocket via roslibpy (default, no ROS2 required on client)
-# - "rclpy": Native ROS2 Python (best performance, requires ROS2 installed)
 # - "zenoh": Zenoh DDS bridge (not yet implemented)
 # - "auto": Auto-detect best available protocol
 ROS_PROTOCOL = "rosbridge"

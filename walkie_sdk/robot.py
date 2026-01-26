@@ -1,12 +1,11 @@
 """
-WalkieRobot - Main entry point for the Walkie SDK.
+WalkieRobot - Main entry point for Walkie SDK.
 
 Provides a unified interface to control the robot through
 .nav, .status, and .camera submodules.
 
 Supports multiple communication protocols via the transport abstraction layer:
 - rosbridge: WebSocket via roslibpy (default, no ROS2 required on client)
-- rclpy: Native ROS2 Python (best performance, requires ROS2 installed)
 - zenoh: Zenoh DDS bridge (good performance, no ROS2 required)
 """
 
@@ -21,7 +20,9 @@ from walkie_sdk.core.interfaces import (
     CameraTransportInterface,
     ROSTransportInterface,
 )
+from walkie_sdk.modules.arm import Arm
 from walkie_sdk.modules.camera import Camera
+from walkie_sdk.modules.multi_camera import MultiCamera
 from walkie_sdk.modules.navigation import Navigation
 from walkie_sdk.modules.telemetry import Telemetry
 
@@ -39,17 +40,15 @@ class WalkieRobot:
         ip: Robot IP address or hostname
         ros_protocol: ROS communication protocol to use:
             - "rosbridge": WebSocket via roslibpy (default, no ROS2 required)
-            - "rclpy": Native ROS2 Python (best performance, requires ROS2)
             - "zenoh": Zenoh DDS bridge (no ROS2 required)
             - "auto": Auto-detect best available protocol
         ros_port: Port for ROS transport (default: 9090 for rosbridge)
         camera_protocol: Camera stream protocol to use:
             - "webrtc": WebRTC stream (default, pairs with rosbridge)
-            - "ros_image": ROS sensor_msgs/Image topic (pairs with rclpy)
             - "zenoh": Zenoh video stream (pairs with zenoh)
+            - "shm": Shared memory (same-host only)
             - "none": Disable camera functionality
         camera_port: Port for camera stream (default: 8554 for WebRTC)
-        camera_topic: Camera topic name for ROS Image protocol
         timeout: Connection timeout in seconds (default: 10.0)
         namespace: ROS namespace for topics/actions (default: "" = no namespace)
 
@@ -62,13 +61,6 @@ class WalkieRobot:
         >>>
         >>> # Default: WebSocket + WebRTC (no ROS2 needed on client)
         >>> bot = WalkieRobot(ip="192.168.1.100")
-        >>>
-        >>> # Native ROS2 (requires ROS2 installed)
-        >>> bot = WalkieRobot(
-        ...     ip="localhost",
-        ...     ros_protocol="rclpy",
-        ...     camera_protocol="ros_image"
-        ... )
         >>>
         >>> bot.status.get_pose()
         {'x': 0.0, 'y': 0.0, 'heading': 0.0}
@@ -90,7 +82,6 @@ class WalkieRobot:
         ros_port: int = 9090,
         camera_protocol: str = "webrtc",
         camera_port: int = 8554,
-        camera_topic: str = "/camera/image_raw",
         timeout: float = 10.0,
         namespace: str = "",
         # Legacy parameters for backward compatibility
@@ -145,15 +136,20 @@ class WalkieRobot:
                 host=ip,
                 port=camera_port,
                 ros_transport=self._transport,
-                topic=camera_topic,
             )
         )
 
         # Initialize modules with transport interface (not specific implementation)
         self._nav = Navigation(self._transport, namespace=namespace)
         self._status = Telemetry(self._transport, namespace=namespace)
+        self._arm = Arm(self._transport, namespace=namespace)
         self._camera: Optional[Camera] = (
             Camera(self._camera_transport) if self._camera_transport else None
+        )
+
+        # Multi-camera interface (wraps camera transport for multi-cam access)
+        self._multi_camera: Optional[MultiCamera] = (
+            MultiCamera(self._camera_transport) if self._camera_transport else None
         )
 
         # Auto-connect
@@ -172,6 +168,9 @@ class WalkieRobot:
 
         # Start telemetry subscription
         self._status.start()
+
+        # Setup arm subscription (must be done after transport is connected)
+        self._arm._setup_state_subscription()
 
         # Connect camera if enabled
         if self._camera_transport is not None:
@@ -209,6 +208,19 @@ class WalkieRobot:
         return self._status
 
     @property
+    def arm(self) -> Arm:
+        """
+        Arm controller.
+
+        Provides:
+        - set_joint_positions(left_arm, right_arm, ...): Set joint positions
+        - set_joint_velocities(left_arm, right_arm, ...): Set joint velocities
+        - set_joint_torques(left_arm, right_arm, ...): Set joint torques
+        - get_joint_states(): Get current joint states
+        """
+        return self._arm
+
+    @property
     def camera(self) -> Optional[Camera]:
         """
         Camera interface (if enabled).
@@ -220,6 +232,26 @@ class WalkieRobot:
         Returns None if camera was disabled or failed to connect.
         """
         return self._camera
+
+    @property
+    def cameras(self) -> Optional[MultiCamera]:
+        """
+        Multi-camera interface (if enabled).
+
+        Provides access to multiple cameras on the robot:
+        - get_head_frame(): Get head/front camera frame
+        - get_left_frame(): Get left wrist camera frame
+        - get_right_frame(): Get right wrist camera frame
+        - get_all_frames(): Get all camera frames as dict
+        - get_frame(camera_name): Get frame from specific camera
+
+        Returns None if camera was disabled or failed to connect.
+
+        Example:
+            >>> frames = bot.cameras.get_all_frames()
+            >>> head = bot.cameras.get_head_frame()
+        """
+        return self._multi_camera
 
     @property
     def ip(self) -> str:
@@ -242,6 +274,7 @@ class WalkieRobot:
         self._namespace = value
         self._nav.namespace = value
         self._status.namespace = value
+        self._arm.namespace = value
 
     @property
     def is_connected(self) -> bool:

@@ -2,10 +2,10 @@
 Telemetry - Robot status and sensor data module.
 
 Provides get_pose() and get_velocity() functions by subscribing
-to the robot's odometry topic.
+to robot's odometry topic.
 
-This module uses the ROSTransportInterface abstraction, allowing it
-to work with any transport implementation (rosbridge, rclpy, zenoh).
+This module uses ROSTransportInterface abstraction, allowing it
+to work with any transport implementation (rosbridge, zenoh).
 """
 
 import threading
@@ -29,7 +29,7 @@ class Telemetry:
     Data is cached and updated in background via ROS subscription.
 
     This class works with any transport that implements ROSTransportInterface,
-    making it protocol-agnostic (works with rosbridge, rclpy, zenoh, etc.).
+    making it protocol-agnostic (works with rosbridge, zenoh, etc.).
 
     Args:
         transport: Transport instance implementing ROSTransportInterface

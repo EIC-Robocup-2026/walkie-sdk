@@ -1,13 +1,13 @@
 """
 Walkie SDK - Core Module
 
-This module provides the core infrastructure for the SDK:
+This module provides core infrastructure for SDK:
 - Abstract interfaces defining transport contracts
 - Transport factory for creating protocol-specific implementations
 - Backward compatibility aliases
 
 The core module abstracts away the underlying communication protocol,
-allowing the SDK to work with different backends (rosbridge, rclpy, zenoh).
+allowing SDK to work with different backends (rosbridge, zenoh).
 """
 
 from walkie_sdk.core.factory import (

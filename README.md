@@ -1,6 +1,6 @@
 # Walkie SDK
 
-A pure Python SDK for controlling Walkie robots with **pluggable protocol support**. Choose between WebSocket (ROSBridge), native ROS2 (rclpy), or Zenoh based on your needs.
+A pure Python SDK for controlling Walkie robots with **pluggable protocol support**. Choose between WebSocket (ROSBridge) or Zenoh based on your needs.
 
 **No ROS 2 installation required on the client machine** (when using rosbridge or zenoh protocols).
 
@@ -9,30 +9,30 @@ A pure Python SDK for controlling Walkie robots with **pluggable protocol suppor
 Walkie SDK uses a **Protocol-Agnostic Architecture** that separates high-level robot control from the underlying communication protocol:
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                              YOUR LAPTOP                                │
-│  ┌───────────────────────────────────────────────────────────────────┐  │
-│  │                          walkie_sdk                               │  │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐    │  │
-│  │  │   bot.nav   │  │ bot.status  │  │      bot.camera         │    │  │
-│  │  │  • go_to()  │  │ • get_pose()│  │      • get_frame()      │    │  │
-│  │  │  • cancel() │  │ • get_vel() │  │                         │    │  │
-│  │  │  • stop()   │  │             │  │                         │    │  │
-│  │  └──────┬──────┘  └──────┬──────┘  └────────────┬────────────┘    │  │
-│  │         │                │                      │                 │  │
-│  │         └───────┬────────┴──────────────────────┘                 │  │
-│  │                 │                                                 │  │
-│  │    ┌────────────▼─────────────────────────────────────────────┐   │  │
-│  │    │              TransportFactory                            │   │  │
-│  │    │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐         │   │  │
-│  │    │  │  rosbridge  │ │   rclpy     │ │   zenoh     │         │   │  │
-│  │    │  │ (WebSocket) │ │ (Native)    │ │  (DDS)      │         │   │  │
-│  │    │  └──────┬──────┘ └──────┬──────┘ └──────┬──────┘         │   │  │
-│  │    └─────────┼───────────────┼───────────────┼────────────────┘   │  │
-│  └──────────────┼───────────────┼───────────────┼────────────────────┘  │
-└─────────────────┼───────────────┼───────────────┼───────────────────────┘
-                  │               │               │
-                  ▼               ▼               ▼
+ ┌─────────────────────────────────────────────────────────────────────────┐
+ │                              YOUR LAPTOP                                │
+ │  ┌───────────────────────────────────────────────────────────────────┐  │
+ │  │                          walkie_sdk                               │  │
+ │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐    │  │
+ │  │  │   bot.nav   │  │ bot.status  │  │      bot.camera         │    │  │
+ │  │  │  • go_to()  │  │ • get_pose()│  │      • get_frame()      │    │  │
+ │  │  │  • cancel() │  │ • get_vel() │  │                         │    │  │
+ │  │  │  • stop()   │  │             │  │                         │    │  │
+ │  │  └──────┬──────┘  └──────┬──────┘  └────────────┬────────────┘    │  │
+ │  │         │                │                      │                 │  │
+ │  │         └───────┬────────┴──────────────────────┘                 │  │
+ │  │                 │                                                 │  │
+ │  │    ┌────────────▼─────────────────────────────────────────────┐   │  │
+ │  │    │              TransportFactory                            │   │  │
+ │  │    │  ┌─────────────┐ ┌─────────────┐                       │   │  │
+ │  │    │  │  rosbridge  │ │   zenoh     │                       │   │  │
+ │  │    │  │ (WebSocket) │ │  (DDS)      │                       │   │  │
+ │  │    │  └──────┬──────┘ └──────┬──────┘                       │   │  │
+ │  │    └─────────┼───────────────┼───────────────────────────────┘   │  │
+ │  └──────────────┼───────────────┼───────────────────────────────────┘  │
+ └─────────────────┼───────────────┼───────────────────────────────────────┘
+                   │               │
+                   ▼               ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                              THE ROBOT                                  │
 │  ┌───────────────────────────────────────────────────────────────────┐  │
@@ -50,14 +50,13 @@ Walkie SDK uses a **Protocol-Agnostic Architecture** that separates high-level r
 | Protocol | ROS2 Required | Performance | Status |
 |----------|---------------|-------------|--------|
 | `rosbridge` | ❌ No | Medium | ✅ Implemented |
-| `rclpy` | ✅ Yes | Best | 🚧 Planned |
 | `zenoh` | ❌ No | Good | 🚧 Planned |
 
 | Camera Protocol | Pairs With | Status |
 |-----------------|------------|--------|
 | `webrtc` | rosbridge | ✅ Implemented |
-| `ros_image` | rclpy | 🚧 Planned |
 | `zenoh` | zenoh | 🚧 Planned |
+| `shm` | same-host | ✅ Implemented |
 | `none` | any | ✅ Implemented |
 
 ## 📦 Installation
@@ -156,12 +155,18 @@ bot = WalkieRobot(
     camera_protocol="none",      # Disable camera
 )
 
-# Native ROS2 (requires ROS2 installed) - Coming Soon
+# Zenoh DDS Bridge - Coming Soon
 bot = WalkieRobot(
-    ip="localhost",
-    ros_protocol="rclpy",        # Native ROS2 Python
-    camera_protocol="ros_image", # ROS Image topic
-    camera_topic="/camera/image_raw",
+    ip="192.168.1.100",
+    ros_protocol="zenoh",        # Zenoh DDS bridge
+    ros_port=7447,
+    camera_protocol="zenoh",
+)
+
+# Auto-detect best available protocol
+bot = WalkieRobot(
+    ip="192.168.1.100",
+    camera_protocol="none",      # Disable camera
 )
 
 # Zenoh DDS Bridge - Coming Soon
@@ -175,7 +180,7 @@ bot = WalkieRobot(
 # Auto-detect best available protocol
 bot = WalkieRobot(
     ip="192.168.1.100",
-    ros_protocol="auto",         # Tries: rclpy → zenoh → rosbridge
+    ros_protocol="auto",         # Tries: zenoh → rosbridge
 )
 ```
 
@@ -201,11 +206,10 @@ Main SDK class for controlling a Walkie robot.
 ```python
 WalkieRobot(
     ip: str,                         # Robot IP address or hostname
-    ros_protocol: str = "rosbridge", # "rosbridge", "rclpy", "zenoh", or "auto"
+    ros_protocol: str = "rosbridge", # "rosbridge", "zenoh", or "auto"
     ros_port: int = 9090,            # Port for ROS transport
-    camera_protocol: str = "webrtc", # "webrtc", "ros_image", "zenoh", or "none"
+    camera_protocol: str = "webrtc", # "webrtc", "zenoh", "shm", or "none"
     camera_port: int = 8554,         # Port for camera stream
-    camera_topic: str = "/camera/image_raw",  # For ros_image protocol
     timeout: float = 10.0,           # Connection timeout in seconds
     namespace: str = ""              # ROS namespace for topics/actions
 )
@@ -420,7 +424,6 @@ walkie_sdk/
 │       ├── rosbridge/          # WebSocket (roslibpy)
 │       │   ├── transport.py    # ROSBridgeTransport
 │       │   └── camera.py       # WebRTCCamera
-│       ├── rclpy/              # Native ROS2 (stub)
 │       └── zenoh/              # Zenoh DDS (stub)
 └── modules/
     ├── navigation.py           # Navigation (uses interface)
@@ -472,12 +475,12 @@ bot.status.get_pose()  # Returns None
 ### Protocol Not Implemented
 
 ```
-NotImplementedError: RclpyTransport is not yet implemented...
+ValueError: Unknown ROS protocol: ...
 ```
 
 **Solutions:**
-1. Use `ros_protocol="rosbridge"` (default) for now
-2. Contribute an implementation! See [Contributing](#-contributing)
+1. Use `ros_protocol="rosbridge"` (default) or `ros_protocol="zenoh"`
+2. Check available protocols: "rosbridge", "zenoh", "auto"
 
 ## 📄 License
 
@@ -486,7 +489,6 @@ MIT License - see [LICENSE](LICENSE) for details.
 ## 🤝 Contributing
 
 Contributions welcome! Especially for:
-- `rclpy` transport implementation
 - `zenoh` transport implementation
 - Additional camera protocols
 

@@ -6,14 +6,13 @@ Demonstrates how to use different communication protocols with the SDK.
 
 Available ROS Protocols:
 - "rosbridge": WebSocket via roslibpy (default, no ROS2 required on client)
-- "rclpy": Native ROS2 Python (best performance, requires ROS2 installed)
 - "zenoh": Zenoh DDS bridge (no ROS2 required on client)
 - "auto": Auto-detect best available protocol
 
 Available Camera Protocols:
 - "webrtc": WebRTC stream (default, pairs with rosbridge)
-- "ros_image": ROS sensor_msgs/Image topic (pairs with rclpy)
 - "zenoh": Zenoh video stream (pairs with zenoh)
+- "shm": Shared memory (same-host)
 - "none": Disable camera functionality
 
 Usage:
@@ -105,46 +104,9 @@ def example_rosbridge_no_camera():
         return False
 
 
-def example_rclpy():
-    """
-    Example 3: Native ROS2 Python (rclpy) - Best Performance
-
-    This protocol requires ROS2 to be installed on the client machine.
-    It provides the best performance with lowest latency.
-    """
-    from walkie_sdk import WalkieRobot
-
-    print("\n" + "=" * 60)
-    print("Example 3: Native ROS2 Python (rclpy) Protocol")
-    print("=" * 60)
-    print("This protocol uses native rclpy for best performance.")
-    print("Requires ROS2 to be installed on the client machine.")
-
-    try:
-        bot = WalkieRobot(
-            ip="localhost",  # rclpy typically runs locally
-            ros_protocol="rclpy",  # Native ROS2 Python
-            camera_protocol="ros_image",  # Subscribe to ROS Image topic
-            camera_topic="/camera/image_raw",  # Image topic name
-            timeout=10.0,
-        )
-
-        print(f"✓ Connected using {bot.ros_protocol} protocol")
-        bot.disconnect()
-        return True
-
-    except NotImplementedError as e:
-        print(f"✗ Protocol not yet implemented: {e}")
-        print("  (This is expected - rclpy transport is a stub)")
-        return False
-    except ConnectionError as e:
-        print(f"✗ Connection failed: {e}")
-        return False
-
-
 def example_zenoh():
     """
-    Example 4: Zenoh DDS Bridge
+    Example 3: Zenoh DDS Bridge
 
     This protocol uses Zenoh for communication, providing good performance
     without requiring ROS2 on the client.
@@ -152,7 +114,7 @@ def example_zenoh():
     from walkie_sdk import WalkieRobot
 
     print("\n" + "=" * 60)
-    print("Example 4: Zenoh DDS Bridge Protocol")
+    print("Example 3: Zenoh DDS Bridge Protocol")
     print("=" * 60)
     print("This protocol uses Zenoh for low-latency communication.")
     print("No ROS2 installation required on the client machine.")
@@ -181,15 +143,15 @@ def example_zenoh():
 
 def example_auto_detect():
     """
-    Example 5: Auto-detect Protocol
+    Example 4: Auto-detect Protocol
 
     Automatically detects and uses the best available protocol.
-    Tries: rclpy (best) -> zenoh -> rosbridge (fallback)
+    Tries: zenoh -> rosbridge
     """
     from walkie_sdk import WalkieRobot
 
     print("\n" + "=" * 60)
-    print("Example 5: Auto-detect Protocol")
+    print("Example 4: Auto-detect Protocol")
     print("=" * 60)
     print("Automatically selecting the best available protocol...")
 
@@ -211,14 +173,14 @@ def example_auto_detect():
 
 def example_backward_compatible():
     """
-    Example 6: Backward Compatible API
+    Example 5: Backward Compatible API
 
     Shows that the old API parameters still work for backward compatibility.
     """
     from walkie_sdk import WalkieRobot
 
     print("\n" + "=" * 60)
-    print("Example 6: Backward Compatible API")
+    print("Example 5: Backward Compatible API")
     print("=" * 60)
     print("Using legacy parameter names (ws_port, enable_camera)...")
 
@@ -258,7 +220,7 @@ def show_available_protocols():
 
     print("\nCamera Protocols (camera_protocol parameter):")
     for protocol in CameraProtocol:
-        if protocol.value in ("webrtc", "none"):
+        if protocol.value in ("webrtc", "none", "shm"):
             status = "✓ implemented"
         else:
             status = "○ stub"
@@ -286,7 +248,6 @@ def main():
     example_rosbridge_no_camera()  # Will fail without robot
 
     # These will show NotImplementedError (expected)
-    example_rclpy()
     example_zenoh()
 
     print("\n" + "=" * 60)

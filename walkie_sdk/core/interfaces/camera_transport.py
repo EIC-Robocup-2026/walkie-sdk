@@ -2,7 +2,7 @@
 CameraTransportInterface - Abstract interface for camera/video streams.
 
 Defines the contract that any camera transport implementation must fulfill,
-allowing the SDK to work with different camera protocols (WebRTC, ROS Image, Zenoh, etc.)
+allowing the SDK to work with different camera protocols (WebRTC, Zenoh, etc.)
 """
 
 from abc import ABC, abstractmethod
@@ -17,8 +17,8 @@ class CameraTransportInterface(ABC):
 
     Implementations:
     - WebRTCCamera: WebRTC stream (for rosbridge setup)
-    - ROSImageCamera: Subscribe to sensor_msgs/Image topic (for rclpy)
     - ZenohCamera: Zenoh video stream
+    - SharedMemoryCamera: Direct memory access (same-host)
 
     All implementations must provide thread-safe frame access.
     """

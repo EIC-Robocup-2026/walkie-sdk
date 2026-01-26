@@ -4,7 +4,6 @@ ROSTransportInterface - Abstract base class for ROS communication transports.
 This interface defines the contract that any ROS transport implementation must fulfill.
 Implementations include:
 - ROSBridgeTransport: WebSocket via roslibpy (no ROS2 required on client)
-- RclpyTransport: Native ROS2 Python (requires ROS2 installed)
 - ZenohTransport: Zenoh DDS bridge
 """
 
@@ -22,7 +21,6 @@ class ROSTransportInterface(ABC, Generic[SubscriptionHandle]):
     This interface abstracts away the underlying protocol used to communicate
     with ROS2, allowing the SDK to work with different backends:
     - WebSocket (rosbridge/roslibpy)
-    - Native ROS2 (rclpy)
     - Zenoh DDS bridge
 
     All implementations must provide the same API for:

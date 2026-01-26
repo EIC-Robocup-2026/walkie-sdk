@@ -3,7 +3,7 @@ Walkie SDK - Core Interfaces
 
 Abstract base classes defining the contracts for transport implementations.
 These interfaces allow the SDK to work with different protocols
-(rosbridge, rclpy, zenoh) without changing the module code.
+(rosbridge, zenoh) without changing the module code.
 """
 
 from walkie_sdk.core.interfaces.camera_transport import CameraTransportInterface

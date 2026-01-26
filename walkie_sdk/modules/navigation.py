@@ -2,10 +2,10 @@
 Navigation - Robot navigation control module.
 
 Provides go_to(), cancel(), and stop() functions for controlling
-the robot's navigation via Nav2 action server.
+robot's navigation via Nav2 action server.
 
-This module uses the ROSTransportInterface abstraction, allowing it
-to work with any transport implementation (rosbridge, rclpy, zenoh).
+This module uses ROSTransportInterface abstraction, allowing it
+to work with any transport implementation (rosbridge, zenoh).
 """
 
 import threading
@@ -30,7 +30,7 @@ class Navigation:
     and perform emergency stops.
 
     This class works with any transport that implements ROSTransportInterface,
-    making it protocol-agnostic (works with rosbridge, rclpy, zenoh, etc.).
+    making it protocol-agnostic (works with rosbridge, zenoh, etc.).
 
     Args:
         transport: Transport instance implementing ROSTransportInterface

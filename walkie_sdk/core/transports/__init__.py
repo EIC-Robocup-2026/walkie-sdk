@@ -5,7 +5,6 @@ This package contains concrete implementations of the transport interfaces.
 Each subpackage provides a different protocol for communicating with ROS2:
 
 - rosbridge: WebSocket via roslibpy (no ROS2 required on client)
-- rclpy: Native ROS2 Python (requires ROS2 installed)
 - zenoh: Zenoh DDS bridge (no ROS2 required on client)
 
 Transports are loaded lazily by the TransportFactory to avoid
@@ -18,6 +17,5 @@ importing unnecessary dependencies.
 
 __all__ = [
     "rosbridge",
-    "rclpy",
     "zenoh",
 ]

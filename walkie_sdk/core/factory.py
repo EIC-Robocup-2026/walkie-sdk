@@ -21,13 +21,11 @@ class ROSProtocol(Enum):
 
     Each protocol has different requirements and trade-offs:
     - ROSBRIDGE: WebSocket via roslibpy. No ROS2 needed on client. Higher latency.
-    - RCLPY: Native ROS2 Python. Best performance. Requires ROS2 installed.
     - ZENOH: Zenoh DDS bridge. Good performance. No ROS2 needed on client.
     - AUTO: Auto-detect best available protocol.
     """
 
     ROSBRIDGE = "rosbridge"
-    RCLPY = "rclpy"
     ZENOH = "zenoh"
     AUTO = "auto"
 
@@ -37,14 +35,14 @@ class CameraProtocol(Enum):
     Available camera stream protocols.
 
     - WEBRTC: WebRTC stream. Pairs with rosbridge. Low latency video.
-    - ROS_IMAGE: ROS sensor_msgs/Image topic. Pairs with rclpy.
     - ZENOH: Zenoh video stream. Pairs with zenoh transport.
+    - SHM: Shared memory. Direct access for same-host scenarios.
     - NONE: Disable camera functionality.
     """
 
     WEBRTC = "webrtc"
-    ROS_IMAGE = "ros_image"
     ZENOH = "zenoh"
+    SHM = "shm"
     NONE = "none"
 
 
@@ -103,11 +101,6 @@ class TransportFactory:
 
             return ROSBridgeTransport(host=host, port=port, timeout=timeout)
 
-        elif protocol == ROSProtocol.RCLPY:
-            from walkie_sdk.core.transports.rclpy import RclpyTransport
-
-            return RclpyTransport(timeout=timeout, **kwargs)
-
         elif protocol == ROSProtocol.ZENOH:
             from walkie_sdk.core.transports.zenoh import ZenohTransport
 
@@ -154,17 +147,26 @@ class TransportFactory:
 
             return WebRTCCamera(host=host, port=port, **kwargs)
 
-        elif protocol == CameraProtocol.ROS_IMAGE:
-            if ros_transport is None:
-                raise ValueError("ROS_IMAGE camera requires a ros_transport instance")
-            from walkie_sdk.core.transports.rclpy import ROSImageCamera
-
-            return ROSImageCamera(ros_transport=ros_transport, topic=topic, **kwargs)
-
         elif protocol == CameraProtocol.ZENOH:
             from walkie_sdk.core.transports.zenoh import ZenohCamera
 
-            return ZenohCamera(host=host, port=port, **kwargs)
+            # Check for multi_camera flag in kwargs
+            multi_camera = kwargs.pop("multi_camera", False)
+            camera_name = kwargs.pop("camera_name", "head")
+            return ZenohCamera(
+                host=host,
+                port=port,
+                multi_camera=multi_camera,
+                camera_name=camera_name,
+                **kwargs,
+            )
+
+        elif protocol == CameraProtocol.SHM:
+            from walkie_sdk.core.transports.shm import MultiSharedMemoryCamera
+
+            # Use multi-camera SHM transport
+            camera_names = kwargs.pop("camera_names", ["head", "left", "right"])
+            return MultiSharedMemoryCamera(camera_names=camera_names, **kwargs)
 
         else:
             raise ValueError(f"Unknown camera protocol: {protocol}")
@@ -180,9 +182,8 @@ class TransportFactory:
         Auto-detect the best available ROS transport.
 
         Tries protocols in order of preference:
-        1. rclpy (best performance, if ROS2 is available)
-        2. zenoh (good performance, no ROS2 needed)
-        3. rosbridge (fallback, always available)
+        1. zenoh (good performance, no ROS2 needed)
+        2. rosbridge (fallback, always available)
 
         Args:
             host: Robot IP address
@@ -198,20 +199,7 @@ class TransportFactory:
         """
         errors = []
 
-        # Try rclpy first (best performance)
-        try:
-            from walkie_sdk.core.transports.rclpy import RclpyTransport
-
-            transport = RclpyTransport(timeout=timeout, **kwargs)
-            transport.connect()
-            print(f"  ✓ Auto-detected: rclpy (native ROS2)")
-            return transport
-        except ImportError:
-            errors.append("rclpy: not installed")
-        except Exception as e:
-            errors.append(f"rclpy: {e}")
-
-        # Try zenoh next
+        # Try zenoh first
         try:
             from walkie_sdk.core.transports.zenoh import ZenohTransport
 
@@ -256,7 +244,6 @@ class TransportFactory:
         """
         protocol_map = {
             ROSProtocol.ROSBRIDGE: CameraProtocol.WEBRTC,
-            ROSProtocol.RCLPY: CameraProtocol.ROS_IMAGE,
             ROSProtocol.ZENOH: CameraProtocol.ZENOH,
             ROSProtocol.AUTO: CameraProtocol.WEBRTC,  # Safe default
         }
