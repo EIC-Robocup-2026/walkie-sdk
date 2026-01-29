@@ -85,6 +85,8 @@ class ZenohTransport(ROSTransportInterface[Any]):
         try:
             # Configure Zenoh session using string-based keys (zenoh>=1.0 API)
             conf = zenoh.Config()
+            # Enable shared memory transport
+            conf.insert_json5("transport/shared_memory/enabled", "true")
             if self._host != "localhost" and self._host != "127.0.0.1":
                 conf.insert_json5("mode", json.dumps("client"))
                 conf.insert_json5(
@@ -302,7 +304,6 @@ class ZenohCamera(CameraTransportInterface):
         port: Zenoh port for video stream
         topic: Zenoh topic for camera frames (single camera mode)
         camera_name: Camera name for multi-camera mode ("head", "left", "right")
-        multi_camera: Enable multi-camera mode (subscribe to all cameras)
     """
 
     CAMERA_TOPICS = {
@@ -329,7 +330,6 @@ class ZenohCamera(CameraTransportInterface):
         self._port = port
         self._topic = topic
         self._camera_name = camera_name
-        self._multi_camera = multi_camera
         self._session: Optional[Any] = None
         self._subscribers: Dict[str, Any] = {}
         self._latest_frames: Dict[str, np.ndarray] = {}
@@ -356,6 +356,8 @@ class ZenohCamera(CameraTransportInterface):
         try:
             # Configure Zenoh session using string-based keys (zenoh>=1.0 API)
             conf = zenoh.Config()
+            # Enable shared memory transport
+            conf.insert_json5("transport/shared_memory/enabled", "true")
             if self._host != "localhost" and self._host != "127.0.0.1":
                 conf.insert_json5("mode", json.dumps("client"))
                 conf.insert_json5(
@@ -374,10 +376,28 @@ class ZenohCamera(CameraTransportInterface):
 
                         payload = sample.payload
                         if payload:
-                            # Decode image (assuming JPEG encoding)
                             img_bytes = bytes(payload)
-                            nparr = np.frombuffer(img_bytes, np.uint8)
-                            frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+                            # Check for JPEG (0xFF 0xD8)
+                            if img_bytes.startswith(b"\xff\xd8"):
+                                nparr = np.frombuffer(img_bytes, np.uint8)
+                                frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                            else:
+                                # Try to decode as raw with 12-byte header (h, w, c)
+                                if len(img_bytes) > 12:
+                                    header = np.frombuffer(
+                                        img_bytes[:12], dtype=np.uint32
+                                    )
+                                    h, w, c = header
+                                    if h * w * c == len(img_bytes) - 12:
+                                        frame = np.frombuffer(
+                                            img_bytes[12:], dtype=np.uint8
+                                        ).reshape(h, w, c)
+                                    else:
+                                        frame = None
+                                else:
+                                    frame = None
+
                             if frame is not None:
                                 with self._frame_lock:
                                     self._latest_frames[camera_name] = frame
@@ -389,25 +409,12 @@ class ZenohCamera(CameraTransportInterface):
                 return frame_callback
 
             # Subscribe to camera topics
-            if self._multi_camera:
-                # Multi-camera mode: subscribe to all cameras
-                for cam_name, topic in self.CAMERA_TOPICS.items():
-                    subscriber = self._session.declare_subscriber(
-                        topic, make_frame_callback(cam_name)
-                    )
-                    self._subscribers[cam_name] = subscriber
-                print(f"  ✓ Connected to Zenoh multi-camera stream")
-            else:
-                # Single camera mode
-                if self._camera_name in self.CAMERA_TOPICS:
-                    topic = self.CAMERA_TOPICS[self._camera_name]
-                else:
-                    topic = self._topic
+            for cam_name, topic in self.CAMERA_TOPICS.items():
                 subscriber = self._session.declare_subscriber(
-                    topic, make_frame_callback(self._camera_name)
+                    topic, make_frame_callback(cam_name)
                 )
-                self._subscribers[self._camera_name] = subscriber
-                print(f"  ✓ Connected to Zenoh camera stream: {topic}")
+                self._subscribers[cam_name] = subscriber
+            print(f"  ✓ Connected to Zenoh multi-camera stream")
 
             self._streaming = True
         except Exception as e:
