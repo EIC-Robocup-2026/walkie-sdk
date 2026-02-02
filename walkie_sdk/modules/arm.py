@@ -309,3 +309,101 @@ class Arm:
             except Exception as e:
                 print(f"[Arm] Error parsing joint states: {e}")
                 return None
+            
+
+    def go_to_pose(
+        self, 
+        position: list, 
+        orientation: list, 
+        frame_id: str = "base_link",
+    ) -> None:
+        """
+        Move the arm to a specific Cartesian pose using an action.
+        
+        Args:
+            position: [x, y, z] coordinates.
+            orientation: [x, y, z, w] quaternion.
+            frame_id: The reference frame for the pose.
+            callback: Optional callback for action completion.
+        """
+        goal_msg = {
+            "pose": {
+                "header": {"frame_id": self._ns.get_full_name(frame_id)},
+                "pose": {
+                    "position": {"x": position[0], "y": position[1], "z": position[2]},
+                    "orientation": {"x": orientation[0], "y": orientation[1], "z": orientation[2], "w": orientation[3]}
+                }
+            }
+        }
+        # Assuming the action name is 'go_to_pose' under the arm namespace
+        self._transport.call_action(
+            self._ns.get_full_name("go_to_pose"),
+            "my_robot_interfaces/action/GoToPose",
+            goal_msg,
+        )
+    def on_callback():
+        print("finish")
+    #added ros2 action arm manipulator
+    def go_to_home(self) -> None:
+        """Move the arm to its defined home position."""
+        self._transport.call_action(
+            "go_to_home",
+            "my_robot_interfaces/action/GoToHome",
+            {},  # Empty goal if defined as such in the .action file
+            feedback_callback=self.on_callback
+            
+        )
+
+    def control_gripper(self, open: bool) -> None:
+        """
+        Open or close the gripper.
+        
+        Args:
+            open: True to open, False to close.
+            callback: Optional callback for action completion.
+        """
+        goal_msg = {"open": open}
+        self._transport.call_action(
+            self._ns.get_full_name("control_gripper"),
+            "my_robot_interfaces/action/ControlGripper",
+            goal_msg,
+        )
+
+    def go_to_pose_relative(
+        self,
+        x: float = 0.0,
+        y: float = 0.0,
+        z: float = 0.0,
+        roll: float = 0.0,
+        pitch: float = 0.0,
+        yaw: float = 0.0,
+        group_name: str = "arm",
+        cartesian_path: bool = True,
+    ) -> None:
+        """
+        Move the arm relative to its current pose.
+
+        Args:
+            x, y, z: Translation relative to the current position.
+            roll, pitch, yaw: Rotation relative to the current orientation.
+            group_name: The MoveIt planning group (default: "arm").
+            cartesian_path: Whether to follow a linear Cartesian path.
+            callback: Optional callback for action completion.
+        """
+        goal_msg = {
+            "group_name": group_name,
+            "x": float(x),
+            "y": float(y),
+            "z": float(z),
+            "roll": float(roll),
+            "pitch": float(pitch),
+            "yaw": float(yaw),
+            "cartesian_path": cartesian_path
+        }
+
+        # Sends the action to the relative pose endpoint
+        self._transport.call_action(
+            self._ns.get_full_name("go_to_pose_relative"),
+            "my_robot_interfaces/action/GoToPoseRelative",
+            goal_msg,
+        )
