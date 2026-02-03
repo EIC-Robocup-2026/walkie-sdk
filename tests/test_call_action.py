@@ -10,11 +10,29 @@ def main():
         ros_port=9090
     )
 
+    # Wait up to 5 seconds for the connection to be established
+
 
     try:
         print("Sending 'Go To Home' command to left arm...")
         # Assuming the namespace in walkie-sdk/robot.py is configured for 'left_arm'
-        robot.arm.go_to_home()
+        robot.arm.go_to_home(group_name="left_arm")
+
+        time.sleep(5)
+
+        #robot.arm.control_gripper(group_name="left_gripper",open=True)
+
+        #target_positions = [0.1, -0.2, 0.0, 0.5, 0.0, -0.1, 0.0]
+    
+        #print(f"Sending joint positions to left_arm: {target_positions}")
+        #robot.arm.set_joint_positions(target_positions)
+
+        #time.sleep(5)
+
+        #current_states = robot.arm.get_joint_states()
+        #print("all joints state: ",current_states)
+
+
 
         print("Waiting for action to complete (Press Ctrl+C to stop)...")
         # Keep the script alive while the action executes in the background
