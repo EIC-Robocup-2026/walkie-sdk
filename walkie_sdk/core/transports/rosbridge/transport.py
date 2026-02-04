@@ -261,6 +261,7 @@ class ROSBridgeTransport(ROSTransportInterface[roslibpy.Topic]):
             with self._lock:
                 self._current_goal = None
                 self._current_action_client = None
+                #action_client.destroy()
             return result_data
         else:
             # Timeout - cancel the goal
@@ -274,7 +275,7 @@ class ROSBridgeTransport(ROSTransportInterface[roslibpy.Topic]):
                 self._current_action_client = None
 
             raise TimeoutError(f"Action {action_name} timed out after {timeout}s")
-
+        
     def cancel_action(self) -> None:
         """Cancel the current action goal if any."""
         with self._lock:

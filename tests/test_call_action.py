@@ -18,8 +18,40 @@ def main():
         # Assuming the namespace in walkie-sdk/robot.py is configured for 'left_arm'
         robot.arm.go_to_home(group_name="left_arm")
 
-        time.sleep(5)
-
+        time.sleep(1)
+        #dayum
+        #print("Sending 'Go To Pose Relative' command to left arm...")
+        for i in range(20): 
+            robot.arm.go_to_pose_relative(group_name="left_arm", x=0.01, y=0.0, z=-0.01, roll=0.0, pitch=0.0, yaw=0.0,cartesian_path=False)
+            #time.sleep(0.1)
+        print("Completed relative movements.")
+        """
+        print("Sending 'Go To Pose' command to left arm...")
+        robot.arm.go_to_pose(
+            x=0.38, 
+            y=0.19, 
+            z=0.58, 
+            group_name="left_arm",
+            roll=-1.57, 
+            pitch=0.0, 
+            yaw=1.57, 
+            cartesian_path=False
+        )
+        """
+        """
+            ros2 action send_goal /go_to_pose my_robot_interfaces/action/GoToPose "
+            {
+            group_name: 'left_arm',
+            x: 0.38, 
+            y: 0.19, 
+            z: 0.58, 
+            roll: -1.57, 
+            pitch: 0.0, 
+            yaw: 1.57, 
+            cartesian_path: false
+            }"
+        )
+        """
         #robot.arm.control_gripper(group_name="left_gripper",open=True)
 
         #target_positions = [0.1, -0.2, 0.0, 0.5, 0.0, -0.1, 0.0]
