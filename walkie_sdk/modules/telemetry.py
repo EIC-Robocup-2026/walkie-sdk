@@ -2,17 +2,21 @@
 Telemetry - Robot status and sensor data module.
 
 Provides get_pose() and get_velocity() functions by subscribing
-to the robot's odometry topic.
+to robot's odometry topic.
+
+This module uses ROSTransportInterface abstraction, allowing it
+to work with any transport implementation (rosbridge, zenoh).
 """
 
 import threading
 from typing import Any, Dict, Optional
 
-from walkie_sdk.core.bridge_client import BridgeClient
+from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.converters import quaternion_to_euler
 from walkie_sdk.utils.namespace import apply_namespace
 
 # Default ROS topic names and types (without namespace)
+DEFAULT_ODOM_TOPIC = "odom"
 DEFAULT_ODOM_TOPIC = "omni_wheel_drive_controller/odom"
 ODOM_TYPE = "nav_msgs/msg/Odometry"
 
@@ -22,15 +26,18 @@ class Telemetry:
     Robot telemetry/status provider.
 
     Subscribes to odometry and provides current pose and velocity.
-    Data is cached and updated in background via ROSBridge subscription.
+    Data is cached and updated in background via ROS subscription.
+
+    This class works with any transport that implements ROSTransportInterface,
+    making it protocol-agnostic (works with rosbridge, zenoh, etc.).
 
     Args:
-        bridge: BridgeClient instance for ROSBridge communication
+        transport: Transport instance implementing ROSTransportInterface
         namespace: ROS namespace prefix for topics (default: "" = no namespace)
     """
 
-    def __init__(self, bridge: BridgeClient, namespace: str = ""):
-        self._bridge = bridge
+    def __init__(self, transport: ROSTransportInterface, namespace: str = ""):
+        self._transport = transport
         self._namespace = namespace
         self._lock = threading.Lock()
 
@@ -39,8 +46,8 @@ class Telemetry:
         self._velocity: Optional[Dict[str, float]] = None
         self._raw_odom: Optional[Dict[str, Any]] = None
 
-        # Subscription handle
-        self._odom_subscription = None
+        # Subscription handle (type varies by transport)
+        self._odom_subscription: Optional[Any] = None
         self._subscribed = False
 
     @property
@@ -67,11 +74,11 @@ class Telemetry:
         if self._subscribed:
             return
 
-        if not self._bridge.is_connected:
+        if not self._transport.is_connected:
             return
 
         try:
-            self._odom_subscription = self._bridge.subscribe(
+            self._odom_subscription = self._transport.subscribe(
                 topic=self.odom_topic,
                 message_type=ODOM_TYPE,
                 callback=self._on_odom,
@@ -80,13 +87,13 @@ class Telemetry:
             )
             self._subscribed = True
         except Exception as e:
-            print(f" ⚠ Failed to subscribe to odometry: {e}")
+            print(f"  ⚠ Failed to subscribe to odometry: {e}")
 
     def stop(self) -> None:
         """Stop telemetry subscriptions."""
         if self._odom_subscription is not None:
             try:
-                self._odom_subscription.unsubscribe()
+                self._transport.unsubscribe(self._odom_subscription)
             except Exception:
                 pass
             self._odom_subscription = None
