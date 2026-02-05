@@ -9,7 +9,7 @@ to work with any transport implementation (rosbridge, zenoh).
 """
 
 import threading
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.namespace import apply_namespace
@@ -316,7 +316,44 @@ class Arm:
 
     
     #added ros2 action arm manipulator
-    
+    def _send_action_goal(
+        self,
+        action_name: str,
+        action_type: str,
+        goal_msg: Dict[str, Any],
+        blocking: bool,
+        feedback_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> str:
+        """
+        Helper to handle blocking vs non-blocking action calls.
+        """
+        
+        # 1. Define the function that performs the actual call
+        def perform_call():
+            try:
+                result = self._transport.call_action(
+                    action_name=action_name,
+                    action_type=action_type,
+                    goal=goal_msg,
+                    feedback_callback=feedback_callback,
+                    timeout=None # Or set a timeout like 10.0
+                )
+                status = result.get("status", "UNKNOWN")
+                return status
+            except Exception as e:
+                print(f"[Arm] Action {action_name} failed: {e}")
+                return "FAILED"
+
+        # 2. Handle Blocking Mode
+        if blocking:
+            return perform_call()
+        
+        # 3. Handle Non-Blocking Mode (Async)
+        else:
+            thread = threading.Thread(target=perform_call, daemon=True)
+            thread.start()
+            return "IN_PROGRESS"
+        
     #tested
     def go_to_home(self,group_name: str) -> None:
         """Move the arm to its defined home position."""
@@ -340,7 +377,16 @@ class Arm:
             print(f"Go Home failed: {e}")
             return "FAILED"
     #tested
-    def control_gripper(self,group_name: str, open: bool) -> None:
+    """    
+    Open: -15.71 rad
+    Close: 0.7 rad
+    """
+    def control_gripper(
+            self,group_name: str,
+            position: float,
+            blocking: bool = True, # NEW ARGUMENT
+            feedback_callback: Optional[Callable[[Dict[str, Any]], None]] = None # NEW ARGUMENT
+              ) -> None:
         """
         Open or close the gripper.
         
@@ -350,12 +396,15 @@ class Arm:
         """
         goal_msg = {
             "group_name": group_name, 
-            "open": open
+            "position": position
         }
-        self._transport.call_action(
+
+        return self._send_action_goal(
             action_name="control_gripper",
             action_type=f"{MOVEIT_ACTION_INTERFACE}/ControlGripper",
-            goal=goal_msg,
+            goal_msg=goal_msg,
+            blocking=blocking,
+            feedback_callback=feedback_callback
         )
 
     
@@ -369,6 +418,8 @@ class Arm:
         yaw: float,
         group_name: str,
         cartesian_path: bool = False,
+        blocking: bool = True, # NEW ARGUMENT
+        feedback_callback: Optional[Callable[[Dict[str, Any]], None]] = None # NEW ARGUMENT
     ) -> None:
         """
         Move the arm to a specific Cartesian pose using an absolute coordinate action.
@@ -385,11 +436,14 @@ class Arm:
         }
         
         # Assuming the action name is 'go_to_pose'
-        self._transport.call_action(
+        return self._send_action_goal(
             action_name="go_to_pose",
             action_type=f"{MOVEIT_ACTION_INTERFACE}/GoToPose",
-            goal=goal_msg,
+            goal_msg=goal_msg,
+            blocking=blocking,
+            feedback_callback=feedback_callback
         )
+        
 
     #tested
     def go_to_pose_relative(
@@ -402,6 +456,8 @@ class Arm:
         yaw: float,
         group_name: str,
         cartesian_path: bool = False,
+        blocking: bool = True, # NEW ARGUMENT
+        feedback_callback: Optional[Callable[[Dict[str, Any]], None]] = None # NEW ARGUMENT
     ) -> None:
         """
         Move the arm to a specific Cartesian pose using an absolute coordinate action.
@@ -418,8 +474,10 @@ class Arm:
         }
         
         # Assuming the action name is 'go_to_pose'
-        self._transport.call_action(
+        return self._send_action_goal(
             action_name="go_to_pose_relative",
             action_type=f"{MOVEIT_ACTION_INTERFACE}/GoToPoseRelative",
-            goal=goal_msg,
+            goal_msg=goal_msg,
+            blocking=blocking,
+            feedback_callback=feedback_callback
         )

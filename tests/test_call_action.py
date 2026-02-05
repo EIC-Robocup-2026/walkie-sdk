@@ -21,9 +21,11 @@ def main():
         time.sleep(1)
         #dayum
         #print("Sending 'Go To Pose Relative' command to left arm...")
+        #Race coonditions lul
         for i in range(20): 
-            robot.arm.go_to_pose_relative(group_name="left_arm", x=0.01, y=0.0, z=-0.01, roll=0.0, pitch=0.0, yaw=0.0,cartesian_path=False)
-            #time.sleep(0.1)
+            pass
+            #print(robot.arm.go_to_pose_relative(group_name="left_arm", x=0.01, y=0.0, z=-0.01, roll=0.0, pitch=0.0, yaw=0.0,cartesian_path=False,blocking=False))
+            #time.sleep(2)
         print("Completed relative movements.")
         """
         print("Sending 'Go To Pose' command to left arm...")
@@ -52,7 +54,7 @@ def main():
             }"
         )
         """
-        #robot.arm.control_gripper(group_name="left_gripper",open=True)
+        robot.arm.control_gripper(group_name="left_gripper",position=0.7) # Close gripper
 
         #target_positions = [0.1, -0.2, 0.0, 0.5, 0.0, -0.1, 0.0]
     
