@@ -22,6 +22,7 @@ from walkie_sdk.core.factory import (
     ROSProtocol,
     TransportFactory,
 )
+from walkie_sdk.modules.arm import ArmControlMode
 from walkie_sdk.robot import WalkieRobot
 from walkie_sdk.modules.multi_camera import MultiCamera
 
@@ -36,6 +37,8 @@ __all__ = [
     "ROSProtocol",
     "CameraProtocol",
     "TransportFactory",
+    # Arm control mode enum
+    "ArmControlMode",
     # Version
     "__version__",
 ]
