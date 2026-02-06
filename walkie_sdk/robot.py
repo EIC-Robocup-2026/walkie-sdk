@@ -25,6 +25,7 @@ from walkie_sdk.modules.camera import Camera
 from walkie_sdk.modules.multi_camera import MultiCamera
 from walkie_sdk.modules.navigation import Navigation
 from walkie_sdk.modules.telemetry import Telemetry
+from walkie_sdk.modules.visualization import Visualization
 
 
 class WalkieRobot:
@@ -35,6 +36,7 @@ class WalkieRobot:
     - .nav: Navigation controls (go_to, cancel, stop)
     - .status: Telemetry data (get_pose, get_velocity)
     - .camera: Camera frames (get_frame) - if enabled
+    - .viz: Visualization markers for RViz2 (draw_marker, clear_markers)
 
     Args:
         ip: Robot IP address or hostname
@@ -163,6 +165,9 @@ class WalkieRobot:
             MultiCamera(self._camera_transport) if self._camera_transport else None
         )
 
+        # Visualization module (marker publishing for RViz2)
+        self._viz = Visualization(self._transport, namespace=namespace)
+
         # Auto-connect
         self._connect()
 
@@ -265,6 +270,83 @@ class WalkieRobot:
         return self._multi_camera
 
     @property
+    def viz(self) -> Visualization:
+        """
+        Visualization marker controller for RViz2.
+
+        Provides:
+        - draw_marker(position, quaternion, frame_id, ...): Publish a single marker
+        - draw_markers(markers): Publish multiple markers as MarkerArray
+        - delete_marker(marker_id): Delete a specific marker
+        - clear_markers(): Remove all markers
+
+        Example:
+            >>> bot.viz.draw_marker(
+            ...     position=[1.0, 2.0, 0.0],
+            ...     quaternion=[0.0, 0.0, 0.0, 1.0],
+            ... )
+        """
+        return self._viz
+
+    def draw_marker(
+        self,
+        position,
+        quaternion,
+        frame_id: str = "base_link",
+        **kwargs,
+    ) -> int:
+        """
+        Convenience method to publish a visualization marker to RViz2.
+
+        Shortcut for bot.viz.draw_marker(). See Visualization.draw_marker()
+        for full parameter documentation.
+
+        Args:
+            position: [x, y, z] position in the reference frame.
+            quaternion: [x, y, z, w] orientation quaternion.
+            frame_id: TF reference frame (default: "base_link").
+            **kwargs: Additional marker options (marker_type, scale, color, etc.)
+
+        Returns:
+            The marker ID that was used.
+
+        Example:
+            >>> bot.draw_marker([1.0, 2.0, 0.0], [0.0, 0.0, 0.0, 1.0])
+            0
+        """
+        return self._viz.draw_marker(position, quaternion, frame_id, **kwargs)
+
+    def update_marker(
+        self,
+        marker_id: int,
+        position=None,
+        quaternion=None,
+        **kwargs,
+    ) -> None:
+        """
+        Convenience method to update an existing visualization marker.
+
+        Only pass the fields you want to change. Everything else is kept
+        from the original draw_marker() call.
+
+        Shortcut for bot.viz.update_marker(). See Visualization.update_marker()
+        for full parameter documentation.
+
+        Args:
+            marker_id: ID of the marker to update.
+            position: New [x, y, z] position (or None to keep current).
+            quaternion: New [x, y, z, w] orientation (or None to keep current).
+            **kwargs: Additional fields to update (frame_id, scale, color, etc.)
+
+        Example:
+            >>> mid = bot.draw_marker([0, 0, 0], [0, 0, 0, 1])
+            >>> bot.update_marker(mid, position=[1.0, 2.0, 0.0])
+        """
+        self._viz.update_marker(
+            marker_id, position=position, quaternion=quaternion, **kwargs
+        )
+
+    @property
     def ip(self) -> str:
         """Robot IP address."""
         return self._ip
@@ -286,6 +368,7 @@ class WalkieRobot:
         self._nav.namespace = value
         self._status.namespace = value
         self._arm.namespace = value
+        self._viz.namespace = value
 
     @property
     def is_connected(self) -> bool:

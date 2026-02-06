@@ -12,6 +12,7 @@ from walkie_sdk.modules.arm import Arm, ArmControlMode
 from walkie_sdk.modules.camera import Camera
 from walkie_sdk.modules.navigation import Navigation
 from walkie_sdk.modules.telemetry import Telemetry
+from walkie_sdk.modules.visualization import Visualization
 
 __all__ = [
     "Navigation",
@@ -19,4 +20,5 @@ __all__ = [
     "Camera",
     "Arm",
     "ArmControlMode",
+    "Visualization",
 ]
