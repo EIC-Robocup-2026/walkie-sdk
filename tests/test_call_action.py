@@ -38,8 +38,8 @@ def main():
         #Race coonditions lul
         for i in range(20): 
             pass
-            robot.arm.go_to_pose_relative(group_name="left_arm", x=0.01, y=0.0, z=-0.01, roll=0.0, pitch=0.0, yaw=0.0,cartesian_path=False,blocking=True,feedback_callback=on_arm_feedback)
-            #time.sleep(2)
+            robot.arm.go_to_pose(group_name="left_arm", x=0.38, y=0.19+(0.01*i), z=0.58, roll=-1.57, pitch=0.0, yaw=1.57,cartesian_path=False,blocking=False,feedback_callback=on_arm_feedback)
+            time.sleep(0.2)
         print("Completed relative movements.")
         """
         print("Sending 'Go To Pose' command to left arm...")

@@ -481,3 +481,119 @@ class Arm:
             blocking=blocking,
             feedback_callback=feedback_callback
         )
+    def go_to_pose_quaternion(
+        self,
+        x: float,
+        y: float,
+        z: float,
+        qx: float,
+        qy: float,
+        qz: float,
+        qw: float,
+        group_name: str,
+        link_name: str = "left_link7",
+        frame_id: str = "base_link",
+        allowed_planning_time: float = 10.0,
+        blocking: bool = True,
+        feedback_callback: Optional[Callable[[Dict[str, Any]], None]] = None
+    ) -> str:
+        """
+        Move the arm to a specific Cartesian pose using Quaternion orientation 
+        by communicating directly with the MoveGroup action server.
+        """
+        # Construct the complex MoveGroup goal message based on your successful CLI command
+        goal_msg = {
+            "request": {
+                "group_name": group_name,
+                "goal_constraints": [{
+                    "position_constraints": [{
+                        "header": {"frame_id": frame_id},
+                        "link_name": link_name,
+                        "constraint_region": {
+                            "primitives": [{"type": 1, "dimensions": [0.1, 0.1, 0.1]}],
+                            "primitive_poses": [{"position": {"x": float(x), "y": float(y), "z": float(z)}}]
+                        },
+                        "weight": 1.0
+                    }],
+                    "orientation_constraints": [{
+                        "header": {"frame_id": frame_id},
+                        "link_name": link_name,
+                        "orientation": {"x": float(qx), "y": float(qy), "z": float(qz), "w": float(qw)},
+                        "absolute_x_axis_tolerance": 0.1,
+                        "absolute_y_axis_tolerance": 0.1,
+                        "absolute_z_axis_tolerance": 0.1,
+                        "weight": 1.0
+                    }]
+                }],
+                "allowed_planning_time": float(allowed_planning_time),
+                "max_velocity_scaling_factor": 0.1,
+                "max_acceleration_scaling_factor": 0.1
+            }
+        }
+
+        return self._send_action_goal(
+            action_name="move_action",
+            action_type="moveit_msgs/action/MoveGroup",
+            goal_msg=goal_msg,
+            blocking=blocking,
+            feedback_callback=feedback_callback
+        )
+    """
+    got o pose qurtanion
+
+    ros2 action send_goal /move_action moveit_msgs/action/MoveGroup "{
+
+    request: {
+
+        group_name: 'left_arm',
+
+        goal_constraints: [{
+
+        position_constraints: [{
+
+            header: {frame_id: 'base_link'},
+
+            link_name: 'left_link7',
+
+            constraint_region: {
+
+            primitives: [{type: 1, dimensions: [0.1, 0.1, 0.1]}],
+
+            primitive_poses: [{position: {x: 0.38, y: 0.19, z: 0.58}}]
+
+            },
+
+            weight: 1.0
+
+        }],
+
+        orientation_constraints: [{
+
+            header: {frame_id: 'base_link'},
+
+            link_name: 'left_link7',
+
+            orientation: {x: -0.5, y: -0.5, z: 0.5, w: 0.5},
+
+            absolute_x_axis_tolerance: 0.1,
+
+            absolute_y_axis_tolerance: 0.1,
+
+            absolute_z_axis_tolerance: 0.1,
+
+            weight: 1.0
+
+        }]
+
+        }],
+
+        allowed_planning_time: 10.0,
+
+        max_velocity_scaling_factor: 0.1,
+
+        max_acceleration_scaling_factor: 0.1
+
+    }
+
+    }"
+    """
