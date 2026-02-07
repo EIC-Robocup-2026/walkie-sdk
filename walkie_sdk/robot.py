@@ -277,13 +277,23 @@ class WalkieRobot:
         Provides:
         - draw_marker(position, quaternion, frame_id, ...): Publish a single marker
         - draw_markers(markers): Publish multiple markers as MarkerArray
+        - update_marker(marker_id, ...): Update an existing marker
         - delete_marker(marker_id): Delete a specific marker
         - clear_markers(): Remove all markers
+        - draw_pose(position, quaternion, frame_id, topic): Publish a PoseStamped
+        - update_pose(position, quaternion, topic): Update an existing PoseStamped
+        - draw_axis(position, quaternion, axis_name, ...): Draw RGB axis triad
+        - update_axis(axis_name, position, quaternion, ...): Update axis triad
 
         Example:
             >>> bot.viz.draw_marker(
             ...     position=[1.0, 2.0, 0.0],
             ...     quaternion=[0.0, 0.0, 0.0, 1.0],
+            ... )
+            >>> bot.viz.draw_pose(
+            ...     position=[1.0, 2.0, 0.0],
+            ...     quaternion=[0.0, 0.0, 0.0, 1.0],
+            ...     topic="walkie/target_pose/left_arm",
             ... )
         """
         return self._viz
@@ -344,6 +354,119 @@ class WalkieRobot:
         """
         self._viz.update_marker(
             marker_id, position=position, quaternion=quaternion, **kwargs
+        )
+
+    def draw_pose(
+        self,
+        position,
+        quaternion,
+        frame_id: str = "base_link",
+        **kwargs,
+    ) -> str:
+        """
+        Convenience method to publish a PoseStamped to RViz2.
+
+        Shortcut for bot.viz.draw_pose(). See Visualization.draw_pose()
+        for full parameter documentation.
+
+        Args:
+            position: [x, y, z] position in the reference frame.
+            quaternion: [x, y, z, w] orientation quaternion.
+            frame_id: TF reference frame (default: "base_link").
+            **kwargs: Additional options (topic, etc.)
+
+        Returns:
+            The topic string that was used.
+
+        Example:
+            >>> bot.draw_pose([1.0, 2.0, 0.0], [0.0, 0.0, 0.0, 1.0])
+            'walkie/target_pose'
+        """
+        return self._viz.draw_pose(position, quaternion, frame_id, **kwargs)
+
+    def update_pose(
+        self,
+        position=None,
+        quaternion=None,
+        **kwargs,
+    ) -> None:
+        """
+        Convenience method to update an existing PoseStamped.
+
+        Only pass the fields you want to change. Everything else is kept
+        from the original draw_pose() call.
+
+        Shortcut for bot.viz.update_pose(). See Visualization.update_pose()
+        for full parameter documentation.
+
+        Args:
+            position: New [x, y, z] position (or None to keep current).
+            quaternion: New [x, y, z, w] orientation (or None to keep current).
+            **kwargs: Additional fields to update (frame_id, topic, etc.)
+
+        Example:
+            >>> bot.draw_pose([0, 0, 0], [0, 0, 0, 1], topic="my_pose")
+            >>> bot.update_pose(position=[1.0, 2.0, 0.0], topic="my_pose")
+        """
+        self._viz.update_pose(position=position, quaternion=quaternion, **kwargs)
+
+    def draw_axis(
+        self,
+        position,
+        quaternion,
+        frame_id: str = "base_link",
+        axis_name: str = "axis",
+        **kwargs,
+    ) -> str:
+        """
+        Convenience method to draw an RGB axis triad in RViz2.
+
+        Publishes 3 ARROW markers (Red=X, Green=Y, Blue=Z) at the given
+        pose.  Shortcut for bot.viz.draw_axis().
+
+        Args:
+            position: [x, y, z] origin of the axis triad.
+            quaternion: [x, y, z, w] orientation of the frame.
+            frame_id: TF reference frame (default: "base_link").
+            axis_name: Unique name for this axis set (default: "axis").
+            **kwargs: Additional options (scale, lifetime, topic).
+
+        Returns:
+            The axis_name that was used (pass to update_axis()).
+
+        Example:
+            >>> bot.draw_axis([1.0, 0.0, 0.5], [0.0, 0.0, 0.0, 1.0])
+            'axis'
+        """
+        return self._viz.draw_axis(
+            position, quaternion, frame_id=frame_id, axis_name=axis_name, **kwargs
+        )
+
+    def update_axis(
+        self,
+        axis_name: str,
+        position=None,
+        quaternion=None,
+        **kwargs,
+    ) -> None:
+        """
+        Convenience method to update an existing axis triad.
+
+        Only pass the fields you want to change.  Shortcut for
+        bot.viz.update_axis().
+
+        Args:
+            axis_name: Name of the axis set (returned by draw_axis()).
+            position: New [x, y, z] origin (or None to keep current).
+            quaternion: New [x, y, z, w] orientation (or None to keep current).
+            **kwargs: Additional fields (frame_id, scale, lifetime).
+
+        Example:
+            >>> bot.draw_axis([0, 0, 0], [0, 0, 0, 1], axis_name="target")
+            >>> bot.update_axis("target", position=[1.0, 2.0, 0.0])
+        """
+        self._viz.update_axis(
+            axis_name, position=position, quaternion=quaternion, **kwargs
         )
 
     @property

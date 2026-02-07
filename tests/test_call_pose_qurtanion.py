@@ -50,6 +50,14 @@ def test_moveit(robot: WalkieRobot):
     print(f"  Group: {group}  Link: {link}")
     print(f"  Mode: MOVEIT (blocking)\n")
 
+    # Draw axis triad at target pose before moving
+    robot.draw_axis(
+        position=[x_pos, y_pos, z_pos],
+        quaternion=[qx_val, qy_val, qz_val, qw_val],
+        axis_name=f"target_{group}",
+    )
+    print(f"  [Viz] Drew axis triad for target pose")
+
     status = robot.arm.go_to_pose_quaternion(
         x=x_pos,
         y=y_pos,
@@ -77,7 +85,7 @@ def test_custom_ik(robot: WalkieRobot, duration: float = 5.0):
     print("=" * 60)
 
     # Circle parameters (YZ plane, same as the example circle_pose publisher)
-    cx, cy, cz = 0.34, 0.20, 0.50
+    cx, cy, cz = 0.34, -0.20, 0.50
     radius = 0.08
     period = 4.0
     rate_hz = 50.0
@@ -93,14 +101,17 @@ def test_custom_ik(robot: WalkieRobot, duration: float = 5.0):
     print(f"  Duration: {duration} s")
     print(f"  Mode: CUSTOM_IK\n")
 
+    axis_name = "ik_target"
+    axis_created = False
+
     elapsed = 0.0
     start = time.monotonic()
 
     while (time.monotonic() - start) < duration:
         angle = 2.0 * math.pi * (elapsed / period)
 
-        x = cx
-        y = cy + radius * math.cos(angle)
+        y = cy
+        x = cx + radius * math.cos(angle)
         z = cz + radius * math.sin(angle)
 
         status = robot.arm.go_to_pose_quaternion(
@@ -114,6 +125,17 @@ def test_custom_ik(robot: WalkieRobot, duration: float = 5.0):
             group_name="left_arm",  # ignored in custom_ik mode
             mode=ArmControlMode.CUSTOM_IK,
         )
+
+        # Update axis triad to follow the target pose
+        if not axis_created:
+            robot.draw_axis(
+                position=[x, y, z],
+                quaternion=[qx_val, qy_val, qz_val, qw_val],
+                axis_name=axis_name,
+            )
+            axis_created = True
+        else:
+            robot.update_axis(axis_name, position=[x, y, z])
 
         # Throttled log (once per second)
         if int(elapsed) != int(elapsed - dt) or elapsed < dt:
