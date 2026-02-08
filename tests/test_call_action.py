@@ -30,18 +30,20 @@ def main():
     try:
         print("Sending 'Go To Home' command to left arm...")
         # Assuming the namespace in walkie-sdk/robot.py is configured for 'left_arm'
-        robot.arm.go_to_home(group_name="left_arm")
+        #robot.arm.go_to_home(group_name="left_arm")
 
         time.sleep(1)
         #dayum
+        x_pos, y_pos, z_pos = 0.38, 0.19, 0.58
+        qx_val, qy_val, qz_val, qw_val = -0.5, -0.5, 0.5, 0.5
         #print("Sending 'Go To Pose Relative' command to left arm...")
         #Race coonditions lul
         for i in range(20): 
-            pass
-            robot.arm.go_to_pose(group_name="left_arm", x=0.38, y=0.19+(0.01*i), z=0.58, roll=-1.57, pitch=0.0, yaw=1.57,cartesian_path=False,blocking=False,feedback_callback=on_arm_feedback)
-            time.sleep(0.2)
-        print("Completed relative movements.")
-        """
+            #print(robot.arm.go_to_pose_quaternion(group_name="left_arm", x=x_pos, y=y_pos, z=z_pos, qx=qx_val, qy=qy_val, qz=qz_val, qw=qw_val,cartesian_path=False,blocking=False,feedback_callback=on_arm_feedback))
+            #robot.arm.go_to_pose(group_name="left_arm", x=0.38, y=0.19+(0.01*i), z=0.58, roll=-1.57, pitch=0.0, yaw=1.57,cartesian_path=False,blocking=False,feedback_callback=on_arm_feedback)
+            print(f"Sent relative pose {i}")
+            #time.sleep(0.2)
+        
         print("Sending 'Go To Pose' command to left arm...")
         robot.arm.go_to_pose(
             x=0.38, 
@@ -53,7 +55,7 @@ def main():
             yaw=1.57, 
             cartesian_path=False
         )
-        """
+        
         """
             ros2 action send_goal /go_to_pose my_robot_interfaces/action/GoToPose "
             {
