@@ -414,6 +414,79 @@ class ZenohCamera(CameraTransportInterface):
             return {
                 k: v.copy() for k, v in self._latest_frames.items() if v is not None
             }
+    def get3Dcord(
+        self,
+        topic: str,
+        message_type: str,
+        callback: Callable[[Dict[str, Any]], None]
+    ) -> None:
+        """
+        Subscribe to an arbitrary ROS 2 topic via Zenoh.
+        """
+        if self._session_mgr is None:
+            print("[ZenohCamera] Cannot subscribe: Session not connected.")
+            return
+
+        with self._general_lock:
+            if topic in self._subscribers:
+                print(f"[ZenohCamera] Already subscribed to {topic}")
+                return
+
+            print(f"[ZenohCamera] Subscribing to: {topic} ({message_type})")
+
+            # Wrapper to convert SDK Object -> Dict before sending to your callback
+            def callback_wrapper(msg_obj):
+                try:
+                    # _msg_to_dict is defined globally in your __init__.py
+                    msg_dict = _msg_to_dict(msg_obj)
+                    callback(msg_dict)
+                except Exception as e:
+                    print(f"[ZenohCamera] Callback error on {topic}: {e}")
+
+            # Create the ROS2Subscriber
+            sub = ROS2Subscriber(
+                topic=topic,
+                msg_type=message_type,
+                callback=callback_wrapper,
+                router_ip=self._host,
+                router_port=self._port,
+                domain_id=ROS_DOMAIN_ID  # Uses the global ID defined in file
+            )
+            
+            self._subscribers[topic] = sub
+
+    def publish_to_topic(
+        self,
+        topic: str,
+        message_type: str,
+        message: Dict[str, Any]
+    ) -> None:
+        """
+        Publish a dictionary message to a ROS 2 topic via Zenoh.
+        """
+        if self._session_mgr is None:
+            print("[ZenohCamera] Cannot publish: Session not connected.")
+            return
+
+        with self._general_lock:
+            # Create Publisher if it doesn't exist
+            if topic not in self._publishers:
+                print(f"[ZenohCamera] Creating publisher for: {topic} ({message_type})")
+                self._publishers[topic] = ROS2Publisher(
+                    topic=topic,
+                    msg_type=message_type,
+                    router_ip=self._host,
+                    router_port=self._port,
+                    domain_id=ROS_DOMAIN_ID
+                )
+            
+            pub = self._publishers[topic]
+
+        # Publish the message dictionary as kwargs
+        try:
+            pub.publish(**message)
+        except Exception as e:
+            print(f"[ZenohCamera] Error publishing to {topic}: {e}")
 
 
 __all__ = ["ZenohTransport", "ZenohCamera"]

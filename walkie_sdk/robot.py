@@ -26,6 +26,7 @@ from walkie_sdk.modules.multi_camera import MultiCamera
 from walkie_sdk.modules.navigation import Navigation
 from walkie_sdk.modules.telemetry import Telemetry
 from walkie_sdk.modules.visualization import Visualization
+from walkie_sdk.modules.tools import Tools
 
 
 class WalkieRobot:
@@ -156,6 +157,8 @@ class WalkieRobot:
             default_mode=ArmControlMode(arm_mode),
             target_pose_topic=arm_target_pose_topic,
         )
+        self._tools = Tools(self._transport, namespace=namespace)
+
         self._camera: Optional[Camera] = (
             Camera(self._camera_transport) if self._camera_transport else None
         )
@@ -185,6 +188,8 @@ class WalkieRobot:
         # Start telemetry subscription
         self._status.start()
 
+        self._tools.start()
+
         # Setup arm subscription (must be done after transport is connected)
         self._arm._setup_state_subscription()
 
@@ -199,6 +204,13 @@ class WalkieRobot:
 
         self._connected = True
         print(f"✓ Robot connected!")
+
+    @property
+    def tools(self) -> Tools:
+        """
+        Tools module for auxiliary functions and 3D object detection.
+        """
+        return self._tools
 
     @property
     def nav(self) -> Navigation:
@@ -492,6 +504,7 @@ class WalkieRobot:
         self._status.namespace = value
         self._arm.namespace = value
         self._viz.namespace = value
+        self._tools.namespace = value  # <--- Add this
 
     @property
     def is_connected(self) -> bool:
