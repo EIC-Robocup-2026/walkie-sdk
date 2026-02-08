@@ -25,7 +25,9 @@ dependencies = [
     "numpy>=2.3.5",
     "opencv-python>=4.11.0.86",
     "roslibpy>=2.0.0",
-    "pyyaml"
+    "pyyaml" ,
+    "zenoh-ros2-sdk",
+    "rosbags"
     ]
 
 [project.urls]
