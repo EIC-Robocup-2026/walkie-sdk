@@ -73,7 +73,7 @@ def compose_transforms(parent_tf, child_tf):
 
 
 def lookup_ee_pose(
-    robot_instance, target_link, reference_frame="base_link", timeout=5.0
+    robot_instance, target_link, reference_frame="base_footprint", timeout=5.0
 ):
     """
     Subscribe to /tf, collect transforms, and walk the TF tree from
@@ -103,10 +103,10 @@ def lookup_ee_pose(
                 ro["z"],
                 ro["w"],
             )
-
         # Try to resolve the chain after every batch
         chain = _resolve_chain(tf_data, reference_frame, target_link)
         if chain is not None:
+            print(chain)
             result[0] = chain
             done_event.set()
 
@@ -181,7 +181,7 @@ def _invert_transform(tf):
 
 
 # ---------------------------------------------------------------------------
-# Axis remapping:  controller frame  -->  ROS base_link frame
+# Axis remapping:  controller frame  -->  ROS base_footprint frame
 # ---------------------------------------------------------------------------
 #
 # Position mapping (confirmed):
@@ -197,9 +197,10 @@ def _invert_transform(tf):
 # So: ros_roll = c_pitch, ros_pitch = -c_yaw, ros_yaw = c_roll
 
 
+
 def remap_controller_to_ros(cx, cy, cz, cqx, cqy, cqz, cqw):
     """
-    Remap controller-frame position + quaternion to ROS base_link frame.
+    Remap controller-frame position + quaternion to ROS base_footprint frame.
 
     Args:
         cx, cy, cz: controller position
@@ -209,21 +210,22 @@ def remap_controller_to_ros(cx, cy, cz, cqx, cqy, cqz, cqw):
         (ros_x, ros_y, ros_z, ros_qx, ros_qy, ros_qz, ros_qw)
     """
     # Position remap
-    ros_x = cx
+    ros_x = -cx
     ros_y = -cz
     ros_z = cy
 
-    # Orientation remap: convert to euler, swap axes, convert back
-    c_roll, c_pitch, c_yaw = quaternion_to_euler(cqx, cqy, cqz, cqw)
-
-    ros_roll = c_pitch
-    ros_pitch = -c_yaw
-    ros_yaw = c_roll
-
-    ros_qx, ros_qy, ros_qz, ros_qw = euler_to_quaternion(ros_roll, ros_pitch, ros_yaw)
-
+    # Swap roll and pitch quaternion components
+    ros_qx = -cqx
+    ros_qy = -cqz
+    ros_qz = cqy
+    ros_qw = cqw
+    # Apply -90 degree yaw offset
+    yaw_offset = math.radians(-90)
+    offset_quat = euler_to_quaternion(0, 0, yaw_offset)
+    ros_quat = (ros_qx, ros_qy, ros_qz, ros_qw)
+    ros_quat = quaternion_multiply(ros_quat, offset_quat)
+    ros_qx, ros_qy, ros_qz, ros_qw = ros_quat
     return (ros_x, ros_y, ros_z, ros_qx, ros_qy, ros_qz, ros_qw)
-
 
 # ---------------------------------------------------------------------------
 # Zenoh callback
@@ -260,7 +262,7 @@ def listener(sample):
 
         link_name = data.get("link_name", EE_LINKS.get(group, "left_link7"))
         planning_time = float(data.get("allowed_planning_time", 10.0))
-        blocking = bool(data.get("blocking", True))
+        blocking = bool(data.get("blocking", False))
 
         # 3. Validation
         if robot is None or not robot.is_connected:
@@ -305,8 +307,11 @@ def listener(sample):
             qz=target_qz,
             qw=target_qw,
             group_name=group,
+            frame_id="base_footprint",
             link_name=link_name,
             allowed_planning_time=planning_time,
+            # mode="moveit",
+            mode="custom_ik",
             blocking=blocking,
         )
 
@@ -358,7 +363,7 @@ def main():
 
     # 1. Initialize Robot Connection
     print("Connecting to WalkieRobot...")
-    robot = WalkieRobot(ip="127.0.0.1", ros_port=9090)
+    robot = WalkieRobot(ip="10.206.61.14", ros_port=9090, camera_protocol='none',arm_mode='custom_ik')
 
     try:
         print("Robot Connected and Arm Initialized")
@@ -366,11 +371,11 @@ def main():
         # 2. Look up initial EE poses via /tf
         for group, link in EE_LINKS.items():
             print(f"Looking up initial EE pose for '{group}' ({link})...")
-            pose = lookup_ee_pose(robot, target_link=link, timeout=5.0)
+            pose = lookup_ee_pose(robot, target_link=link, timeout=0.3)
             if pose is None:
                 print(f"[Warning] Could not resolve TF for '{link}' within timeout.")
                 print(f"          Using identity pose (0,0,0, 0,0,0,1) for '{group}'.")
-                pose = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
+                pose = (0.2, -0.3, 0.5, 0.0, 0.0, 0.0, 1.0)
             else:
                 print(
                     f"  Initial pose for '{group}': "
