@@ -260,9 +260,12 @@ def listener(sample):
         cqz = float(data.get("qz", 0.0))
         cqw = float(data.get("qw", 1.0))
 
+        gripperDist = float(data.get("gripperDist", None))
+
         link_name = data.get("link_name", EE_LINKS.get(group, "left_link7"))
         planning_time = float(data.get("allowed_planning_time", 10.0))
         blocking = bool(data.get("blocking", False))
+        teleop_status = data.get("teleop_status", "IN_PROGRESS")
 
         # 3. Validation
         if robot is None or not robot.is_connected:
@@ -297,6 +300,10 @@ def listener(sample):
             f"quat=({target_qx:.4f}, {target_qy:.4f}, {target_qz:.4f}, {target_qw:.4f})"
         )
 
+        if teleop_status == "COMPLETED":
+            print("Teleop session marked as completed.")
+            return
+
         # 6. Execute quaternion move
         status = robot.arm.go_to_pose_quaternion(
             x=target_x,
@@ -310,10 +317,15 @@ def listener(sample):
             frame_id="base_footprint",
             link_name=link_name,
             allowed_planning_time=planning_time,
-            # mode="moveit",
-            mode="custom_ik",
+            mode="moveit",
+            # mode="custom_ik",
             blocking=blocking,
         )
+
+        # 6.5 Execue gripper move
+        if gripperDist is not None:
+            gripper_status = robot.arm.control_gripper(group, gripperDist)
+            print(f" -> Gripper result: {gripper_status}")
 
         print(f" -> Result: {status}")
 
@@ -360,10 +372,13 @@ def listener(sample):
 
 def main():
     global robot
+    global teleop_status
+    teleop_status = "IN_PROGRESS"
 
     # 1. Initialize Robot Connection
     print("Connecting to WalkieRobot...")
-    robot = WalkieRobot(ip="10.206.61.14", ros_port=9090, camera_protocol='none',arm_mode='custom_ik')
+    robot = WalkieRobot(ip="10.0.0.204", ros_port=9090, camera_protocol='none',arm_mode='custom_ik')
+    # robot = WalkieRobot(ip="10.206.61.14", ros_port=9090, camera_protocol='none',arm_mode='custom_ik')
 
     try:
         print("Robot Connected and Arm Initialized")
@@ -393,9 +408,8 @@ def main():
         key_expr = "arm_pose"
         print(f"Watching for updates on Zenoh key: '{key_expr}'...")
         sub = session.declare_subscriber(key_expr, listener)
-
         # 5. Keep Alive
-        while True:
+        while teleop_status != "COMPLETED":
             time.sleep(1)
 
     except KeyboardInterrupt:

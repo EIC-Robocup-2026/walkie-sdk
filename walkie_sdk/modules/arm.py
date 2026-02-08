@@ -30,7 +30,7 @@ MOVEIT_ACTION_INTERFACE = "my_robot_interfaces/action"
 
 # Custom IK defaults
 DEFAULT_TARGET_POSE_TOPIC = "/target_pose"
-TARGET_POSE_TYPE = "geometry_msgs/msg/Pose"
+TARGET_POSE_TYPE = "geometry_msgs/msg/PoseStamped"
 
 
 class ArmControlMode(Enum):
@@ -393,7 +393,7 @@ class Arm:
         qz: float = 0.0,
         qw: float = 1.0,
     ) -> bool:
-        """Publish a geometry_msgs/Pose to the custom IK target topic.
+        """Publish a geometry_msgs/PoseStamped to the custom IK target topic.
 
         Args:
             x, y, z: Target position in meters.
@@ -404,16 +404,19 @@ class Arm:
         """
         try:
             msg = {
-                "position": {
-                    "x": float(x),
-                    "y": float(y),
-                    "z": float(z),
-                },
-                "orientation": {
-                    "x": float(qx),
-                    "y": float(qy),
-                    "z": float(qz),
-                    "w": float(qw),
+                "header": {"stamp": {"sec": 0, "nanosec": 0}, "frame_id": ""},
+                "pose": {
+                    "position": {
+                        "x": float(x),
+                        "y": float(y),
+                        "z": float(z),
+                    },
+                    "orientation": {
+                        "x": float(qx),
+                        "y": float(qy),
+                        "z": float(qz),
+                        "w": float(qw),
+                    },
                 },
             }
             self._transport.publish(self._target_pose_topic, TARGET_POSE_TYPE, msg)
@@ -499,7 +502,7 @@ class Arm:
         feedback_callback: Optional[
             Callable[[Dict[str, Any]], None]
         ] = None,  # NEW ARGUMENT
-    ) -> None:
+    ) -> str:
         """
         Open or close the gripper.
 
@@ -626,7 +629,7 @@ class Arm:
         qw: float,
         group_name: str,
         link_name: str = "left_link7",
-        frame_id: str = "base_link",
+        frame_id: str = "base_footprint",
         allowed_planning_time: float = 10.0,
         blocking: bool = True,
         feedback_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
@@ -730,7 +733,7 @@ class Arm:
 
         position_constraints: [{
 
-            header: {frame_id: 'base_link'},
+            header: {frame_id: 'base_footprint'},
 
             link_name: 'left_link7',
 
@@ -748,7 +751,7 @@ class Arm:
 
         orientation_constraints: [{
 
-            header: {frame_id: 'base_link'},
+            header: {frame_id: 'base_footprint'},
 
             link_name: 'left_link7',
 
