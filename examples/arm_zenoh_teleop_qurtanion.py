@@ -12,8 +12,10 @@ from walkie_sdk.utils.converters import (
 
 # Global robot instance
 robot = None
-# Marker ID for the end-effector visualization (one per group)
-_marker_ids = {}
+# Pose topics for the end-effector visualization (one per group)
+_pose_topics = {}
+# Axis triad names for the end-effector visualization (one per group)
+_axis_names = {}
 # Initial EE poses keyed by group name: {group: (x, y, z, qx, qy, qz, qw)}
 _initial_ee_pose = {}
 
@@ -310,21 +312,40 @@ def listener(sample):
 
         print(f" -> Result: {status}")
 
-        # 7. Visualize end-effector target as an arrow marker in RViz2
-        if group not in _marker_ids:
-            _marker_ids[group] = robot.draw_marker(
+        # 7. Visualize end-effector target as a PoseStamped in RViz2
+        pose_topic = f"walkie/target_pose/{group}"
+        if group not in _pose_topics:
+            _pose_topics[group] = robot.draw_pose(
                 position=[target_x, target_y, target_z],
                 quaternion=[target_qx, target_qy, target_qz, target_qw],
-                ns=group,
+                topic=pose_topic,
             )
-            print(f" -> Created viz marker for '{group}' (id={_marker_ids[group]})")
+            print(f" -> Created pose on topic '{_pose_topics[group]}'")
         else:
-            robot.update_marker(
-                _marker_ids[group],
+            robot.update_pose(
+                position=[target_x, target_y, target_z],
+                quaternion=[target_qx, target_qy, target_qz, target_qw],
+                topic=pose_topic,
+            )
+            print(f" -> Updated pose on topic '{pose_topic}'")
+
+        # 8. Visualize end-effector target as an axis triad (RGB arrows) in RViz2
+        axis_name = f"ee_target_{group}"
+        if group not in _axis_names:
+            _axis_names[group] = robot.draw_axis(
+                position=[target_x, target_y, target_z],
+                quaternion=[target_qx, target_qy, target_qz, target_qw],
+                axis_name=axis_name,
+                scale=0.1,
+            )
+            print(f" -> Created axis triad '{_axis_names[group]}'")
+        else:
+            robot.update_axis(
+                axis_name=axis_name,
                 position=[target_x, target_y, target_z],
                 quaternion=[target_qx, target_qy, target_qz, target_qw],
             )
-            print(f" -> Updated viz marker for '{group}'")
+            print(f" -> Updated axis triad '{axis_name}'")
 
     except json.JSONDecodeError:
         print(f"[Error] Invalid JSON format: {sample.payload.to_string()}")

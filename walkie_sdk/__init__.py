@@ -26,11 +26,17 @@ from walkie_sdk.modules.arm import ArmControlMode
 from walkie_sdk.modules.visualization import (
     ARROW,
     CUBE,
+    CUBE_LIST,
     CYLINDER,
+    DEFAULT_AXIS_TOPIC,
     LINE_LIST,
     LINE_STRIP,
+    MESH_RESOURCE,
+    POINTS,
     SPHERE,
+    SPHERE_LIST,
     TEXT_VIEW_FACING,
+    TRIANGLE_LIST,
     Visualization,
 )
 from walkie_sdk.robot import WalkieRobot
@@ -57,7 +63,13 @@ __all__ = [
     "CYLINDER",
     "LINE_STRIP",
     "LINE_LIST",
+    "CUBE_LIST",
+    "SPHERE_LIST",
+    "POINTS",
     "TEXT_VIEW_FACING",
+    "MESH_RESOURCE",
+    "TRIANGLE_LIST",
+    "DEFAULT_AXIS_TOPIC",
     # Version
     "__version__",
 ]
