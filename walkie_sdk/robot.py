@@ -20,13 +20,11 @@ from walkie_sdk.core.interfaces import (
     CameraTransportInterface,
     ROSTransportInterface,
 )
-from walkie_sdk.modules.arm import Arm, ArmControlMode
+from walkie_sdk.modules.arm import Arm
 from walkie_sdk.modules.camera import Camera
 from walkie_sdk.modules.multi_camera import MultiCamera
 from walkie_sdk.modules.navigation import Navigation
 from walkie_sdk.modules.telemetry import Telemetry
-from walkie_sdk.modules.visualization import Visualization
-from walkie_sdk.modules.tools import Tools
 
 
 class WalkieRobot:
@@ -37,7 +35,6 @@ class WalkieRobot:
     - .nav: Navigation controls (go_to, cancel, stop)
     - .status: Telemetry data (get_pose, get_velocity)
     - .camera: Camera frames (get_frame) - if enabled
-    - .viz: Visualization markers for RViz2 (draw_marker, clear_markers)
 
     Args:
         ip: Robot IP address or hostname
@@ -54,10 +51,6 @@ class WalkieRobot:
         camera_port: Port for camera stream (default: 8554 for WebRTC)
         timeout: Connection timeout in seconds (default: 10.0)
         namespace: ROS namespace for topics/actions (default: "" = no namespace)
-        arm_mode: Default arm control mode:
-            - "moveit": MoveIt motion planning (default)
-            - "custom_ik": Publish Pose to custom IK solver for teleop
-        arm_target_pose_topic: Topic for custom IK mode (default: "/target_pose")
 
     Raises:
         ConnectionError: If connection to robot fails
@@ -91,8 +84,6 @@ class WalkieRobot:
         camera_port: int = 8554,
         timeout: float = 10.0,
         namespace: str = "",
-        arm_mode: str = "custom_ik",
-        arm_target_pose_topic: str = "/target_pose",
         # Legacy parameters for backward compatibility
         ws_port: Optional[int] = None,
         webrtc_port: Optional[int] = None,
@@ -151,14 +142,7 @@ class WalkieRobot:
         # Initialize modules with transport interface (not specific implementation)
         self._nav = Navigation(self._transport, namespace=namespace)
         self._status = Telemetry(self._transport, namespace=namespace)
-        self._arm = Arm(
-            self._transport,
-            namespace=namespace,
-            default_mode=ArmControlMode(arm_mode),
-            target_pose_topic=arm_target_pose_topic,
-        )
-        self._tools = Tools(self._transport, namespace=namespace)
-
+        self._arm = Arm(self._transport, namespace=namespace)
         self._camera: Optional[Camera] = (
             Camera(self._camera_transport) if self._camera_transport else None
         )
@@ -167,9 +151,6 @@ class WalkieRobot:
         self._multi_camera: Optional[MultiCamera] = (
             MultiCamera(self._camera_transport) if self._camera_transport else None
         )
-
-        # Visualization module (marker publishing for RViz2)
-        self._viz = Visualization(self._transport, namespace=namespace)
 
         # Auto-connect
         self._connect()
@@ -188,8 +169,6 @@ class WalkieRobot:
         # Start telemetry subscription
         self._status.start()
 
-        self._tools.start()
-
         # Setup arm subscription (must be done after transport is connected)
         self._arm._setup_state_subscription()
 
@@ -204,13 +183,6 @@ class WalkieRobot:
 
         self._connected = True
         print(f"✓ Robot connected!")
-
-    @property
-    def tools(self) -> Tools:
-        """
-        Tools module for auxiliary functions and 3D object detection.
-        """
-        return self._tools
 
     @property
     def nav(self) -> Navigation:
@@ -282,206 +254,6 @@ class WalkieRobot:
         return self._multi_camera
 
     @property
-    def viz(self) -> Visualization:
-        """
-        Visualization marker controller for RViz2.
-
-        Provides:
-        - draw_marker(position, quaternion, frame_id, ...): Publish a single marker
-        - draw_markers(markers): Publish multiple markers as MarkerArray
-        - update_marker(marker_id, ...): Update an existing marker
-        - delete_marker(marker_id): Delete a specific marker
-        - clear_markers(): Remove all markers
-        - draw_pose(position, quaternion, frame_id, topic): Publish a PoseStamped
-        - update_pose(position, quaternion, topic): Update an existing PoseStamped
-        - draw_axis(position, quaternion, axis_name, ...): Draw RGB axis triad
-        - update_axis(axis_name, position, quaternion, ...): Update axis triad
-
-        Example:
-            >>> bot.viz.draw_marker(
-            ...     position=[1.0, 2.0, 0.0],
-            ...     quaternion=[0.0, 0.0, 0.0, 1.0],
-            ... )
-            >>> bot.viz.draw_pose(
-            ...     position=[1.0, 2.0, 0.0],
-            ...     quaternion=[0.0, 0.0, 0.0, 1.0],
-            ...     topic="walkie/target_pose/left_arm",
-            ... )
-        """
-        return self._viz
-
-    def draw_marker(
-        self,
-        position,
-        quaternion,
-        frame_id: str = "base_link",
-        **kwargs,
-    ) -> int:
-        """
-        Convenience method to publish a visualization marker to RViz2.
-
-        Shortcut for bot.viz.draw_marker(). See Visualization.draw_marker()
-        for full parameter documentation.
-
-        Args:
-            position: [x, y, z] position in the reference frame.
-            quaternion: [x, y, z, w] orientation quaternion.
-            frame_id: TF reference frame (default: "base_link").
-            **kwargs: Additional marker options (marker_type, scale, color, etc.)
-
-        Returns:
-            The marker ID that was used.
-
-        Example:
-            >>> bot.draw_marker([1.0, 2.0, 0.0], [0.0, 0.0, 0.0, 1.0])
-            0
-        """
-        return self._viz.draw_marker(position, quaternion, frame_id, **kwargs)
-
-    def update_marker(
-        self,
-        marker_id: int,
-        position=None,
-        quaternion=None,
-        **kwargs,
-    ) -> None:
-        """
-        Convenience method to update an existing visualization marker.
-
-        Only pass the fields you want to change. Everything else is kept
-        from the original draw_marker() call.
-
-        Shortcut for bot.viz.update_marker(). See Visualization.update_marker()
-        for full parameter documentation.
-
-        Args:
-            marker_id: ID of the marker to update.
-            position: New [x, y, z] position (or None to keep current).
-            quaternion: New [x, y, z, w] orientation (or None to keep current).
-            **kwargs: Additional fields to update (frame_id, scale, color, etc.)
-
-        Example:
-            >>> mid = bot.draw_marker([0, 0, 0], [0, 0, 0, 1])
-            >>> bot.update_marker(mid, position=[1.0, 2.0, 0.0])
-        """
-        self._viz.update_marker(
-            marker_id, position=position, quaternion=quaternion, **kwargs
-        )
-
-    def draw_pose(
-        self,
-        position,
-        quaternion,
-        frame_id: str = "base_link",
-        **kwargs,
-    ) -> str:
-        """
-        Convenience method to publish a PoseStamped to RViz2.
-
-        Shortcut for bot.viz.draw_pose(). See Visualization.draw_pose()
-        for full parameter documentation.
-
-        Args:
-            position: [x, y, z] position in the reference frame.
-            quaternion: [x, y, z, w] orientation quaternion.
-            frame_id: TF reference frame (default: "base_link").
-            **kwargs: Additional options (topic, etc.)
-
-        Returns:
-            The topic string that was used.
-
-        Example:
-            >>> bot.draw_pose([1.0, 2.0, 0.0], [0.0, 0.0, 0.0, 1.0])
-            'walkie/target_pose'
-        """
-        return self._viz.draw_pose(position, quaternion, frame_id, **kwargs)
-
-    def update_pose(
-        self,
-        position=None,
-        quaternion=None,
-        **kwargs,
-    ) -> None:
-        """
-        Convenience method to update an existing PoseStamped.
-
-        Only pass the fields you want to change. Everything else is kept
-        from the original draw_pose() call.
-
-        Shortcut for bot.viz.update_pose(). See Visualization.update_pose()
-        for full parameter documentation.
-
-        Args:
-            position: New [x, y, z] position (or None to keep current).
-            quaternion: New [x, y, z, w] orientation (or None to keep current).
-            **kwargs: Additional fields to update (frame_id, topic, etc.)
-
-        Example:
-            >>> bot.draw_pose([0, 0, 0], [0, 0, 0, 1], topic="my_pose")
-            >>> bot.update_pose(position=[1.0, 2.0, 0.0], topic="my_pose")
-        """
-        self._viz.update_pose(position=position, quaternion=quaternion, **kwargs)
-
-    def draw_axis(
-        self,
-        position,
-        quaternion,
-        frame_id: str = "base_link",
-        axis_name: str = "axis",
-        **kwargs,
-    ) -> str:
-        """
-        Convenience method to draw an RGB axis triad in RViz2.
-
-        Publishes 3 ARROW markers (Red=X, Green=Y, Blue=Z) at the given
-        pose.  Shortcut for bot.viz.draw_axis().
-
-        Args:
-            position: [x, y, z] origin of the axis triad.
-            quaternion: [x, y, z, w] orientation of the frame.
-            frame_id: TF reference frame (default: "base_link").
-            axis_name: Unique name for this axis set (default: "axis").
-            **kwargs: Additional options (scale, lifetime, topic).
-
-        Returns:
-            The axis_name that was used (pass to update_axis()).
-
-        Example:
-            >>> bot.draw_axis([1.0, 0.0, 0.5], [0.0, 0.0, 0.0, 1.0])
-            'axis'
-        """
-        return self._viz.draw_axis(
-            position, quaternion, frame_id=frame_id, axis_name=axis_name, **kwargs
-        )
-
-    def update_axis(
-        self,
-        axis_name: str,
-        position=None,
-        quaternion=None,
-        **kwargs,
-    ) -> None:
-        """
-        Convenience method to update an existing axis triad.
-
-        Only pass the fields you want to change.  Shortcut for
-        bot.viz.update_axis().
-
-        Args:
-            axis_name: Name of the axis set (returned by draw_axis()).
-            position: New [x, y, z] origin (or None to keep current).
-            quaternion: New [x, y, z, w] orientation (or None to keep current).
-            **kwargs: Additional fields (frame_id, scale, lifetime).
-
-        Example:
-            >>> bot.draw_axis([0, 0, 0], [0, 0, 0, 1], axis_name="target")
-            >>> bot.update_axis("target", position=[1.0, 2.0, 0.0])
-        """
-        self._viz.update_axis(
-            axis_name, position=position, quaternion=quaternion, **kwargs
-        )
-
-    @property
     def ip(self) -> str:
         """Robot IP address."""
         return self._ip
@@ -503,8 +275,6 @@ class WalkieRobot:
         self._nav.namespace = value
         self._status.namespace = value
         self._arm.namespace = value
-        self._viz.namespace = value
-        self._tools.namespace = value  # <--- Add this
 
     @property
     def is_connected(self) -> bool:

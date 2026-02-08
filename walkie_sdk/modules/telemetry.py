@@ -16,8 +16,7 @@ from walkie_sdk.utils.converters import quaternion_to_euler
 from walkie_sdk.utils.namespace import apply_namespace
 
 # Default ROS topic names and types (without namespace)
-DEFAULT_ODOM_TOPIC = "odom"
-DEFAULT_ODOM_TOPIC = "omni_wheel_drive_controller/odom"
+DEFAULT_ODOM_TOPIC = "current_pose"
 ODOM_TYPE = "nav_msgs/msg/Odometry"
 
 
