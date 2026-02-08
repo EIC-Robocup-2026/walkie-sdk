@@ -617,8 +617,67 @@ class Arm:
             blocking=blocking,
             feedback_callback=feedback_callback,
         )
-
     def go_to_pose_quaternion(
+        self,
+        x: float,
+        y: float,
+        z: float,
+        qx: float,
+        qy: float,
+        qz: float,
+        qw: float,
+        group_name: str,
+        cartesian_path: bool = False,
+        blocking: bool = True,
+        feedback_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        mode: Optional[Union[str, ArmControlMode]] = None,
+    ) -> str:
+        """
+        Move the arm to a specific Cartesian pose using quaternion orientation data.
+
+        Args:
+            x, y, z: Target position in meters.
+            qx, qy, qz, qw: Target orientation as a quaternion.
+            group_name: MoveIt planning group name (e.g., "left_arm").
+            cartesian_path: If true, compute a linear path in Cartesian space.
+            blocking: If true, wait for the action to finish before returning.
+            feedback_callback: Optional callback for action feedback.
+            mode: Control mode override ("moveit" or "custom_ik").
+
+        Returns:
+            Status string: "SUCCEEDED", "FAILED", or "IN_PROGRESS".
+        """
+        effective_mode = self._resolve_mode(mode)
+
+        if effective_mode == ArmControlMode.CUSTOM_IK:
+            # For custom IK topic, we just publish the raw quaternion directly
+            success = self._publish_target_pose(x, y, z, qx, qy, qz, qw)
+            return "SUCCEEDED" if success else "FAILED"
+
+        # MoveIt mode (Action Server)
+        # The keys here must match your .action file Goal fields exactly
+        goal_msg = {
+            "group_name": group_name,
+            "x": float(x),
+            "y": float(y),
+            "z": float(z),
+            "qx": float(qx),
+            "qy": float(qy),
+            "qz": float(qz),
+            "qw": float(qw),
+            "cartesian_path": cartesian_path,
+        }
+
+        # Uses the GoToPoseQuaternion action type defined in your robot interfaces
+        return self._send_action_goal(
+            action_name="go_to_pose_quat",
+            action_type=f"{MOVEIT_ACTION_INTERFACE}/GoToPoseQuaternion",
+            goal_msg=goal_msg,
+            blocking=blocking,
+            feedback_callback=feedback_callback,
+        )
+
+    def go_to_pose_quaternion_move_action(
         self,
         x: float,
         y: float,
