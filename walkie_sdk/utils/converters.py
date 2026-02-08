@@ -168,8 +168,7 @@ def convert_bboxes_to_detection_array(
             "results": [], # ObjectHypothesisWithPose[] (empty if no classification)
             "bbox": {
                 "center": {
-                    "x": float(cx),
-                    "y": float(cy),
+                    'position':{"x": float(cx),"y": float(cy)},
                     "theta": 0.0
                 },
                 "size_x": float(w),
@@ -189,3 +188,9 @@ def convert_bboxes_to_detection_array(
     }
     
     return msg
+
+def convert_poses_to_array(data):
+    """
+    Extracts [x, y, z] coordinates from a dictionary of poses.
+    """
+    return [[p['position']['x'], p['position']['y'], p['position']['z']] for p in data.get('poses', [])]

@@ -17,12 +17,12 @@ from walkie_sdk.utils.namespace import apply_namespace
 # Constants (Topics, Services, Types)
 # -----------------------------------------------------------------------------
 # For Publishing (Request)
-OBJECT_POSE_TOPIC = "yolo/detections_2d"
+OBJECT_POSE_TOPIC = "/yolo/detections_2d"
 DETECTION_2D_TYPE = "vision_msgs/msg/Detection2DArray"
 
 # For Subscribing (Response)
-DETECT_3D_TOPIC = "ob_detection/detections_3d"
-DETECTION_3D_TYPE = "vision_msgs/msg/Detection3DArray"  # Fixed typo: Detextion -> Detection
+DETECT_3D_TOPIC = "/ob_detection/poses"
+DETECTION_3D_TYPE = "geometry_msgs/msg/PoseArray"  # Fixed typo: Detextion -> Detection
 
 
 class Tools:
@@ -101,7 +101,7 @@ class Tools:
             with self._lock:
                 self._latest_detection = msg
                 # Optional: Debug print
-                # print(f"[Tools] Received 3D detection response")
+                print(f"[Tools] Received 3D detection response")
             
             # 2. Signal that data has arrived (Unblocks the wait)
             self._response_event.set()
@@ -130,7 +130,7 @@ class Tools:
     # Public API
     # -------------------------------------------------------------------------
 
-    def send_3d_coords(self, coords: List[List[float]], timeout: float = 2.0) -> Optional[Dict[str, Any]]:
+    def send_3d_coords(self, coords: List[List[float]], timeout: float = 5.0) -> Optional[Dict[str, Any]]:
         """
         Publishes 2D bounding boxes and waits for the corresponding 3D detections.
 
@@ -161,6 +161,9 @@ class Tools:
             msg = converters.convert_bboxes_to_detection_array(coords)
             
             # Publish to ROS 2
+            #print("publishing to topic")
+            #print(f"publish to topic: {OBJECT_POSE_TOPIC} ,with msg_type: {DETECTION_2D_TYPE}")
+            #print(msg)
             topic = apply_namespace(OBJECT_POSE_TOPIC, self._namespace)
             self._transport.publish(topic, DETECTION_2D_TYPE, msg)
 
@@ -171,7 +174,8 @@ class Tools:
             if data_received:
                 with self._lock:
                     # Return the fresh data
-                    return self._latest_detection.copy() if self._latest_detection else None
+                    detections = converters.convert_poses_to_array(self._latest_detection.copy())  if self._latest_detection else None
+                    return detections
             else:
                 print(f"[Tools] Timeout ({timeout}s) waiting for 3D detections.")
                 return None
