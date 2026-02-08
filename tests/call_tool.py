@@ -10,8 +10,12 @@ bot = WalkieRobot(
 )
 
 # Use the new Tools module
-coords_2d = [[320.0, 240.0, 50.0, 50.0], [220.0, 140.0, 50.0, 50.0], [600.0,300.0,50.0,50.0]]
-result_3d = bot.tools.send_3d_coords(coords_2d)
+coords_2d = [
+    [320.0, 240.0, 50.0, 50.0],
+    [220.0, 140.0, 50.0, 50.0],
+    [600.0, 300.0, 50.0, 50.0],
+]
+result_3d = bot.tools.bboxes_to_positions(coords_2d)
 
 print(f"3D Result: {result_3d}")
 
@@ -48,9 +52,9 @@ if result_3d:
             marker_type=TEXT_VIEW_FACING,
             text=f"det_{i} ({pos[0]:.2f}, {pos[1]:.2f}, {pos[2]:.2f})",
             color=[1.0, 1.0, 1.0, 1.0],
-            scale=[0.1,0.1,0.1],
+            scale=[0.1, 0.1, 0.1],
             ns="detections_label",
-            frame_id="map"
+            frame_id="map",
         )
 
     # Draw an axis triad at each detection position

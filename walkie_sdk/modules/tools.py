@@ -39,14 +39,14 @@ class Tools:
     ):
         self._transport = transport
         self._namespace = namespace
-        
+
         # Thread safety for local state
         self._lock = threading.Lock()
         self._latest_detection: Optional[Dict[str, Any]] = None
-        
+
         # Synchronization Event: Used to wait for the reply
         self._response_event = threading.Event()
-        
+
         self._subscription = None
         self._subscribed = False
 
@@ -102,16 +102,14 @@ class Tools:
                 self._latest_detection = msg
                 # Optional: Debug print
                 print(f"[Tools] Received 3D detection response")
-            
+
             # 2. Signal that data has arrived (Unblocks the wait)
             self._response_event.set()
 
         try:
             print(f"[Tools] Subscribing to: {topic}")
             self._subscription = self._transport.subscribe(
-                topic, 
-                DETECTION_3D_TYPE, 
-                callback
+                topic, DETECTION_3D_TYPE, callback
             )
             self._subscribed = True
         except Exception as e:
@@ -130,7 +128,9 @@ class Tools:
     # Public API
     # -------------------------------------------------------------------------
 
-    def send_3d_coords(self, coords: List[List[float]], timeout: float = 5.0) -> Optional[Dict[str, Any]]:
+    def bboxes_to_positions(
+        self, coords: List[List[float]], timeout: float = 5.0
+    ) -> Optional[Dict[str, Any]]:
         """
         Publishes 2D bounding boxes and waits for the corresponding 3D detections.
 
@@ -138,7 +138,7 @@ class Tools:
             coords: A list of 2D bounding boxes [cx, cy, w, h].
                     Example: [[320, 240, 50, 50], ...]
             timeout: Maximum time to wait for a response in seconds.
-        
+
         Returns:
             Dictionary containing 'vision_msgs/msg/Detection3DArray' data,
             or None if the request timed out.
@@ -150,7 +150,7 @@ class Tools:
         # 2. Clear the 'Data Received' flag
         # We do this BEFORE publishing to ensure we don't read old data
         self._response_event.clear()
-        
+
         # Optional: Clear old data cache to be safe
         with self._lock:
             self._latest_detection = None
@@ -159,11 +159,11 @@ class Tools:
             # 3. Convert and Publish the Request
             # Using your converter logic
             msg = converters.convert_bboxes_to_detection_array(coords)
-            
+
             # Publish to ROS 2
-            #print("publishing to topic")
-            #print(f"publish to topic: {OBJECT_POSE_TOPIC} ,with msg_type: {DETECTION_2D_TYPE}")
-            #print(msg)
+            # print("publishing to topic")
+            # print(f"publish to topic: {OBJECT_POSE_TOPIC} ,with msg_type: {DETECTION_2D_TYPE}")
+            # print(msg)
             topic = apply_namespace(OBJECT_POSE_TOPIC, self._namespace)
             self._transport.publish(topic, DETECTION_2D_TYPE, msg)
 
@@ -174,12 +174,16 @@ class Tools:
             if data_received:
                 with self._lock:
                     # Return the fresh data
-                    detections = converters.convert_poses_to_array(self._latest_detection.copy())  if self._latest_detection else None
+                    detections = (
+                        converters.convert_poses_to_array(self._latest_detection.copy())
+                        if self._latest_detection
+                        else None
+                    )
                     return detections
             else:
                 print(f"[Tools] Timeout ({timeout}s) waiting for 3D detections.")
                 return None
 
         except Exception as e:
-            print(f"[Tools] Error in send_3d_coords: {e}")
+            print(f"[Tools] Error in bboxes_to_positions: {e}")
             return None
