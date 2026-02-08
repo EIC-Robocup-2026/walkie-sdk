@@ -163,6 +163,7 @@ class Navigation:
 
     def _send_goal_async(
         self,
+        
         goal_msg: Dict[str, Any],
         feedback_callback: Optional[Callable[[Dict[str, Any]], None]],
     ) -> None:
