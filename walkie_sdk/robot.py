@@ -25,6 +25,7 @@ from walkie_sdk.modules.camera import Camera
 from walkie_sdk.modules.multi_camera import MultiCamera
 from walkie_sdk.modules.navigation import Navigation
 from walkie_sdk.modules.telemetry import Telemetry
+from walkie_sdk.modules.tools import Tools
 
 
 class WalkieRobot:
@@ -146,6 +147,9 @@ class WalkieRobot:
         self._camera: Optional[Camera] = (
             Camera(self._camera_transport) if self._camera_transport else None
         )
+        
+        # Tools module
+        self._tools = Tools(self._transport, namespace=namespace)
 
         # Multi-camera interface (wraps camera transport for multi-cam access)
         self._multi_camera: Optional[MultiCamera] = (
@@ -290,6 +294,16 @@ class WalkieRobot:
     def camera_protocol(self) -> str:
         """Get the camera protocol being used."""
         return self._camera_protocol.value
+    
+    @property
+    def tools(self) -> Tools:
+        """
+        Tools module.
+
+        Provides:
+        - bboxes_to_positions(bboxes): Convert 2D bounding boxes to 3D positions
+        """
+        return self._tools
 
     def disconnect(self) -> None:
         """

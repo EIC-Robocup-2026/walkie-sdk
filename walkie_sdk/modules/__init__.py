@@ -11,9 +11,11 @@ implementation (rosbridge, zenoh) via abstract interfaces.
 from walkie_sdk.modules.camera import Camera
 from walkie_sdk.modules.navigation import Navigation
 from walkie_sdk.modules.telemetry import Telemetry
+from walkie_sdk.modules.tools import Tools
 
 __all__ = [
     "Navigation",
     "Telemetry",
     "Camera",
+    "Tools",
 ]
