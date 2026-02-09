@@ -5,7 +5,7 @@ Provides quaternion <-> euler angle conversions for working with ROS orientation
 """
 
 import math
-from typing import Tuple
+from typing import Tuple,List
 
 
 def quaternion_to_euler(
@@ -130,3 +130,67 @@ def quaternion_multiply(
     w = w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2
 
     return (x, y, z, w)
+
+def convert_bboxes_to_detection_array(
+    bboxes: List[List[float]], 
+    frame_id: str = "camera_frame"
+) -> dict:
+    """
+    Converts a list of [cx, cy, w, h] to a vision_msgs/Detection2DArray dictionary.
+    
+    Args:
+        bboxes: List of [cx, cy, w, h] where:
+                cx, cy = center x, y
+                w, h = width, height
+        frame_id: The frame reference (e.g., 'head_camera')
+        
+    Returns:
+        Dictionary representing vision_msgs/msg/Detection2DArray
+    """
+    
+    # Get current time (approximate for Zenoh/Python)
+    now = time.time()
+    sec = int(now)
+    nanosec = int((now - sec) * 1e9)
+    
+    detection_list = []
+    
+    for bbox in bboxes:
+        cx, cy, w, h = bbox
+        
+        # Create a single Detection2D
+        detection = {
+            "header": {
+                "stamp": {"sec": sec, "nanosec": nanosec},
+                "frame_id": frame_id
+            },
+            "results": [], # ObjectHypothesisWithPose[] (empty if no classification)
+            "bbox": {
+                "center": {
+                    'position':{"x": float(cx),"y": float(cy)},
+                    "theta": 0.0
+                },
+                "size_x": float(w),
+                "size_y": float(h)
+            },
+            "id": "" # Optional ID
+        }
+        detection_list.append(detection)
+
+    # Create the final Detection2DArray
+    msg = {
+        "header": {
+            "stamp": {"sec": sec, "nanosec": nanosec},
+            "frame_id": frame_id
+        },
+        "detections": detection_list
+    }
+    
+    return msg
+
+def convert_poses_to_array(data):
+    """
+    Extracts [x, y, z] coordinates from a dictionary of poses.
+    """
+    return [[p['position']['x'], p['position']['y'], p['position']['z']] for p in data.get('poses', [])]
+
