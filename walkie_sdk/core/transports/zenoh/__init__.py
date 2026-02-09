@@ -1,42 +1,67 @@
 """
 Walkie SDK - Zenoh Transport
 
-Zenoh-based transport implementation for ROS2 communication.
-This transport uses Zenoh for low-latency communication
-without requiring ROS2 to be installed on the client machine.
+Zenoh-based transport implementation for ROS2 communication using the zenoh_ros2_sdk.
+This handles CDR serialization, discovery, and type support automatically.
 """
 
 from __future__ import annotations
 
-import json
 import threading
 import time
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple, List
 
 import numpy as np
 
+# Import Zenoh and the SDK components
 try:
     import zenoh
-
+    from zenoh_ros2_sdk import (
+        ZenohSession, 
+        ROS2Publisher, 
+        ROS2Subscriber, 
+        ROS2ServiceClient
+    )
     ZENOH_AVAILABLE = True
 except ImportError:
     ZENOH_AVAILABLE = False
     zenoh = None
 
+try:
+    import cv2
+except ImportError:
+    cv2 = None
+
 from walkie_sdk.core.interfaces import CameraTransportInterface, ROSTransportInterface
+
+ROS_DOMAIN_ID = 23
+
+
+def _msg_to_dict(msg: Any) -> Dict[str, Any]:
+    """
+    Recursively convert a rosbags/SDK message object to a dictionary.
+    This bridges the gap between the SDK's object-oriented returns and the
+    Walkie SDK's dictionary-based interface.
+    """
+    if hasattr(msg, "__dataclass_fields__"):
+        result = {}
+        for field in msg.__dataclass_fields__:
+            value = getattr(msg, field)
+            result[field] = _msg_to_dict(value)
+        return result
+    elif isinstance(msg, list):
+        return [_msg_to_dict(x) for x in msg]
+    elif isinstance(msg, (bytes, bytearray)):
+        return msg
+    elif hasattr(msg, "tolist"):  # numpy arrays
+        return msg.tolist()
+    else:
+        return msg
 
 
 class ZenohTransport(ROSTransportInterface[Any]):
     """
-    ROS transport implementation using Zenoh.
-
-    This transport provides an alternative to rosbridge with potentially
-    better performance characteristics for edge computing scenarios.
-
-    Args:
-        host: Robot IP address or hostname (or Zenoh router address)
-        port: Zenoh router port (default: 7447)
-        timeout: Connection timeout in seconds (default: 10.0)
+    ROS transport implementation using Zenoh SDK.
     """
 
     def __init__(
@@ -48,95 +73,64 @@ class ZenohTransport(ROSTransportInterface[Any]):
     ):
         if not ZENOH_AVAILABLE:
             raise ImportError(
-                "zenoh-python is not installed. Install with: pip install zenoh-python"
+                "zenoh_ros2_sdk is not installed or accessible. Please install zenoh and the SDK."
             )
 
         self._host = host
         self._port = port
         self._timeout = timeout
-        self._session: Optional[Any] = None
+        
+        self._session_mgr = None
         self._lock = threading.Lock()
-        self._subscribers: Dict[str, Any] = {}
-        self._publishers: Dict[str, Any] = {}
-
-        # Track current action for cancellation
-        self._current_goal: Optional[Any] = None
-        self._current_action_client: Optional[Any] = None
+        
+        # Cache SDK entities
+        self._subscribers: Dict[str, ROS2Subscriber] = {}
+        self._publishers: Dict[str, ROS2Publisher] = {}
+        self._service_clients: Dict[str, ROS2ServiceClient] = {}
 
     @property
     def host(self) -> str:
-        """Robot IP address or hostname."""
         return self._host
 
     @property
     def port(self) -> int:
-        """Zenoh router port."""
         return self._port
 
     @property
     def is_connected(self) -> bool:
-        """Check if connected to Zenoh."""
-        return self._session is not None
+        return self._session_mgr is not None
 
     def connect(self) -> None:
-        """Connect to Zenoh router."""
-        print(f"  → Connecting to Zenoh at {self._host}:{self._port}...")
+        """Connect to Zenoh router via SDK Session."""
+        print(f"  → Connecting to Zenoh Router at {self._host}:{self._port}...")
 
         try:
-            # Configure Zenoh session using string-based keys (zenoh>=1.0 API)
-            conf = zenoh.Config()
-            # Enable shared memory transport
-            conf.insert_json5("transport/shared_memory/enabled", "true")
-            if self._host != "localhost" and self._host != "127.0.0.1":
-                conf.insert_json5("mode", json.dumps("client"))
-                conf.insert_json5(
-                    "connect/endpoints", json.dumps([f"tcp/{self._host}:{self._port}"])
-                )
-            else:
-                # Peer mode for local transport (no router required)
-                conf.insert_json5("mode", json.dumps("peer"))
-
-            self._session = zenoh.open(conf)
-
-            # Wait for connection
-            start_time = time.time()
-            while not self._session:
-                if time.time() - start_time > self._timeout:
-                    raise ConnectionError(
-                        f"Connection timeout after {self._timeout}s. "
-                        f"Is Zenoh router running at {self._host}:{self._port}?"
-                    )
-                time.sleep(0.1)
-
-            print(f"  ✓ Connected to Zenoh")
+            # Initialize the Singleton Session
+            self._session_mgr = ZenohSession.get_instance(
+                router_ip=self._host, 
+                router_port=self._port
+            )
+            print(f"  ✓ Connected to Zenoh (Session ID: {self._session_mgr.session_id})")
         except Exception as e:
-            self._session = None
+            self._session_mgr = None
             raise ConnectionError(f"Failed to connect to Zenoh: {e}")
 
     def disconnect(self) -> None:
-        """Close Zenoh connection."""
+        """Close all entities and session."""
         with self._lock:
-            # Close all subscribers and publishers
             for sub in self._subscribers.values():
-                try:
-                    sub.close()
-                except Exception:
-                    pass
+                sub.close()
             for pub in self._publishers.values():
-                try:
-                    pub.close()
-                except Exception:
-                    pass
+                pub.close()
+            for client in self._service_clients.values():
+                client.close()
 
             self._subscribers.clear()
             self._publishers.clear()
-
-            if self._session:
-                try:
-                    self._session.close()
-                except Exception:
-                    pass
-                self._session = None
+            self._service_clients.clear()
+            
+            # Reset session reference but don't close singleton (Camera might use it)
+            self._session_mgr = None
 
     def subscribe(
         self,
@@ -146,55 +140,44 @@ class ZenohTransport(ROSTransportInterface[Any]):
         throttle_rate: int = 0,
         queue_size: int = 1,
     ) -> Any:
-        """Subscribe to a ROS topic via Zenoh."""
-        if not self._session:
+        """Subscribe using ROS2Subscriber."""
+        if not self._session_mgr:
             raise ConnectionError("Not connected to Zenoh")
 
-        # Convert ROS topic to Zenoh key (remove leading / if present)
-        zenoh_key = topic.lstrip("/")
-
-        print(
-            f"[ZenohTransport] Subscribing to zenoh key: '{zenoh_key}' (from topic: '{topic}')"
-        )
-
-        # Debug: track message count
-        msg_count = [0]
-
-        def zenoh_callback(sample):
-            msg_count[0] += 1
-            try:
-                payload = sample.payload
-                if payload:
-                    # Decode JSON message
-                    data_str = bytes(payload).decode("utf-8")
-                    msg_dict = json.loads(data_str)
-                    if msg_count[0] == 1:
-                        print(
-                            f"[ZenohTransport] First message on '{zenoh_key}': keys={list(msg_dict.keys())}"
-                        )
-                    callback(msg_dict)
-            except Exception as e:
-                print(f"[ZenohTransport] Error processing message on {topic}: {e}")
-
         with self._lock:
-            subscriber = self._session.declare_subscriber(zenoh_key, zenoh_callback)
-            self._subscribers[topic] = subscriber
+            if topic in self._subscribers:
+                return self._subscribers[topic]
 
-        print(f"[ZenohTransport] Successfully subscribed to '{zenoh_key}'")
-        return subscriber
+            print(f"[ZenohTransport] Subscribing to: {topic} ({message_type})")
+
+            # Wrapper to convert SDK Object -> Dict
+            def callback_wrapper(msg_obj):
+                try:
+                    msg_dict = _msg_to_dict(msg_obj)
+                    callback(msg_dict)
+                except Exception as e:
+                    print(f"[ZenohTransport] Error in callback for {topic}: {e}")
+
+            # Create Subscriber using standard ROS 2 types
+            sub = ROS2Subscriber(
+                topic=topic,
+                msg_type=message_type,
+                callback=callback_wrapper,
+                router_ip=self._host,
+                router_port=self._port
+            )
+            self._subscribers[topic] = sub
+            return sub
 
     def unsubscribe(self, handle: Any) -> None:
-        """Unsubscribe from a topic."""
+        """Unsubscribe and close the SDK subscriber."""
         with self._lock:
-            # Find and remove subscriber
-            for topic, sub in list(self._subscribers.items()):
-                if sub == handle:
-                    try:
-                        sub.close()
-                    except Exception:
-                        pass
-                    del self._subscribers[topic]
-                    break
+            # Handle is the ROS2Subscriber instance
+            if hasattr(handle, 'topic') and handle.topic in self._subscribers:
+                handle.close()
+                del self._subscribers[handle.topic]
+            elif hasattr(handle, 'close'):
+                handle.close()
 
     def publish(
         self,
@@ -202,27 +185,61 @@ class ZenohTransport(ROSTransportInterface[Any]):
         message_type: str,
         message: Dict[str, Any],
     ) -> None:
-        """Publish a message to a ROS topic via Zenoh."""
-        if not self._session:
+        """Publish using ROS2Publisher."""
+        if not self._session_mgr:
             raise ConnectionError("Not connected to Zenoh")
 
-        # Convert ROS topic to Zenoh key
-        zenoh_key = topic.lstrip("/")
-
-        # Get or create publisher
         with self._lock:
             if topic not in self._publishers:
-                publisher = self._session.declare_publisher(zenoh_key)
-                self._publishers[topic] = publisher
-            else:
-                publisher = self._publishers[topic]
+                # Create Publisher
+                self._publishers[topic] = ROS2Publisher(
+                    topic=topic,
+                    msg_type=message_type,
+                    router_ip=self._host,
+                    router_port=self._port
+                )
+            
+            pub = self._publishers[topic]
 
-        # Serialize message to JSON and publish
+        # Publish using kwargs
         try:
-            message_json = json.dumps(message)
-            publisher.put(message_json.encode("utf-8"))
+            pub.publish(**message)
         except Exception as e:
             print(f"[ZenohTransport] Error publishing to {topic}: {e}")
+            raise
+
+    def call_service(
+        self,
+        service_name: str,
+        service_type: str,
+        request: Dict[str, Any],
+        timeout: float = 5.0,
+    ) -> Dict[str, Any]:
+        """Call service using ROS2ServiceClient."""
+        if not self._session_mgr:
+            raise ConnectionError("Not connected to Zenoh")
+
+        with self._lock:
+            if service_name not in self._service_clients:
+                self._service_clients[service_name] = ROS2ServiceClient(
+                    service_name=service_name,
+                    srv_type=service_type,
+                    timeout=timeout,
+                    router_ip=self._host,
+                    router_port=self._port
+                )
+            client = self._service_clients[service_name]
+
+        try:
+            # SDK call returns an object
+            response_obj = client.call(**request)
+            
+            if response_obj is None:
+                raise TimeoutError(f"Service call to {service_name} timed out or failed")
+                
+            return _msg_to_dict(response_obj)
+        except Exception as e:
+            print(f"[ZenohTransport] Error calling service {service_name}: {e}")
             raise
 
     def call_action(
@@ -233,250 +250,169 @@ class ZenohTransport(ROSTransportInterface[Any]):
         feedback_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
         timeout: Optional[float] = None,
     ) -> Dict[str, Any]:
-        """Call a ROS2 action via Zenoh (using queryable pattern)."""
-        if not self._session:
-            raise ConnectionError("Not connected to Zenoh")
-
-        # For actions, we use Zenoh's queryable pattern
-        # This is a simplified implementation
-        action_key = action_name.lstrip("/")
-
-        # Publish goal and wait for result
-        goal_json = json.dumps(goal)
-
-        # TODO: Implement proper action call pattern with Zenoh queryables
-        # For now, return a placeholder
-        return {"result": None, "status": "UNKNOWN"}
+        """
+        Call a ROS2 action.
+        Note: The current zenoh_ros2_sdk does not explicitly expose a high-level ActionClient yet.
+        """
+        print(f"[ZenohTransport] WARNING: Action {action_name} call not fully supported in this SDK version.")
+        return {"result": None, "status": "NOT_IMPLEMENTED"}
 
     def cancel_action(self) -> None:
-        """Cancel the current action goal."""
-        # TODO: Implement action cancellation
         pass
-
-    def call_service(
-        self,
-        service_name: str,
-        service_type: str,
-        request: Dict[str, Any],
-        timeout: float = 5.0,
-    ) -> Dict[str, Any]:
-        """Call a ROS service via Zenoh (using queryable pattern)."""
-        if not self._session:
-            raise ConnectionError("Not connected to Zenoh")
-
-        # Use Zenoh queryable for service calls
-        service_key = service_name.lstrip("/")
-
-        try:
-            request_json = json.dumps(request)
-            # Query Zenoh for service response
-            replies = self._session.get(
-                service_key, request_json.encode("utf-8"), zenoh.Queue()
-            )
-
-            # Wait for response with timeout
-            start_time = time.time()
-            for reply in replies:
-                if time.time() - start_time > timeout:
-                    raise TimeoutError(f"Service call to {service_name} timed out")
-
-                if reply.is_ok:
-                    payload = reply.payload
-                    if payload:
-                        response_str = bytes(payload).decode("utf-8")
-                        return json.loads(response_str)
-
-            raise TimeoutError(f"Service call to {service_name} timed out")
-        except Exception as e:
-            print(f"[ZenohTransport] Error calling service {service_name}: {e}")
-            raise
 
 
 class ZenohCamera(CameraTransportInterface):
     """
-    Camera transport implementation using Zenoh.
-
-    Supports both single-camera and multi-camera modes. For multi-camera,
-    subscribes to multiple topics (head, left, right).
-
-    Args:
-        host: Robot IP address or hostname
-        port: Zenoh port for video stream
-        topic: Zenoh topic for camera frames (single camera mode)
-        camera_name: Camera name for multi-camera mode ("head", "left", "right")
+    Camera transport implementation using Zenoh SDK.
+    Subscribes to standard 'sensor_msgs/msg/CompressedImage'.
     """
+    
+    # Configure your ROS_DOMAIN_ID here if needed
 
+    # Define standard ROS 2 topics for camera streams
+    # Adjust these topics to match your robot's actual output
     CAMERA_TOPICS = {
-        "head": "walkie/camera/head",
-        "left": "walkie/camera/left",
-        "right": "walkie/camera/right",
+        "head":  f"/zed/zed_node/rgb/color/rect/image/compressed",
+        "left":  f"/walkie/camera/left/compressed",
+        "right": f"/walkie/camera/right/compressed",
     }
+    
+    # Example ZED Topic if using standard ZED wrapper
+    # "head": f"/zed/zed_node/rgb/image_rect_color/compressed"
 
     def __init__(
         self,
         host: str,
         port: int = 7447,
-        topic: str = "walkie/camera/image",
+        topic: str = "walkie/camera/image/compressed",
         camera_name: str = "head",
         multi_camera: bool = False,
         **kwargs,
     ):
         if not ZENOH_AVAILABLE:
-            raise ImportError(
-                "zenoh-python is not installed. Install with: pip install zenoh-python"
-            )
+            raise ImportError("zenoh_ros2_sdk is not installed.")
+        if cv2 is None:
+            raise ImportError("opencv-python is required for ZenohCamera.")
 
         self._host = host
         self._port = port
-        self._topic = topic
+        self._default_topic = topic 
         self._camera_name = camera_name
-        self._session: Optional[Any] = None
-        self._subscribers: Dict[str, Any] = {}
+        self._multi_camera = multi_camera
+        
+        self._session_mgr = None
+        self._subscribers: Dict[str, ROS2Subscriber] = {}
+        
         self._latest_frames: Dict[str, np.ndarray] = {}
         self._frame_lock = threading.Lock()
         self._streaming = False
 
     @property
     def is_streaming(self) -> bool:
-        """Check if camera stream is active."""
         return self._streaming
 
     @property
     def frame_shape(self) -> Optional[Tuple[int, int, int]]:
-        """Get frame dimensions."""
         with self._frame_lock:
-            # Return shape of first available frame
             for frame in self._latest_frames.values():
                 if frame is not None:
                     return frame.shape
         return None
 
     def connect(self) -> None:
-        """Connect to Zenoh and start camera stream."""
-        try:
-            # Configure Zenoh session using string-based keys (zenoh>=1.0 API)
-            conf = zenoh.Config()
-            # Enable shared memory transport
-            conf.insert_json5("transport/shared_memory/enabled", "true")
-            if self._host != "localhost" and self._host != "127.0.0.1":
-                conf.insert_json5("mode", json.dumps("client"))
-                conf.insert_json5(
-                    "connect/endpoints", json.dumps([f"tcp/{self._host}:{self._port}"])
-                )
+        if self._streaming:
+            return
+
+        print(f"  → Connecting Camera to Zenoh at {self._host}:{self._port}...")
+        # Reuse existing session singleton if available
+        self._session_mgr = ZenohSession.get_instance(self._host, self._port)
+
+        # Determine which st to subscribe to
+        topics = {}
+        if self._multi_camera:
+            topics = self.CAMERA_TOPICS
+        else:
+            # Use specific topic for requested camera
+            if self._camera_name in self.CAMERA_TOPICS:
+                topics[self._camera_name] = self.CAMERA_TOPICS[self._camera_name]
             else:
-                conf.insert_json5("mode", json.dumps("peer"))
+                topics[self._camera_name] = self._default_topic
 
-            self._session = zenoh.open(conf)
+        # Create subscribers for CompressedImage
+        for name, topic in topics.items():
+            print(f"  → Subscribing to camera topic: {topic}")
+            
+            # Closure to capture camera name for the callback
+            def make_cb(cam_id):
+                return lambda msg: self._on_frame(cam_id, msg)
 
-            # Create frame callback
-            def make_frame_callback(camera_name: str):
-                def frame_callback(sample):
-                    try:
-                        import cv2
-
-                        payload = sample.payload
-                        if payload:
-                            img_bytes = bytes(payload)
-
-                            # Check for JPEG (0xFF 0xD8)
-                            if img_bytes.startswith(b"\xff\xd8"):
-                                nparr = np.frombuffer(img_bytes, np.uint8)
-                                frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-                            else:
-                                # Try to decode as raw with 12-byte header (h, w, c)
-                                if len(img_bytes) > 12:
-                                    header = np.frombuffer(
-                                        img_bytes[:12], dtype=np.uint32
-                                    )
-                                    h, w, c = header
-                                    if h * w * c == len(img_bytes) - 12:
-                                        frame = np.frombuffer(
-                                            img_bytes[12:], dtype=np.uint8
-                                        ).reshape(h, w, c)
-                                    else:
-                                        frame = None
-                                else:
-                                    frame = None
-
-                            if frame is not None:
-                                with self._frame_lock:
-                                    self._latest_frames[camera_name] = frame
-                    except Exception as e:
-                        print(
-                            f"[ZenohCamera] Error processing frame for {camera_name}: {e}"
-                        )
-
-                return frame_callback
-
-            # Subscribe to camera topics
-            for cam_name, topic in self.CAMERA_TOPICS.items():
-                subscriber = self._session.declare_subscriber(
-                    topic, make_frame_callback(cam_name)
-                )
-                self._subscribers[cam_name] = subscriber
-            print(f"  ✓ Connected to Zenoh multi-camera stream")
-
-            self._streaming = True
-        except Exception as e:
-            raise ConnectionError(f"Failed to connect to Zenoh camera: {e}")
+            self._subscribers[name] = ROS2Subscriber(
+                topic=topic,
+                msg_type="sensor_msgs/msg/CompressedImage",
+                domain_id=ROS_DOMAIN_ID,
+                callback=make_cb(name),
+                router_ip=self._host,
+                router_port=self._port
+            )
+        
+        self._streaming = True
+        print("  ✓ Camera Stream Started")
 
     def disconnect(self) -> None:
-        """Disconnect from camera stream."""
-        for subscriber in self._subscribers.values():
-            try:
-                subscriber.close()
-            except Exception:
-                pass
-        self._subscribers.clear()
-
-        if self._session:
-            try:
-                self._session.close()
-            except Exception:
-                pass
-            self._session = None
-
         self._streaming = False
+        for sub in self._subscribers.values():
+            sub.close()
+        self._subscribers.clear()
+        
         with self._frame_lock:
             self._latest_frames.clear()
 
+    def _on_frame(self, name: str, msg: Any) -> None:
+        """Handle CompressedImage message."""
+        try:
+            # ROS 2 CompressedImage: 'data' field contains the bytes
+            data = msg.data
+            print(f"Received frame for camera '{name}', size: {len(data)} bytes")
+            
+            # Handle different byte representations (rosbags vs standard)
+            if hasattr(data, 'tobytes'):
+                data = data.tobytes()
+            elif isinstance(data, list):
+                data = bytes(data)
+            elif not isinstance(data, (bytes, bytearray)):
+                # Fallback
+                data = bytes(data)
+            
+            # Decode JPEG/PNG to OpenCV image
+            np_arr = np.frombuffer(data, np.uint8)
+            frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+            
+            if frame is not None:
+                with self._frame_lock:
+                    self._latest_frames[name] = frame
+        except Exception as e:
+            # print(f"Frame decode error: {e}")
+            pass
+
     def get_frame(self, camera_name: Optional[str] = None) -> Optional[np.ndarray]:
-        """Get the latest camera frame.
-
-        Args:
-            camera_name: Camera name for multi-camera mode. If None, uses default camera.
-
-        Returns:
-            BGR image as numpy array, or None if no frame available
-        """
-        cam = camera_name or self._camera_name
+        target = camera_name or self._camera_name
         with self._frame_lock:
-            frame = self._latest_frames.get(cam)
+            frame = self._latest_frames.get(target)
             return frame.copy() if frame is not None else None
 
     def get_head_frame(self) -> Optional[np.ndarray]:
-        """Get the latest head/front camera frame."""
         return self.get_frame("head")
 
     def get_left_frame(self) -> Optional[np.ndarray]:
-        """Get the latest left wrist camera frame."""
         return self.get_frame("left")
 
     def get_right_frame(self) -> Optional[np.ndarray]:
-        """Get the latest right wrist camera frame."""
         return self.get_frame("right")
 
     def get_all_frames(self) -> Dict[str, np.ndarray]:
-        """Get the latest frames from all cameras.
-
-        Returns:
-            Dictionary mapping camera name to frame
-        """
         with self._frame_lock:
             return {
-                name: frame.copy()
-                for name, frame in self._latest_frames.items()
-                if frame is not None
+                k: v.copy() for k, v in self._latest_frames.items() if v is not None
             }
 
 

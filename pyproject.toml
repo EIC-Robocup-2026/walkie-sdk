@@ -27,6 +27,8 @@ dependencies = [
     "roslibpy>=2.0.0",
     "pyyaml",
     "eclipse-zenoh>=1.7.2",
+    "zenoh-ros2-sdk",
+    "rosbags",
 ]
 
 [project.urls]
