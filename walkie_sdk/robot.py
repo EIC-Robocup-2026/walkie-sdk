@@ -302,6 +302,7 @@ class WalkieRobot:
         """
         return self._viz
     
+    @property
     def tools(self) -> Tools:
         """Tools module for utility functions."""
         return self._tools
