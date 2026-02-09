@@ -26,6 +26,7 @@ from walkie_sdk.modules.multi_camera import MultiCamera
 from walkie_sdk.modules.navigation import Navigation
 from walkie_sdk.modules.telemetry import Telemetry
 from walkie_sdk.modules.visualization import Visualization
+from walkie_sdk.modules.tools import Tools
 
 
 class WalkieRobot:
@@ -165,6 +166,9 @@ class WalkieRobot:
             MultiCamera(self._camera_transport) if self._camera_transport else None
         )
 
+        # Tools module
+        self._tools = Tools(self._transport, namespace=namespace)
+
         # Visualization module (marker publishing for RViz2)
         self._viz = Visualization(self._transport, namespace=namespace)
 
@@ -297,6 +301,10 @@ class WalkieRobot:
             ... )
         """
         return self._viz
+    
+    def tools(self) -> Tools:
+        """Tools module for utility functions."""
+        return self._tools
 
     def draw_marker(
         self,
