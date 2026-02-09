@@ -25,8 +25,9 @@ dependencies = [
     "numpy>=2.3.5",
     "opencv-python>=4.11.0.86",
     "roslibpy>=2.0.0",
-    "pyyaml"
-    ]
+    "pyyaml",
+    "eclipse-zenoh>=1.7.2",
+]
 
 [project.urls]
 Homepage = "https://github.com/walkie-team/walkie-sdk"
