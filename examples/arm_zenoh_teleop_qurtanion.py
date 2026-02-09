@@ -265,6 +265,8 @@ def listener(sample):
         link_name = data.get("link_name", EE_LINKS.get(group, "left_link7"))
         planning_time = float(data.get("allowed_planning_time", 10.0))
         blocking = bool(data.get("blocking", False))
+
+        global teleop_status
         teleop_status = data.get("teleop_status", "IN_PROGRESS")
 
         # 3. Validation
@@ -314,12 +316,12 @@ def listener(sample):
             qz=target_qz,
             qw=target_qw,
             group_name=group,
-            frame_id="base_footprint",
-            link_name=link_name,
-            allowed_planning_time=planning_time,
-            mode="moveit",
-            # mode="custom_ik",
-            blocking=blocking,
+            # frame_id="base_footprint",
+            # link_name=link_name,
+            # allowed_planning_time=planning_time,
+            # mode="moveit",
+            mode="custom_ik",
+            # blocking=blocking,
         )
 
         # 6.5 Execue gripper move
@@ -410,6 +412,7 @@ def main():
         sub = session.declare_subscriber(key_expr, listener)
         # 5. Keep Alive
         while teleop_status != "COMPLETED":
+            print(f"Teleop session status: {teleop_status}.")
             time.sleep(1)
 
     except KeyboardInterrupt:
