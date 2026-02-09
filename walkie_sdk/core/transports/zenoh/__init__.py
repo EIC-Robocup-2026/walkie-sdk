@@ -372,7 +372,7 @@ class ZenohCamera(CameraTransportInterface):
         try:
             # ROS 2 CompressedImage: 'data' field contains the bytes
             data = msg.data
-            print(f"Received frame for camera '{name}', size: {len(data)} bytes")
+            # print(f"Received frame for camera '{name}', size: {len(data)} bytes")
             
             # Handle different byte representations (rosbags vs standard)
             if hasattr(data, 'tobytes'):
