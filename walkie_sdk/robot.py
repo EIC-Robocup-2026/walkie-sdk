@@ -301,7 +301,7 @@ class WalkieRobot:
             ... )
         """
         return self._viz
-    
+
     @property
     def tools(self) -> Tools:
         """Tools module for utility functions."""
@@ -532,14 +532,6 @@ class WalkieRobot:
         # Stop telemetry
         self._status.stop()
 
-        # Stop camera
-        if self._camera is not None:
-            try:
-                self._camera.stop()
-            except Exception:
-                pass
-
-        # Disconnect camera transport
         if self._camera_transport is not None:
             try:
                 self._camera_transport.disconnect()
