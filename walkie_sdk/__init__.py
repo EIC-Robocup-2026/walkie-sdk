@@ -42,7 +42,7 @@ from walkie_sdk.modules.visualization import (
 from walkie_sdk.robot import WalkieRobot
 from walkie_sdk.modules.multi_camera import MultiCamera
 
-__version__ = "0.3.0"
+__version__ = "0.2.0"
 
 __all__ = [
     # Main class
