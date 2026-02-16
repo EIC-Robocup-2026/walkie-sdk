@@ -1,10 +1,15 @@
+import argparse
 import time
 
 from walkie_sdk import WalkieRobot, SPHERE, TEXT_VIEW_FACING
 
+parser = argparse.ArgumentParser(description="Walkie-SDK tools demo")
+parser.add_argument("--ip", default="127.0.0.1", help="Robot IP address")
+args = parser.parse_args()
+
 # Initialize Robot (Zenoh Protocol)
 bot = WalkieRobot(
-    ip="100.87.162.10",
+    ip=args.ip,
     ros_protocol="rosbridge",
     camera_protocol="zenoh",
 )

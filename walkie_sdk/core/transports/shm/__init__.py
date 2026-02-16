@@ -23,6 +23,7 @@ except ImportError:
     HAS_CV2 = False
 
 from walkie_sdk.core.interfaces import CameraTransportInterface
+from walkie_sdk.core.interfaces.camera_transport import MultiCameraTransportInterface
 
 # Constants (must match simulation side)
 SHM_SIZE_PER_IMAGE = 4 * 1024 * 1024  # 4MB per image
@@ -192,7 +193,7 @@ class SharedMemoryCamera(CameraTransportInterface):
         return self._last_timestamp if self._last_timestamp > 0 else None
 
 
-class MultiSharedMemoryCamera(CameraTransportInterface):
+class MultiSharedMemoryCamera(MultiCameraTransportInterface):
     """
     Multi-camera transport using shared memory.
 
@@ -264,30 +265,20 @@ class MultiSharedMemoryCamera(CameraTransportInterface):
         self._cameras.clear()
         self._streaming = False
 
-    def get_frame(self, camera_name: str = "head") -> Optional[np.ndarray]:
+    def get_frame(self, camera_name: Optional[str] = None) -> Optional[np.ndarray]:
         """Get the latest frame from a specific camera.
 
         Args:
-            camera_name: Name of the camera ("head", "left", or "right")
+            camera_name: Name of the camera ("head", "left", or "right").
+                         Defaults to "head" if None.
 
         Returns:
             BGR image as numpy array, or None if not available
         """
-        if camera_name in self._cameras:
-            return self._cameras[camera_name].get_frame()
+        target = camera_name or "head"
+        if target in self._cameras:
+            return self._cameras[target].get_frame()
         return None
-
-    def get_head_frame(self) -> Optional[np.ndarray]:
-        """Get the latest head/front camera frame."""
-        return self.get_frame("head")
-
-    def get_left_frame(self) -> Optional[np.ndarray]:
-        """Get the latest left wrist camera frame."""
-        return self.get_frame("left")
-
-    def get_right_frame(self) -> Optional[np.ndarray]:
-        """Get the latest right wrist camera frame."""
-        return self.get_frame("right")
 
     def get_all_frames(self) -> Dict[str, np.ndarray]:
         """Get the latest frames from all connected cameras.
