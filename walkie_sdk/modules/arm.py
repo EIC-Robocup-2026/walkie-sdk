@@ -80,12 +80,9 @@ class Arm:
         )
         self._target_pose_topic = target_pose_topic
         self._states_lock = threading.Lock()
-        self._latest_states: Optional[Dict[str, any]] = None
+        self._latest_states: Optional[Dict[str, Any]] = None
         self._subscribed = False
         self._msg_count = 0  # Debug counter
-
-        # Try to subscribe to joint states (may fail if transport not connected yet)
-        self._setup_state_subscription()
 
     def _setup_state_subscription(self):
         """Setup subscription to joint states."""
@@ -275,7 +272,7 @@ class Arm:
         return False
 
     # tested
-    def get_joint_states(self) -> Optional[Dict[str, any]]:
+    def get_joint_states(self) -> Optional[Dict[str, Any]]:
         """
         Get current joint states.
 
@@ -351,7 +348,7 @@ class Arm:
                     elif name.startswith("left_gripper"):
                         if i < len(positions):
                             left_gripper = positions[i]
-                    elif name.startswith("right_gripper_controller"):
+                    elif name.startswith("right_gripper"):
                         if i < len(positions):
                             right_gripper = positions[i]
 
@@ -467,7 +464,7 @@ class Arm:
             return "IN_PROGRESS"
 
     # tested
-    def go_to_home(self, group_name: str) -> None:
+    def go_to_home(self, group_name: str) -> str:
         """Move the arm to its defined home position."""
         try:
             result = self._transport.call_action(
@@ -483,7 +480,8 @@ class Arm:
                 return "FAILED"
 
         except TimeoutError:
-            print("timeout error:")
+            print("[Arm] Go Home timed out")
+            return "FAILED"
         except Exception as e:
             print(f"Go Home failed: {e}")
             return "FAILED"
@@ -594,7 +592,7 @@ class Arm:
         feedback_callback: Optional[
             Callable[[Dict[str, Any]], None]
         ] = None,  # NEW ARGUMENT
-    ) -> None:
+    ) -> str:
         """
         Move the arm to a specific Cartesian pose using an absolute coordinate action.
         """
@@ -609,7 +607,6 @@ class Arm:
             "cartesian_path": cartesian_path,
         }
 
-        # Assuming the action name is 'go_to_pose'
         return self._send_action_goal(
             action_name="go_to_pose_relative",
             action_type=f"{MOVEIT_ACTION_INTERFACE}/GoToPoseRelative",
@@ -617,6 +614,7 @@ class Arm:
             blocking=blocking,
             feedback_callback=feedback_callback,
         )
+
     def go_to_pose_quaternion(
         self,
         x: float,
