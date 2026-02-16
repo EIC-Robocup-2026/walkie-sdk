@@ -1,9 +1,10 @@
+import argparse
 import zenoh
 import time
 import json
 import threading
 import math
-from walkie_sdk.robot import WalkieRobot
+from walkie_sdk import WalkieRobot
 from walkie_sdk.utils.converters import (
     quaternion_to_euler,
     euler_to_quaternion,
@@ -197,7 +198,6 @@ def _invert_transform(tf):
 # So: ros_roll = c_pitch, ros_pitch = -c_yaw, ros_yaw = c_roll
 
 
-
 def remap_controller_to_ros(cx, cy, cz, cqx, cqy, cqz, cqw):
     """
     Remap controller-frame position + quaternion to ROS base_footprint frame.
@@ -226,6 +226,7 @@ def remap_controller_to_ros(cx, cy, cz, cqx, cqy, cqz, cqw):
     ros_quat = quaternion_multiply(ros_quat, offset_quat)
     ros_qx, ros_qy, ros_qz, ros_qw = ros_quat
     return (ros_x, ros_y, ros_z, ros_qx, ros_qy, ros_qz, ros_qw)
+
 
 # ---------------------------------------------------------------------------
 # Zenoh callback
@@ -377,9 +378,16 @@ def main():
     global teleop_status
     teleop_status = "IN_PROGRESS"
 
+    parser = argparse.ArgumentParser(description="Zenoh arm teleoperation (quaternion)")
+    parser.add_argument("--ip", default="127.0.0.1", help="Robot IP address")
+    parser.add_argument("--ros-port", type=int, default=9090, help="ROS bridge port")
+    args = parser.parse_args()
+
     # 1. Initialize Robot Connection
     print("Connecting to WalkieRobot...")
-    robot = WalkieRobot(ip="10.0.0.204", ros_port=9090, camera_protocol='none',arm_mode='custom_ik')
+    robot = WalkieRobot(
+        ip=args.ip, ros_port=args.ros_port, camera_protocol="none", arm_mode="custom_ik"
+    )
     # robot = WalkieRobot(ip="10.206.61.14", ros_port=9090, camera_protocol='none',arm_mode='custom_ik')
 
     try:
