@@ -1,8 +1,8 @@
 site_name: Walkie SDK
 site_description: Python SDK for controlling Walkie robots
-site_url: https://walkie-team.github.io/walkie-sdk/
-repo_url: https://github.com/walkie-team/walkie-sdk
-repo_name: walkie-team/walkie-sdk
+site_url: https://EIC-Robocup-2026.github.io/walkie-sdk/
+repo_url: https://github.com/EIC-Robocup-2026/walkie-sdk
+repo_name: EIC-Robocup-2026/walkie-sdk
 
 theme:
   name: material

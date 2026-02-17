@@ -1,6 +1,6 @@
 # Examples
 
-Example scripts are in the [`examples/`](https://github.com/walkie-team/walkie-sdk/tree/main/examples) directory.
+Example scripts are in the [`examples/`](https://github.com/EIC-Robocup-2026/walkie-sdk/tree/main/examples) directory.
 
 ## Running Examples
 
