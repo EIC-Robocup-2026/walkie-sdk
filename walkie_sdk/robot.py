@@ -35,7 +35,7 @@ class WalkieRobot:
 
     Auto-connects to the robot on initialization and provides access to:
     - .nav: Navigation controls (go_to, cancel, stop)
-    - .status: Telemetry data (get_pose, get_velocity)
+    - .status: Telemetry data (get_position, get_velocity)
     - .camera: Camera frames (get_frame) - if enabled
     - .viz: Visualization markers for RViz2 (draw_marker, clear_markers)
 
@@ -69,7 +69,7 @@ class WalkieRobot:
         # Default: WebSocket + Zenoh camera (no ROS2 needed on client)
         bot = WalkieRobot(ip="192.168.1.100")
 
-        bot.status.get_pose()
+        bot.status.get_position()
         # {'x': 0.0, 'y': 0.0, 'heading': 0.0}
 
         bot.nav.go_to(x=2.0, y=1.0, heading=0.0)
@@ -220,7 +220,7 @@ class WalkieRobot:
         Telemetry/status provider.
 
         Provides:
-        - get_pose(): Get current pose {x, y, heading}
+        - get_position(): Get current pose {x, y, heading}
         - get_velocity(): Get current velocity {linear, angular}
         """
         return self._status

@@ -53,7 +53,7 @@ def example_rosbridge():
         print(f"  Camera protocol: {bot.camera_protocol}")
 
         # Use the robot...
-        pose = bot.status.get_pose()
+        pose = bot.status.get_position()
         if pose:
             print(f"  Robot pose: x={pose['x']:.2f}, y={pose['y']:.2f}")
 

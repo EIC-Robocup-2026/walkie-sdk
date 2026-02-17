@@ -26,7 +26,7 @@ from walkie_sdk import WalkieRobot
 bot = WalkieRobot(ip="192.168.1.100")
 
 # Read telemetry
-pose = bot.status.get_pose()
+pose = bot.status.get_position()
 print(f"Robot at ({pose['x']:.2f}, {pose['y']:.2f})")
 
 # Get a camera frame

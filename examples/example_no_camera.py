@@ -54,7 +54,7 @@ def main():
     print("\n[2] Reading telemetry...")
     time.sleep(0.3)
 
-    pose = bot.status.get_pose()
+    pose = bot.status.get_position()
     if pose:
         print(f"  📍 Position: x={pose['x']:.3f}, y={pose['y']:.3f}")
         print(f"  🧭 Heading:  {pose['heading']:.3f} rad")
@@ -81,7 +81,7 @@ def main():
     print("\n[4] Monitoring until navigation completes...")
     i = 0
     while bot.nav.status != "SUCCEEDED":
-        pose = bot.status.get_pose()
+        pose = bot.status.get_position()
         if pose:
             print(
                 f" [{i + 1}s] Status={bot.nav.status} x={pose['x']:+6.2f}  y={pose['y']:+6.2f}  θ={pose['heading']:+5.2f}"

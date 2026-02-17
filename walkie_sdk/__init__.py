@@ -13,7 +13,7 @@ Example:
     # Default: WebSocket + Zenoh camera
     bot = WalkieRobot(ip="192.168.1.100")
 
-    print(f"Pose: {bot.status.get_pose()}")
+    print(f"Pose: {bot.status.get_position()}")
     bot.nav.go_to(x=2.0, y=1.0, heading=0.0)
 """
 

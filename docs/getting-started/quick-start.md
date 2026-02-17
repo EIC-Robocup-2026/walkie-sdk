@@ -16,7 +16,7 @@ See [Protocol Selection](../guides/protocols.md) for other options.
 ## 2. Read Telemetry
 
 ```python
-pose = bot.status.get_pose()
+pose = bot.status.get_position()
 if pose:
     print(f"Position: ({pose['x']:.2f}, {pose['y']:.2f})")
     print(f"Heading: {pose['heading']:.2f} rad")

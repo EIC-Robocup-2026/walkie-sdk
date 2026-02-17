@@ -140,7 +140,7 @@ def main():
                 )
 
                 # Add robot pose if available
-                pose = bot.status.get_pose()
+                pose = bot.status.get_position()
                 if pose:
                     cv2.putText(
                         display_frame,

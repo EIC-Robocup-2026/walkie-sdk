@@ -27,7 +27,7 @@ Camera will not be available.
 ## No Odometry Data
 
 ```python
-bot.status.get_pose()  # Returns None
+bot.status.get_position()  # Returns None
 ```
 
 1. Wait for the first odometry message (may take 100-200ms after connect)
