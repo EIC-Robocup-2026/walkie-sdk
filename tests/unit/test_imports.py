@@ -40,7 +40,6 @@ def test_import_visualization_constants():
         TEXT_VIEW_FACING,
         MESH_RESOURCE,
         TRIANGLE_LIST,
-        DEFAULT_AXIS_TOPIC,
         Visualization,
     )
 

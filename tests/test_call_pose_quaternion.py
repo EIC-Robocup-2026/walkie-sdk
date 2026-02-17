@@ -50,13 +50,13 @@ def test_moveit(robot: WalkieRobot):
     print(f"  Group: {group}  Link: {link}")
     print(f"  Mode: MOVEIT (blocking)\n")
 
-    # Draw axis triad at target pose before moving
-    robot.draw_axis(
+    # Draw target pose
+    robot.draw_pose(
         position=[x_pos, y_pos, z_pos],
         quaternion=[qx_val, qy_val, qz_val, qw_val],
-        axis_name=f"target_{group}",
+        topic="walkie/target_viz",
     )
-    print(f"  [Viz] Drew axis triad for target pose")
+    print(f"  [Viz] Drew pose for target")
 
     status = robot.arm.go_to_pose_quaternion(
         x=x_pos,
@@ -101,8 +101,8 @@ def test_custom_ik(robot: WalkieRobot, duration: float = 5.0):
     print(f"  Duration: {duration} s")
     print(f"  Mode: CUSTOM_IK\n")
 
-    axis_name = "ik_target"
-    axis_created = False
+    pose_topic = "walkie/ik_target"
+    pose_created = False
 
     elapsed = 0.0
     start = time.monotonic()
@@ -126,16 +126,16 @@ def test_custom_ik(robot: WalkieRobot, duration: float = 5.0):
             mode=ArmControlMode.CUSTOM_IK,
         )
 
-        # Update axis triad to follow the target pose
-        if not axis_created:
-            robot.draw_axis(
+        # Update pose visualization to follow the target
+        if not pose_created:
+            robot.draw_pose(
                 position=[x, y, z],
                 quaternion=[qx_val, qy_val, qz_val, qw_val],
-                axis_name=axis_name,
+                topic=pose_topic,
             )
-            axis_created = True
+            pose_created = True
         else:
-            robot.update_axis(axis_name, position=[x, y, z])
+            robot.update_pose(topic=pose_topic, position=[x, y, z])
 
         # Throttled log (once per second)
         if int(elapsed) != int(elapsed - dt) or elapsed < dt:

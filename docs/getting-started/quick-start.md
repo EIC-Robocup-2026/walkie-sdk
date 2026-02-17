@@ -88,16 +88,13 @@ from walkie_sdk import SPHERE
 # Draw a marker in RViz2
 marker_id = bot.viz.draw_marker(
     position=[1.0, 2.0, 0.0],
-    quaternion=[0.0, 0.0, 0.0, 1.0],
-    marker_type=SPHERE,
-    color=[0.0, 1.0, 0.0, 0.8],
+    # Defaults to red arrow
 )
 
-# Draw an axis triad
-bot.viz.draw_axis(
+# Draw a PoseStamped (triad)
+bot.viz.draw_pose(
     position=[0.5, 0.0, 0.3],
-    quaternion=[0.0, 0.0, 0.0, 1.0],
-    axis_name="target",
+    topic="walkie/target_pose/left_arm",
 )
 ```
 

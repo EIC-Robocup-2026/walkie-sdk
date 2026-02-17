@@ -28,7 +28,6 @@ from walkie_sdk.modules.visualization import (
     CUBE,
     CUBE_LIST,
     CYLINDER,
-    DEFAULT_AXIS_TOPIC,
     LINE_LIST,
     LINE_STRIP,
     MESH_RESOURCE,
@@ -69,7 +68,6 @@ __all__ = [
     "TEXT_VIEW_FACING",
     "MESH_RESOURCE",
     "TRIANGLE_LIST",
-    "DEFAULT_AXIS_TOPIC",
     # Version
     "__version__",
 ]

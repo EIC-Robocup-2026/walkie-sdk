@@ -123,22 +123,6 @@ bot.viz.draw_pose(
 )
 ```
 
-## Axis Triads
-
-Draw RGB axis arrows (Red=X, Green=Y, Blue=Z) to visualize a coordinate frame:
-
-```python
-name = bot.viz.draw_axis(
-    position=[1.0, 0.0, 0.5],
-    quaternion=[0.0, 0.0, 0.0, 1.0],
-    axis_name="ee_target",
-    scale=0.15,  # arrow length in meters
-)
-
-# Update the axis pose
-bot.viz.update_axis("ee_target", position=[2.0, 0.0, 0.5])
-```
-
 ## Convenience Methods
 
 `WalkieRobot` exposes shorthand methods that delegate to `bot.viz`:
@@ -150,9 +134,6 @@ bot.viz.draw_marker([1, 0, 0], [0, 0, 0, 1])
 
 bot.draw_pose([1, 0, 0], [0, 0, 0, 1])
 bot.viz.draw_pose([1, 0, 0], [0, 0, 0, 1])
-
-bot.draw_axis([1, 0, 0], [0, 0, 0, 1])
-bot.viz.draw_axis([1, 0, 0], [0, 0, 0, 1])
 ```
 
 ## Default Topics
@@ -162,6 +143,5 @@ bot.viz.draw_axis([1, 0, 0], [0, 0, 0, 1])
 | `draw_marker` | `walkie/viz_markers` |
 | `draw_markers` | `walkie/viz_markers_array` |
 | `draw_pose` | `walkie/target_pose` |
-| `draw_axis` | `walkie/viz_axis` |
 
 All topics respect the robot's namespace setting.

@@ -24,5 +24,3 @@ Main entry point for the Walkie SDK. Wraps all robot subsystems into a single ob
         - update_marker
         - draw_pose
         - update_pose
-        - draw_axis
-        - update_axis
