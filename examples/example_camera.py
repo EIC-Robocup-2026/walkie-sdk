@@ -15,6 +15,12 @@ Requirements:
 Controls:
     - Press 'q' to quit
     - Press 's' to save a snapshot
+
+Tip:
+    For multi-camera setups (e.g. head + wrist), or to use a local USB
+    camera, pass the ``cameras={}`` dict to WalkieRobot instead of
+    camera_protocol. See examples/example_usb_camera.py and the
+    cameras guide in the docs for details.
 """
 
 import sys

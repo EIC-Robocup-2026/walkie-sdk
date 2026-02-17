@@ -64,22 +64,24 @@ class WalkieRobot:
         ValueError: If invalid protocol specified
 
     Example:
-        >>> from walkie_sdk import WalkieRobot
-        >>>
-        >>> # Default: WebSocket + WebRTC (no ROS2 needed on client)
-        >>> bot = WalkieRobot(ip="192.168.1.100")
-        >>>
-        >>> bot.status.get_pose()
-        {'x': 0.0, 'y': 0.0, 'heading': 0.0}
-        >>>
-        >>> bot.nav.go_to(x=2.0, y=1.0, heading=0.0)
-        'SUCCEEDED'
-        >>>
-        >>> bot.disconnect()
+        ```python
+        from walkie_sdk import WalkieRobot
+
+        # Default: WebSocket + WebRTC (no ROS2 needed on client)
+        bot = WalkieRobot(ip="192.168.1.100")
+
+        bot.status.get_pose()
+        # {'x': 0.0, 'y': 0.0, 'heading': 0.0}
+
+        bot.nav.go_to(x=2.0, y=1.0, heading=0.0)
+        # 'SUCCEEDED'
+
+        bot.disconnect()
 
         # With namespace:
-        >>> bot = WalkieRobot(ip="192.168.1.100", namespace="robot1")
+        bot = WalkieRobot(ip="192.168.1.100", namespace="robot1")
         # Topics will be /robot1/odom, /robot1/cmd_vel, etc.
+        ```
     """
 
     def __init__(
@@ -268,8 +270,10 @@ class WalkieRobot:
         Returns None if camera was disabled or failed to connect.
 
         Example:
-            >>> frames = bot.cameras.get_all_frames()
-            >>> head = bot.cameras.get_head_frame()
+            ```python
+            frames = bot.cameras.get_all_frames()
+            head = bot.cameras.get_frame("head")
+            ```
         """
         return self._multi_camera
 
@@ -290,15 +294,17 @@ class WalkieRobot:
         - update_axis(axis_name, position, quaternion, ...): Update axis triad
 
         Example:
-            >>> bot.viz.draw_marker(
-            ...     position=[1.0, 2.0, 0.0],
-            ...     quaternion=[0.0, 0.0, 0.0, 1.0],
-            ... )
-            >>> bot.viz.draw_pose(
-            ...     position=[1.0, 2.0, 0.0],
-            ...     quaternion=[0.0, 0.0, 0.0, 1.0],
-            ...     topic="walkie/target_pose/left_arm",
-            ... )
+            ```python
+            bot.viz.draw_marker(
+                position=[1.0, 2.0, 0.0],
+                quaternion=[0.0, 0.0, 0.0, 1.0],
+            )
+            bot.viz.draw_pose(
+                position=[1.0, 2.0, 0.0],
+                quaternion=[0.0, 0.0, 0.0, 1.0],
+                topic="walkie/target_pose/left_arm",
+            )
+            ```
         """
         return self._viz
 
@@ -330,8 +336,9 @@ class WalkieRobot:
             The marker ID that was used.
 
         Example:
-            >>> bot.draw_marker([1.0, 2.0, 0.0], [0.0, 0.0, 0.0, 1.0])
-            0
+            ```python
+            bot.draw_marker([1.0, 2.0, 0.0], [0.0, 0.0, 0.0, 1.0])
+            ```
         """
         return self._viz.draw_marker(position, quaternion, frame_id, **kwargs)
 
@@ -358,8 +365,10 @@ class WalkieRobot:
             **kwargs: Additional fields to update (frame_id, scale, color, etc.)
 
         Example:
-            >>> mid = bot.draw_marker([0, 0, 0], [0, 0, 0, 1])
-            >>> bot.update_marker(mid, position=[1.0, 2.0, 0.0])
+            ```python
+            mid = bot.draw_marker([0, 0, 0], [0, 0, 0, 1])
+            bot.update_marker(mid, position=[1.0, 2.0, 0.0])
+            ```
         """
         self._viz.update_marker(
             marker_id, position=position, quaternion=quaternion, **kwargs
@@ -388,8 +397,10 @@ class WalkieRobot:
             The topic string that was used.
 
         Example:
-            >>> bot.draw_pose([1.0, 2.0, 0.0], [0.0, 0.0, 0.0, 1.0])
-            'walkie/target_pose'
+            ```python
+            bot.draw_pose([1.0, 2.0, 0.0], [0.0, 0.0, 0.0, 1.0])
+            # returns 'walkie/target_pose'
+            ```
         """
         return self._viz.draw_pose(position, quaternion, frame_id, **kwargs)
 
@@ -414,8 +425,10 @@ class WalkieRobot:
             **kwargs: Additional fields to update (frame_id, topic, etc.)
 
         Example:
-            >>> bot.draw_pose([0, 0, 0], [0, 0, 0, 1], topic="my_pose")
-            >>> bot.update_pose(position=[1.0, 2.0, 0.0], topic="my_pose")
+            ```python
+            bot.draw_pose([0, 0, 0], [0, 0, 0, 1], topic="my_pose")
+            bot.update_pose(position=[1.0, 2.0, 0.0], topic="my_pose")
+            ```
         """
         self._viz.update_pose(position=position, quaternion=quaternion, **kwargs)
 
@@ -444,8 +457,10 @@ class WalkieRobot:
             The axis_name that was used (pass to update_axis()).
 
         Example:
-            >>> bot.draw_axis([1.0, 0.0, 0.5], [0.0, 0.0, 0.0, 1.0])
-            'axis'
+            ```python
+            bot.draw_axis([1.0, 0.0, 0.5], [0.0, 0.0, 0.0, 1.0])
+            # returns 'axis'
+            ```
         """
         return self._viz.draw_axis(
             position, quaternion, frame_id=frame_id, axis_name=axis_name, **kwargs
@@ -471,8 +486,10 @@ class WalkieRobot:
             **kwargs: Additional fields (frame_id, scale, lifetime).
 
         Example:
-            >>> bot.draw_axis([0, 0, 0], [0, 0, 0, 1], axis_name="target")
-            >>> bot.update_axis("target", position=[1.0, 2.0, 0.0])
+            ```python
+            bot.draw_axis([0, 0, 0], [0, 0, 0, 1], axis_name="target")
+            bot.update_axis("target", position=[1.0, 2.0, 0.0])
+            ```
         """
         self._viz.update_axis(
             axis_name, position=position, quaternion=quaternion, **kwargs

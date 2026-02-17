@@ -94,10 +94,13 @@ class Navigation:
             TimeoutError: If blocking and navigation times out
 
         Example:
-            >>> bot.nav.go_to(x=2.0, y=1.0, heading=0.0)
-            'SUCCEEDED'
-            >>> bot.nav.go_to(x=5.0, y=3.0, heading=1.57, blocking=False)
-            'IN_PROGRESS'
+            ```python
+            result = bot.nav.go_to(x=2.0, y=1.0, heading=0.0)
+            # result == "SUCCEEDED"
+
+            result = bot.nav.go_to(x=5.0, y=3.0, heading=1.57, blocking=False)
+            # result == "IN_PROGRESS"
+            ```
         """
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
@@ -192,10 +195,11 @@ class Navigation:
             True if cancellation was sent successfully, False otherwise
 
         Example:
-            >>> bot.nav.go_to(x=10.0, y=5.0, heading=0.0, blocking=False)
-            >>> time.sleep(2)
-            >>> bot.nav.cancel()
-            True
+            ```python
+            bot.nav.go_to(x=10.0, y=5.0, heading=0.0, blocking=False)
+            time.sleep(2)
+            bot.nav.cancel()  # returns True
+            ```
         """
         if not self._transport.is_connected:
             return False
@@ -218,8 +222,9 @@ class Navigation:
             True if stop command was sent successfully, False otherwise
 
         Example:
-            >>> bot.nav.stop()
-            True
+            ```python
+            bot.nav.stop()  # returns True
+            ```
         """
         if not self._transport.is_connected:
             return False

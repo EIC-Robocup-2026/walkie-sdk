@@ -140,8 +140,10 @@ class Telemetry:
             or None if no odometry data is available yet.
 
         Example:
-            >>> bot.status.get_pose()
-            {'x': 1.2, 'y': 3.5, 'heading': 0.5}
+            ```python
+            pose = bot.status.get_pose()
+            # {'x': 1.2, 'y': 3.5, 'heading': 0.5}
+            ```
         """
         with self._lock:
             if self._pose is not None:
@@ -157,8 +159,10 @@ class Telemetry:
             or None if no odometry data is available yet.
 
         Example:
-            >>> bot.status.get_velocity()
-            {'linear': 0.2, 'angular': 0.0}
+            ```python
+            vel = bot.status.get_velocity()
+            # {'linear': 0.2, 'angular': 0.0}
+            ```
         """
         with self._lock:
             if self._velocity is not None:

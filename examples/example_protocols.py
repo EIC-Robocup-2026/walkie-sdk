@@ -12,6 +12,7 @@ Available ROS Protocols:
 Available Camera Protocols:
 - "webrtc": WebRTC stream (default, pairs with rosbridge)
 - "zenoh": Zenoh video stream (pairs with zenoh)
+- "usb": Local USB camera via OpenCV (auto-retry on disconnect)
 - "shm": Shared memory (same-host)
 - "none": Disable camera functionality
 
@@ -220,11 +221,61 @@ def show_available_protocols():
 
     print("\nCamera Protocols (camera_protocol parameter):")
     for protocol in CameraProtocol:
-        if protocol.value in ("webrtc", "none", "shm"):
+        if protocol.value in ("webrtc", "none", "shm", "usb"):
             status = "✓ implemented"
         else:
             status = "○ stub"
         print(f"  - '{protocol.value}': {status}")
+
+
+def example_mixed_cameras():
+    """
+    Example 6: Mixed Camera Transports
+
+    Use different protocols for different cameras.  The ``cameras={}``
+    dict lets you assign a separate transport to each named camera
+    (head, wrist, etc.) on the same WalkieRobot instance.
+    """
+    from walkie_sdk import WalkieRobot
+
+    print("\n" + "=" * 60)
+    print("Example 6: Mixed Camera Transports")
+    print("=" * 60)
+    print("Each camera can use a different protocol (zenoh, usb, shm, ...).")
+
+    try:
+        bot = WalkieRobot(
+            ip=ROBOT_IP,
+            ros_protocol="zenoh",
+            ros_port=7447,
+            cameras={
+                "head": {"protocol": "zenoh"},
+                "wrist": {
+                    "protocol": "usb",
+                    # Prefer stable paths from /dev/v4l/by-id/
+                    "device": "/dev/v4l/by-id/usb-WristCam-video-index0",
+                    "width": 640,
+                    "height": 480,
+                    "fps": 15,
+                },
+            },
+        )
+
+        print(f"✓ Connected using {bot.ros_protocol} protocol")
+        print(f"  Camera mode: {bot.camera_protocol}")  # "mixed"
+
+        # Access individual camera frames
+        head = bot.cameras.get_frame("head")
+        wrist = bot.cameras.get_frame("wrist")
+        print(f"  Head frame:  {'OK' if head is not None else 'None'}")
+        print(f"  Wrist frame: {'OK' if wrist is not None else 'None'}")
+
+        bot.disconnect()
+        return True
+
+    except Exception as e:
+        print(f"✗ Could not start mixed cameras: {e}")
+        return False
 
 
 def main():
@@ -249,6 +300,9 @@ def main():
 
     # These will show NotImplementedError (expected)
     example_zenoh()
+
+    # Mixed camera example
+    example_mixed_cameras()
 
     print("\n" + "=" * 60)
     print("Examples completed!")

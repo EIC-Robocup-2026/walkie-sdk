@@ -17,12 +17,16 @@ def apply_namespace(name: str, namespace: str) -> str:
         Full topic/action name with namespace (e.g., "/robot1/odom", "/cmd_vel")
 
     Example:
-        >>> apply_namespace("odom", "")
-        '/odom'
-        >>> apply_namespace("odom", "robot1")
-        '/robot1/odom'
-        >>> apply_namespace("cmd_vel", "my_robot")
-        '/my_robot/cmd_vel'
+        ```python
+        apply_namespace("odom", "")
+        # 'odom'
+
+        apply_namespace("odom", "robot1")
+        # 'robot1/odom'
+
+        apply_namespace("cmd_vel", "my_robot")
+        # 'my_robot/cmd_vel'
+        ```
     """
     if namespace:
         # Ensure namespace doesn't have leading/trailing slashes

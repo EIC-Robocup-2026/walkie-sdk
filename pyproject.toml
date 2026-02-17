@@ -46,6 +46,10 @@ packages = ["walkie_sdk"]
 dev = [
     "pytest>=7.0",
 ]
+docs = [
+    "mkdocs-material>=9.0",
+    "mkdocstrings[python]>=0.25",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/unit"]

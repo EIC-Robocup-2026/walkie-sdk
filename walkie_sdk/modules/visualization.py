@@ -221,12 +221,14 @@ class Visualization:
         namespace: ROS namespace prefix for topics (default: "" = no namespace)
 
     Example:
-        >>> viz = Visualization(transport, namespace="robot1")
-        >>> viz.draw_marker(
-        ...     position=[1.0, 2.0, 0.0],
-        ...     quaternion=[0.0, 0.0, 0.0, 1.0],
-        ...     frame_id="base_link",
-        ... )
+        ```python
+        viz = Visualization(transport, namespace="robot1")
+        viz.draw_marker(
+            position=[1.0, 2.0, 0.0],
+            quaternion=[0.0, 0.0, 0.0, 1.0],
+            frame_id="base_link",
+        )
+        ```
     """
 
     def __init__(self, transport: ROSTransportInterface, namespace: str = ""):
@@ -309,23 +311,23 @@ class Visualization:
             ConnectionError: If not connected to ROS transport.
 
         Example:
-            >>> # Draw a red arrow at position (1, 2, 0) in base_link frame
-            >>> viz.draw_marker(
-            ...     position=[1.0, 2.0, 0.0],
-            ...     quaternion=[0.0, 0.0, 0.0, 1.0],
-            ... )
-            0
+            ```python
+            # Draw a red arrow at position (1, 2, 0) in base_link frame
+            viz.draw_marker(
+                position=[1.0, 2.0, 0.0],
+                quaternion=[0.0, 0.0, 0.0, 1.0],
+            )
 
-            >>> # Draw a green sphere with custom scale
-            >>> viz.draw_marker(
-            ...     position=[3.0, 0.0, 0.5],
-            ...     quaternion=[0.0, 0.0, 0.0, 1.0],
-            ...     frame_id="map",
-            ...     marker_type=SPHERE,
-            ...     color=[0.0, 1.0, 0.0, 0.8],
-            ...     scale=[0.2, 0.2, 0.2],
-            ... )
-            1
+            # Draw a green sphere with custom scale
+            viz.draw_marker(
+                position=[3.0, 0.0, 0.5],
+                quaternion=[0.0, 0.0, 0.0, 1.0],
+                frame_id="map",
+                marker_type=SPHERE,
+                color=[0.0, 1.0, 0.0, 0.8],
+                scale=[0.2, 0.2, 0.2],
+            )
+            ```
         """
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
@@ -422,14 +424,16 @@ class Visualization:
             KeyError: If the marker_id was not previously created with draw_marker().
 
         Example:
-            >>> # Create a marker
-            >>> mid = viz.draw_marker([0, 0, 0], [0, 0, 0, 1])
-            >>>
-            >>> # Update only its position (everything else stays the same)
-            >>> viz.update_marker(mid, position=[1.0, 2.0, 0.0])
-            >>>
-            >>> # Update position and color together
-            >>> viz.update_marker(mid, position=[3.0, 0.0, 0.0], color=[0, 1, 0, 1])
+            ```python
+            # Create a marker
+            mid = viz.draw_marker([0, 0, 0], [0, 0, 0, 1])
+
+            # Update only its position (everything else stays the same)
+            viz.update_marker(mid, position=[1.0, 2.0, 0.0])
+
+            # Update position and color together
+            viz.update_marker(mid, position=[3.0, 0.0, 0.0], color=[0, 1, 0, 1])
+            ```
         """
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
@@ -518,21 +522,22 @@ class Visualization:
             ConnectionError: If not connected to ROS transport.
 
         Example:
-            >>> viz.draw_markers([
-            ...     {
-            ...         "position": [1.0, 0.0, 0.0],
-            ...         "quaternion": [0.0, 0.0, 0.0, 1.0],
-            ...         "marker_type": ARROW,
-            ...         "color": [1.0, 0.0, 0.0, 1.0],
-            ...     },
-            ...     {
-            ...         "position": [2.0, 0.0, 0.0],
-            ...         "quaternion": [0.0, 0.0, 0.0, 1.0],
-            ...         "marker_type": SPHERE,
-            ...         "color": [0.0, 1.0, 0.0, 1.0],
-            ...     },
-            ... ])
-            [0, 1]
+            ```python
+            viz.draw_markers([
+                {
+                    "position": [1.0, 0.0, 0.0],
+                    "quaternion": [0.0, 0.0, 0.0, 1.0],
+                    "marker_type": ARROW,
+                    "color": [1.0, 0.0, 0.0, 1.0],
+                },
+                {
+                    "position": [2.0, 0.0, 0.0],
+                    "quaternion": [0.0, 0.0, 0.0, 1.0],
+                    "marker_type": SPHERE,
+                    "color": [0.0, 1.0, 0.0, 1.0],
+                },
+            ])
+            ```
         """
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
@@ -623,7 +628,9 @@ class Visualization:
             ConnectionError: If not connected to ROS transport.
 
         Example:
-            >>> viz.clear_markers()
+            ```python
+            viz.clear_markers()
+            ```
         """
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
@@ -674,19 +681,21 @@ class Visualization:
             ConnectionError: If not connected to ROS transport.
 
         Example:
-            >>> viz.draw_pose(
-            ...     position=[1.0, 2.0, 0.0],
-            ...     quaternion=[0.0, 0.0, 0.0, 1.0],
-            ... )
-            'walkie/target_pose'
+            ```python
+            viz.draw_pose(
+                position=[1.0, 2.0, 0.0],
+                quaternion=[0.0, 0.0, 0.0, 1.0],
+            )
+            # returns 'walkie/target_pose'
 
-            >>> # Multiple poses on different topics
-            >>> viz.draw_pose(
-            ...     position=[0.5, 0.0, 0.3],
-            ...     quaternion=[0.0, 0.0, 0.0, 1.0],
-            ...     topic="walkie/target_pose/left_arm",
-            ... )
-            'walkie/target_pose/left_arm'
+            # Multiple poses on different topics
+            viz.draw_pose(
+                position=[0.5, 0.0, 0.3],
+                quaternion=[0.0, 0.0, 0.0, 1.0],
+                topic="walkie/target_pose/left_arm",
+            )
+            # returns 'walkie/target_pose/left_arm'
+            ```
         """
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
@@ -735,10 +744,12 @@ class Visualization:
             KeyError: If the topic was not previously used with draw_pose().
 
         Example:
-            >>> topic = viz.draw_pose([0, 0, 0], [0, 0, 0, 1])
-            >>>
-            >>> # Update only position (orientation stays the same)
-            >>> viz.update_pose(position=[1.0, 2.0, 0.0], topic=topic)
+            ```python
+            topic = viz.draw_pose([0, 0, 0], [0, 0, 0, 1])
+
+            # Update only position (orientation stays the same)
+            viz.update_pose(position=[1.0, 2.0, 0.0], topic=topic)
+            ```
         """
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
@@ -809,12 +820,14 @@ class Visualization:
             ConnectionError: If not connected to ROS transport.
 
         Example:
-            >>> viz.draw_axis(
-            ...     position=[1.0, 0.0, 0.5],
-            ...     quaternion=[0.0, 0.0, 0.0, 1.0],
-            ...     axis_name="ee_target",
-            ... )
-            'ee_target'
+            ```python
+            viz.draw_axis(
+                position=[1.0, 0.0, 0.5],
+                quaternion=[0.0, 0.0, 0.0, 1.0],
+                axis_name="ee_target",
+            )
+            # returns 'ee_target'
+            ```
         """
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
@@ -901,8 +914,10 @@ class Visualization:
             KeyError: If axis_name was not previously created with draw_axis().
 
         Example:
-            >>> viz.draw_axis([0, 0, 0], [0, 0, 0, 1], axis_name="target")
-            >>> viz.update_axis("target", position=[1.0, 2.0, 0.0])
+            ```python
+            viz.draw_axis([0, 0, 0], [0, 0, 0, 1], axis_name="target")
+            viz.update_axis("target", position=[1.0, 2.0, 0.0])
+            ```
         """
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")

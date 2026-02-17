@@ -36,13 +36,15 @@ class MultiCamera:
         transport: Camera transport or dict of camera transports
 
     Example:
-        >>> # Get all frames
-        >>> frames = bot.cameras.get_all_frames()
-        >>> for name, frame in frames.items():
-        ...     cv2.imshow(f"Camera: {name}", frame)
+        ```python
+        # Get all frames
+        frames = bot.cameras.get_all_frames()
+        for name, frame in frames.items():
+            cv2.imshow(f"Camera: {name}", frame)
 
-        >>> # Get specific camera
-        >>> head_frame = bot.cameras.get_frame("head")
+        # Get specific camera
+        head_frame = bot.cameras.get_frame("head")
+        ```
     """
 
     CAMERA_NAMES = ["head", "left", "right"]
@@ -122,9 +124,11 @@ class MultiCamera:
             Dictionary mapping camera name to frame
 
         Example:
-            >>> frames = bot.cameras.get_all_frames()
-            >>> if "head" in frames:
-            ...     cv2.imshow("Head Camera", frames["head"])
+            ```python
+            frames = bot.cameras.get_all_frames()
+            if "head" in frames:
+                cv2.imshow("Head Camera", frames["head"])
+            ```
         """
         if self._is_dict:
             frames = {}

@@ -1,0 +1,82 @@
+site_name: Walkie SDK
+site_description: Python SDK for controlling Walkie robots
+site_url: https://walkie-team.github.io/walkie-sdk/
+repo_url: https://github.com/walkie-team/walkie-sdk
+repo_name: walkie-team/walkie-sdk
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - content.code.copy
+    - content.code.annotate
+    - search.highlight
+    - toc.follow
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+plugins:
+  - search
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            members_order: source
+            merge_init_into_class: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.snippets
+  - admonition
+  - pymdownx.details
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quick-start.md
+  - Guides:
+    - Protocol Selection: guides/protocols.md
+    - Camera Setup: guides/cameras.md
+    - Arm Control: guides/arm-control.md
+    - Visualization: guides/visualization.md
+  - API Reference:
+    - WalkieRobot: api/robot.md
+    - Navigation: api/navigation.md
+    - Telemetry: api/telemetry.md
+    - Camera: api/camera.md
+    - MultiCamera: api/multi-camera.md
+    - Arm: api/arm.md
+    - Visualization: api/visualization.md
+    - Tools: api/tools.md
+    - Factory & Protocols: api/factory.md
+  - Examples: examples.md
+  - Troubleshooting: troubleshooting.md
