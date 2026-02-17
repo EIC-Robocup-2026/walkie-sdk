@@ -20,7 +20,7 @@ pip install walkie-sdk
 ## From Source
 
 ```bash
-git clone https://github.com/walkie-team/walkie-sdk.git
+git clone https://github.com/EIC-Robocup-2026/walkie-sdk.git
 cd walkie-sdk
 uv sync
 ```
@@ -50,7 +50,6 @@ The robot must run ROS 2 with the appropriate servers depending on your protocol
 | Component | Port | Required For |
 |-----------|------|--------------|
 | rosbridge_server | 9090 | `ros_protocol="rosbridge"` |
-| WebRTC camera server | 8554 | `camera_protocol="webrtc"` |
 | Zenoh router | 7447 | `ros_protocol="zenoh"` |
 | Nav2 stack | -- | Navigation (`bot.nav`) |
 | MoveIt / IK solver | -- | Arm control (`bot.arm`) |

@@ -9,7 +9,7 @@ Usage:
     uv run python examples/example_camera.py
 
 Requirements:
-    - Robot running WebRTC camera server on port 8554
+    - Robot running Zenoh camera server
     - OpenCV installed (opencv-python)
 
 Controls:
@@ -34,7 +34,7 @@ NAMESPACE = ""  # Optional: "robot1" for namespaced topics
 
 # Protocol selection
 ROS_PROTOCOL = "rosbridge"
-CAMERA_PROTOCOL = "webrtc"
+CAMERA_PROTOCOL = "zenoh"
 
 
 def main():

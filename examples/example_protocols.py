@@ -10,10 +10,8 @@ Available ROS Protocols:
 - "auto": Auto-detect best available protocol
 
 Available Camera Protocols:
-- "webrtc": WebRTC stream (default, pairs with rosbridge)
-- "zenoh": Zenoh video stream (pairs with zenoh)
+- "zenoh": Zenoh video stream (default)
 - "usb": Local USB camera via OpenCV (auto-retry on disconnect)
-- "shm": Shared memory (same-host)
 - "none": Disable camera functionality
 
 Usage:
@@ -42,13 +40,12 @@ def example_rosbridge():
     print("No ROS2 installation required on the client machine.")
 
     try:
-        # Default protocol - rosbridge with webrtc camera
+        # Default protocol - rosbridge with zenoh camera
         bot = WalkieRobot(
             ip=ROBOT_IP,
             ros_protocol="rosbridge",  # WebSocket via roslibpy
             ros_port=9090,  # ROSBridge WebSocket port
-            camera_protocol="webrtc",  # WebRTC video stream
-            camera_port=8554,  # WebRTC signaling port
+            camera_protocol="zenoh",  # Zenoh video stream
             timeout=10.0,
         )
 
@@ -72,7 +69,7 @@ def example_rosbridge_no_camera():
     """
     Example 2: ROSBridge without Camera
 
-    Useful when the WebRTC camera server is not available.
+    Useful when camera is not needed or not available.
     """
     from walkie_sdk import WalkieRobot
 
@@ -221,10 +218,7 @@ def show_available_protocols():
 
     print("\nCamera Protocols (camera_protocol parameter):")
     for protocol in CameraProtocol:
-        if protocol.value in ("webrtc", "none", "shm", "usb"):
-            status = "✓ implemented"
-        else:
-            status = "○ stub"
+        status = "✓ implemented"
         print(f"  - '{protocol.value}': {status}")
 
 
@@ -241,7 +235,7 @@ def example_mixed_cameras():
     print("\n" + "=" * 60)
     print("Example 6: Mixed Camera Transports")
     print("=" * 60)
-    print("Each camera can use a different protocol (zenoh, usb, shm, ...).")
+    print("Each camera can use a different protocol (zenoh, usb, ...).")
 
     try:
         bot = WalkieRobot(

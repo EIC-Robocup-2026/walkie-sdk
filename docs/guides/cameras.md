@@ -1,23 +1,12 @@
 # Camera Setup
 
 The SDK provides flexible camera access through multiple protocols and a
-unified API. Cameras can come from network streams (Zenoh, WebRTC), shared
-memory, or local USB devices -- and you can mix them.
+unified API. Cameras can come from network streams (Zenoh) or local USB
+devices -- and you can mix them.
 
 ## Single Camera
 
 The simplest setup uses one camera protocol for all cameras:
-
-=== "WebRTC"
-
-    ```python
-    bot = WalkieRobot(
-        ip="192.168.1.100",
-        camera_protocol="webrtc",
-        camera_port=8554,
-    )
-    frame = bot.camera.get_frame()
-    ```
 
 === "Zenoh"
 
@@ -40,20 +29,9 @@ The simplest setup uses one camera protocol for all cameras:
     frame = bot.camera.get_frame()
     ```
 
-=== "Shared Memory"
-
-    ```python
-    bot = WalkieRobot(
-        ip="192.168.1.100",
-        camera_protocol="shm",
-    )
-    frame = bot.camera.get_frame()
-    ```
-
 ## Multi-Camera (Same Protocol)
 
-When all cameras use the same protocol, use `multi_camera=True` (Zenoh) or
-the default behavior of SHM:
+When all cameras use the same protocol, use `multi_camera=True` (Zenoh):
 
 ```python
 # Zenoh multi-camera

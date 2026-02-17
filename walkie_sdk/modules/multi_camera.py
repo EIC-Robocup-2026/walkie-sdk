@@ -2,7 +2,7 @@
 MultiCamera - Multi-camera robot interface module.
 
 Provides access to multiple cameras (head, left wrist, right wrist)
-on the robot. Supports both shared memory and Zenoh transports.
+on the robot. Supports Zenoh, USB, and mixed transports.
 """
 
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
@@ -27,9 +27,9 @@ class MultiCamera:
 
     This class can wrap either:
     - A multi-camera transport implementing MultiCameraTransportInterface
-      (e.g. MultiSharedMemoryCamera, ZenohCamera with multi_camera=True)
+      (e.g. ZenohCamera with multi_camera=True)
     - A single-camera transport implementing CameraTransportInterface
-      (e.g. WebRTCCamera, SharedMemoryCamera)
+      (e.g. ZenohCamera, USBCamera)
     - A dictionary of single-camera transports
 
     Args:

@@ -2,7 +2,7 @@
 CameraTransportInterface - Abstract interface for camera/video streams.
 
 Defines the contract that any camera transport implementation must fulfill,
-allowing the SDK to work with different camera protocols (WebRTC, Zenoh, etc.)
+allowing the SDK to work with different camera protocols (Zenoh, USB, etc.)
 """
 
 from abc import ABC, abstractmethod
@@ -16,9 +16,8 @@ class CameraTransportInterface(ABC):
     Abstract interface for camera/video streams.
 
     Implementations:
-    - WebRTCCamera: WebRTC stream (for rosbridge setup)
     - ZenohCamera: Zenoh video stream
-    - SharedMemoryCamera: Direct memory access (same-host)
+    - USBCamera: Local USB camera via OpenCV
 
     All implementations must provide thread-safe frame access.
     """
@@ -105,7 +104,6 @@ class MultiCameraTransportInterface(CameraTransportInterface):
 
     Implementations:
     - ZenohCamera (with multi_camera=True)
-    - MultiSharedMemoryCamera
     """
 
     @abstractmethod

@@ -34,15 +34,13 @@ class CameraProtocol(Enum):
     """
     Available camera stream protocols.
 
-    - WEBRTC: WebRTC stream. Pairs with rosbridge. Low latency video.
     - ZENOH: Zenoh video stream. Pairs with zenoh transport.
-    - SHM: Shared memory. Direct access for same-host scenarios.
+    - USB: Local USB camera via OpenCV.
     - NONE: Disable camera functionality.
     """
 
-    WEBRTC = "webrtc"
     ZENOH = "zenoh"
-    SHM = "shm"
+    USB = "usb"
     NONE = "none"
 
 
@@ -116,7 +114,7 @@ class TransportFactory:
     def create_camera_transport(
         protocol: CameraProtocol,
         host: str,
-        port: int = 8554,
+        port: int = 7447,
         ros_transport: Optional["ROSTransportInterface"] = None,
         topic: str = "/camera/image_raw",
         **kwargs,
@@ -127,9 +125,9 @@ class TransportFactory:
         Args:
             protocol: The camera protocol to use (CameraProtocol enum)
             host: Robot IP address or hostname
-            port: Port for the camera stream (default: 8554 for WebRTC)
-            ros_transport: ROS transport instance (required for ROS_IMAGE protocol)
-            topic: Camera topic name (for ROS_IMAGE protocol)
+            port: Port for the camera stream
+            ros_transport: ROS transport instance (reserved for future use)
+            topic: Camera topic name (for Zenoh camera)
             **kwargs: Additional protocol-specific arguments
 
         Returns:
@@ -142,12 +140,7 @@ class TransportFactory:
         if protocol == CameraProtocol.NONE:
             return None
 
-        if protocol == CameraProtocol.WEBRTC:
-            from walkie_sdk.core.transports.rosbridge import WebRTCCamera
-
-            return WebRTCCamera(host=host, port=port, **kwargs)
-
-        elif protocol == CameraProtocol.ZENOH:
+        if protocol == CameraProtocol.ZENOH:
             from walkie_sdk.core.transports.zenoh import ZenohCamera
 
             # Check for multi_camera flag in kwargs
@@ -161,12 +154,16 @@ class TransportFactory:
                 **kwargs,
             )
 
-        elif protocol == CameraProtocol.SHM:
-            from walkie_sdk.core.transports.shm import MultiSharedMemoryCamera
+        elif protocol == CameraProtocol.USB:
+            from walkie_sdk.core.transports.usb import USBCamera
 
-            # Use multi-camera SHM transport
-            camera_names = kwargs.pop("camera_names", ["head", "left", "right"])
-            return MultiSharedMemoryCamera(camera_names=camera_names, **kwargs)
+            device = kwargs.pop("device", 0)
+            width = kwargs.pop("width", None)
+            height = kwargs.pop("height", None)
+            fps = kwargs.pop("fps", None)
+            return USBCamera(
+                device=device, width=width, height=height, fps=fps, **kwargs
+            )
 
         else:
             raise ValueError(f"Unknown camera protocol: {protocol}")
@@ -243,8 +240,8 @@ class TransportFactory:
             The recommended camera protocol to pair with it
         """
         protocol_map = {
-            ROSProtocol.ROSBRIDGE: CameraProtocol.WEBRTC,
+            ROSProtocol.ROSBRIDGE: CameraProtocol.ZENOH,
             ROSProtocol.ZENOH: CameraProtocol.ZENOH,
-            ROSProtocol.AUTO: CameraProtocol.WEBRTC,  # Safe default
+            ROSProtocol.AUTO: CameraProtocol.ZENOH,
         }
         return protocol_map.get(ros_protocol, CameraProtocol.NONE)

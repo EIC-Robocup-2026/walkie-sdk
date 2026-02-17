@@ -14,15 +14,13 @@ The SDK supports multiple communication protocols. Choose based on your setup.
 
 | Protocol | Pairs With | Use Case | Status |
 |----------|------------|----------|--------|
-| `webrtc` | rosbridge | Network video stream | Implemented |
 | `zenoh` | zenoh | Network compressed images | Implemented |
-| `shm` | same-host | Shared memory (zero-copy) | Implemented |
 | `usb` | any | Local USB/V4L2 camera | Implemented |
 | `none` | any | Disable camera | Implemented |
 
 ## Basic Usage
 
-### Default (ROSBridge + WebRTC)
+### Default (ROSBridge + Zenoh Camera)
 
 ```python
 bot = WalkieRobot(ip="192.168.1.100")
@@ -31,8 +29,7 @@ bot = WalkieRobot(
     ip="192.168.1.100",
     ros_protocol="rosbridge",
     ros_port=9090,
-    camera_protocol="webrtc",
-    camera_port=8554,
+    camera_protocol="zenoh",
 )
 ```
 
@@ -107,7 +104,6 @@ See [Camera Setup](cameras.md) for more details.
 |----------|-------------|-----------|
 | rosbridge | 9090 | `ros_port` |
 | zenoh | 7447 | `ros_port` |
-| WebRTC | 8554 | `camera_port` |
 
 ## Backward Compatibility
 

@@ -3,7 +3,7 @@
 Walkie SDK - Example WITHOUT Camera
 
 Demonstrates navigation and telemetry features with the new protocol selection API.
-Useful when WebRTC camera is not available.
+Useful when camera is not needed or not available.
 
 Usage:
     uv run python examples/example_no_camera.py

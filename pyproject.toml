@@ -1,14 +1,14 @@
 [project]
 name = "walkie-sdk"
 version = "0.2.0"
-description = "Python SDK for controlling Walkie robots via WebSocket (ROSBridge) and WebRTC"
+description = "Python SDK for controlling Walkie robots via WebSocket (ROSBridge) and Zenoh"
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
     {name = "Walkie Team"}
 ]
-keywords = ["robotics", "ros2", "sdk", "rosbridge", "webrtc", "navigation"]
+keywords = ["robotics", "ros2", "sdk", "rosbridge", "zenoh", "navigation"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -19,9 +19,6 @@ classifiers = [
     "Topic :: Scientific/Engineering",
 ]
 dependencies = [
-    "aiohttp>=3.13.2",
-    "aiortc>=1.14.0",
-    "av>=16.0.1",
     "numpy>=2.3.5",
     "opencv-python>=4.11.0.86",
     "roslibpy>=2.0.0",
@@ -32,8 +29,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/walkie-team/walkie-sdk"
-Documentation = "https://github.com/walkie-team/walkie-sdk#readme"
+Homepage = "https://github.com/EIC-Robocup-2026/walkie-sdk"
+Documentation = "https://github.com/EIC-Robocup-2026/walkie-sdk#readme"
 
 [build-system]
 requires = ["hatchling"]

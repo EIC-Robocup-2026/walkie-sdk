@@ -20,7 +20,7 @@ Camera will not be available.
 ```
 
 1. Verify the camera server is running on the robot
-2. Check the port is accessible (8554 for WebRTC, 7447 for Zenoh)
+2. Check the port is accessible (7447 for Zenoh)
 3. Disable camera if not needed: `camera_protocol="none"`
 4. Check `bot.camera` is not `None` before calling `get_frame()`
 
@@ -68,7 +68,7 @@ ValueError: Unknown ROS protocol: ...
 Valid values:
 
 - `ros_protocol`: `"rosbridge"`, `"zenoh"`, `"auto"`
-- `camera_protocol`: `"webrtc"`, `"zenoh"`, `"shm"`, `"usb"`, `"none"`
+- `camera_protocol`: `"zenoh"`, `"usb"`, `"none"`
 
 ## Arm Actions Fail
 

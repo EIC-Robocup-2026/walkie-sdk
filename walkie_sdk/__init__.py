@@ -10,7 +10,7 @@ Supports multiple protocols for flexibility:
 Example:
     from walkie_sdk import WalkieRobot
 
-    # Default: WebSocket + WebRTC
+    # Default: WebSocket + Zenoh camera
     bot = WalkieRobot(ip="192.168.1.100")
 
     print(f"Pose: {bot.status.get_pose()}")

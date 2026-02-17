@@ -4,7 +4,7 @@ A pure Python SDK for controlling Walkie robots with **pluggable protocol suppor
 
 **No ROS 2 installation required on the client machine** (when using rosbridge or zenoh protocols).
 
-> **Full documentation:** [walkie-sdk docs](https://walkie-team.github.io/walkie-sdk/)
+> **Full documentation:** [walkie-sdk docs](https://EIC-Robocup-2026.github.io/walkie-sdk/)
 > (run `mkdocs serve` locally to preview)
 
 ## Architecture
@@ -14,26 +14,26 @@ A pure Python SDK for controlling Walkie robots with **pluggable protocol suppor
  │                              YOUR LAPTOP                                │
  │  ┌───────────────────────────────────────────────────────────────────┐  │
  │  │                          walkie_sdk                               │  │
- │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────┐ │  │
- │  │  │ bot.nav  │ │bot.status│ │bot.camera│ │ bot.arm  │ │bot.viz │ │  │
- │  │  │ • go_to  │ │• get_pose│ │• get_frame│ │• set_pos │ │• point │ │  │
- │  │  │ • cancel │ │• get_vel │ │• named   │ │• gripper │ │• clear │ │  │
- │  │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ └───┬────┘ │  │
- │  │       └──────┬──────┴────────────┴────────────┴───────────┘      │  │
+ │  │  ┌──────────┐ ┌──────────┐ ┌───────────┐ ┌──────────┐ ┌────────┐  │  │
+ │  │  │ bot.nav  │ │bot.status│ │bot.camera │ │ bot.arm  │ │bot.viz │  │  │
+ │  │  │ • go_to  │ │• get_pose│ │• get_frame│ │• set_pos │ │• point │  │  │
+ │  │  │ • cancel │ │• get_vel │ │• named    │ │• gripper │ │• clear │  │  │
+ │  │  └────┬─────┘ └────┬─────┘ └────┬──────┘ └────┬─────┘ └───┬────┘  │  │
+ │  │       └──────┬─────┴────────────┴─────────────┴───────────┘       │  │
  │  │              │                                                    │  │
- │  │    ┌─────────▼──────────────────────────────────────────────┐     │  │
- │  │    │              TransportFactory                          │     │  │
- │  │    │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐ │     │  │
- │  │    │  │rosbridge │ │  zenoh   │ │   usb    │ │   shm    │ │     │  │
- │  │    │  │(WebSocket)│ │  (DDS)  │ │(V4L2/cv2)│ │(mmap)   │ │     │  │
- │  │    │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘ │     │  │
- │  │    └───────┼────────────┼────────────┼────────────┼────────┘     │  │
- │  └────────────┼────────────┼────────────┼────────────┼──────────────┘  │
- └───────────────┼────────────┼────────────┼────────────┼──────────────────┘
-                 │            │            │            │
-                 ▼            ▼            ▼            ▼
-              Robot        Robot       Local USB    Shared Mem
-             :9090        :7447        /dev/video*   /dev/shm
+ │  │    ┌─────────▼───────────────────────────────────────────────┐    │  │
+ │  │    │              TransportFactory                           │    │  │
+ │  │    │  ┌───────────┐ ┌──────────┐ ┌──────────┐                │    │  │
+ │  │    │  │rosbridge  │ │  zenoh   │ │   usb    │                │    │  │
+ │  │    │  │(WebSocket)│ │  (DDS)   │ │(V4L2/cv2)│                │    │  │
+ │  │    │  └────┬──────┘ └────┬─────┘ └────┬─────┘                │    │  │
+ │  │    └───────┼─────────────┼────────────┼──────────────────────┘    │  │
+ │  └────────────┼─────────────┼────────────┼───────────────────────────┘  │
+ └───────────────┼─────────────┼────────────┼──────────────────────────────┘
+                 │             │            │
+                 ▼             ▼            ▼
+              Robot         Robot       Local USB
+             :9090         :7447        /dev/video*
 ```
 
 ## Protocol Support
@@ -45,10 +45,8 @@ A pure Python SDK for controlling Walkie robots with **pluggable protocol suppor
 
 | Camera Protocol | Use Case | Status |
 |-----------------|----------|--------|
-| `webrtc` | Remote (pairs with rosbridge) | Implemented |
 | `zenoh` | Remote (pairs with zenoh) | Implemented |
 | `usb` | Local USB webcam / robot-mounted camera | Implemented |
-| `shm` | Same-host shared memory | Implemented |
 | `none` | Disable camera | Implemented |
 
 ## Installation
@@ -61,7 +59,7 @@ uv add walkie-sdk
 pip install walkie-sdk
 
 # From source
-git clone https://github.com/walkie-team/walkie-sdk.git
+git clone https://github.com/EIC-Robocup-2026/walkie-sdk.git
 cd walkie-sdk
 uv sync
 ```
@@ -141,7 +139,7 @@ ros2 launch walkie_bringup robot_server.launch.py
 
 ## Documentation
 
-For full API reference, guides, and examples, see the **[documentation site](https://walkie-team.github.io/walkie-sdk/)**.
+For full API reference, guides, and examples, see the **[documentation site](https://EIC-Robocup-2026.github.io/walkie-sdk/)**.
 
 To build and preview locally:
 

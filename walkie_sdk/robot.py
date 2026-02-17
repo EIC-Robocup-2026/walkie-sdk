@@ -47,11 +47,10 @@ class WalkieRobot:
             - "auto": Auto-detect best available protocol
         ros_port: Port for ROS transport (default: 9090 for rosbridge)
         camera_protocol: Camera stream protocol to use:
-            - "webrtc": WebRTC stream (default, pairs with rosbridge)
-            - "zenoh": Zenoh video stream (pairs with zenoh)
-            - "shm": Shared memory (same-host only)
+            - "zenoh": Zenoh video stream (default)
+            - "usb": Local USB camera via OpenCV
             - "none": Disable camera functionality
-        camera_port: Port for camera stream (default: 8554 for WebRTC)
+        camera_port: Port for camera stream
         timeout: Connection timeout in seconds (default: 10.0)
         namespace: ROS namespace for topics/actions (default: "" = no namespace)
         arm_mode: Default arm control mode:
@@ -67,7 +66,7 @@ class WalkieRobot:
         ```python
         from walkie_sdk import WalkieRobot
 
-        # Default: WebSocket + WebRTC (no ROS2 needed on client)
+        # Default: WebSocket + Zenoh camera (no ROS2 needed on client)
         bot = WalkieRobot(ip="192.168.1.100")
 
         bot.status.get_pose()
@@ -89,22 +88,19 @@ class WalkieRobot:
         ip: str,
         ros_protocol: str = "rosbridge",
         ros_port: int = 9090,
-        camera_protocol: str = "webrtc",
-        camera_port: int = 8554,
+        camera_protocol: str = "zenoh",
+        camera_port: int = 7447,
         timeout: float = 10.0,
         namespace: str = "",
         arm_mode: str = "custom_ik",
         arm_target_pose_topic: str = "/target_pose",
         # Legacy parameters for backward compatibility
         ws_port: Optional[int] = None,
-        webrtc_port: Optional[int] = None,
         enable_camera: bool = True,
     ):
         # Handle legacy parameter names for backward compatibility
         if ws_port is not None:
             ros_port = ws_port
-        if webrtc_port is not None:
-            camera_port = webrtc_port
         if not enable_camera:
             camera_protocol = "none"
 

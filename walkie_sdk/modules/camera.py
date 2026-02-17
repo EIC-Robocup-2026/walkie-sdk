@@ -5,7 +5,7 @@ Provides get_frame() function and streaming status by wrapping
 a camera transport implementation.
 
 This module uses the CameraTransportInterface abstraction, allowing it
-to work with any camera transport implementation (WebRTC, ROS Image, Zenoh).
+to work with any camera transport implementation (Zenoh, USB, etc.).
 """
 
 from typing import TYPE_CHECKING, Optional, Tuple
@@ -24,7 +24,7 @@ class Camera:
     video frames regardless of the underlying protocol.
 
     This class works with any transport that implements CameraTransportInterface,
-    making it protocol-agnostic (works with WebRTC, ROS Image topics, Zenoh, etc.).
+    making it protocol-agnostic (works with Zenoh, USB, etc.).
 
     Args:
         transport: Camera transport instance implementing CameraTransportInterface

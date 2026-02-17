@@ -10,7 +10,7 @@ from walkie_sdk import WalkieRobot
 bot = WalkieRobot(ip="192.168.1.100")
 ```
 
-This auto-connects using the default protocols (rosbridge + WebRTC camera).
+This auto-connects using the default protocols (rosbridge + Zenoh camera).
 See [Protocol Selection](../guides/protocols.md) for other options.
 
 ## 2. Read Telemetry
