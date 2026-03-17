@@ -1,7 +1,7 @@
 """
 Telemetry - Robot status and sensor data module.
 
-Provides get_pose() and get_velocity() functions by subscribing
+Provides get_position() and get_velocity() functions by subscribing
 to robot's odometry topic.
 
 This module uses ROSTransportInterface abstraction, allowing it
@@ -24,7 +24,7 @@ class Telemetry:
     """
     Robot telemetry/status provider.
 
-    Subscribes to odometry and provides current pose and velocity.
+    Subscribes to odometry and provides current position and velocity.
     Data is cached and updated in background via ROS subscription.
 
     This class works with any transport that implements ROSTransportInterface,
@@ -131,17 +131,19 @@ class Telemetry:
             except (KeyError, TypeError):
                 pass
 
-    def get_pose(self) -> Optional[Dict[str, float]]:
+    def get_position(self) -> Optional[Dict[str, float]]:
         """
-        Get the current robot pose.
+        Get the current robot position.
 
         Returns:
             Dictionary with 'x', 'y' (meters), and 'heading' (radians),
             or None if no odometry data is available yet.
 
         Example:
-            >>> bot.status.get_pose()
-            {'x': 1.2, 'y': 3.5, 'heading': 0.5}
+            ```python
+            pos = bot.status.get_position()
+            # {'x': 1.2, 'y': 3.5, 'heading': 0.5}
+            ```
         """
         with self._lock:
             if self._pose is not None:
@@ -157,8 +159,10 @@ class Telemetry:
             or None if no odometry data is available yet.
 
         Example:
-            >>> bot.status.get_velocity()
-            {'linear': 0.2, 'angular': 0.0}
+            ```python
+            vel = bot.status.get_velocity()
+            # {'linear': 0.2, 'angular': 0.0}
+            ```
         """
         with self._lock:
             if self._velocity is not None:

@@ -2,7 +2,7 @@
 MultiCamera - Multi-camera robot interface module.
 
 Provides access to multiple cameras (head, left wrist, right wrist)
-on the robot. Supports both shared memory and Zenoh transports.
+on the robot. Supports Zenoh, USB, and mixed transports.
 """
 
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
@@ -11,6 +11,9 @@ import numpy as np
 
 if TYPE_CHECKING:
     from walkie_sdk.core.interfaces import CameraTransportInterface
+    from walkie_sdk.core.interfaces.camera_transport import (
+        MultiCameraTransportInterface,
+    )
 
 
 class MultiCamera:
@@ -23,30 +26,48 @@ class MultiCamera:
     - Right wrist camera: Camera on right arm gripper
 
     This class can wrap either:
-    - A multi-camera transport (SharedMemoryMultiCamera, ZenohCamera with multi_camera=True)
+    - A multi-camera transport implementing MultiCameraTransportInterface
+      (e.g. ZenohCamera with multi_camera=True)
+    - A single-camera transport implementing CameraTransportInterface
+      (e.g. ZenohCamera, USBCamera)
     - A dictionary of single-camera transports
 
     Args:
-        transport: Multi-camera transport or dict of camera transports
+        transport: Camera transport or dict of camera transports
 
     Example:
-        >>> # Get all frames
-        >>> frames = bot.cameras.get_all_frames()
-        >>> for name, frame in frames.items():
-        ...     cv2.imshow(f"Camera: {name}", frame)
-        
-        >>> # Get specific camera
-        >>> head_frame = bot.cameras.get_head_frame()
+        ```python
+        # Get all frames
+        frames = bot.cameras.get_all_frames()
+        for name, frame in frames.items():
+            cv2.imshow(f"Camera: {name}", frame)
+
+        # Get specific camera
+        head_frame = bot.cameras.get_frame("head")
+        ```
     """
 
     CAMERA_NAMES = ["head", "left", "right"]
 
     def __init__(
         self,
-        transport: Union["CameraTransportInterface", Dict[str, "CameraTransportInterface"]],
+        transport: Union[
+            "CameraTransportInterface",
+            "MultiCameraTransportInterface",
+            Dict[str, "CameraTransportInterface"],
+        ],
     ):
         self._transport = transport
         self._is_dict = isinstance(transport, dict)
+
+        # Detect multi-camera transport at init time (avoids repeated isinstance)
+        from walkie_sdk.core.interfaces.camera_transport import (
+            MultiCameraTransportInterface,
+        )
+
+        self._is_multi = not self._is_dict and isinstance(
+            transport, MultiCameraTransportInterface
+        )
 
     @property
     def is_streaming(self) -> bool:
@@ -70,7 +91,7 @@ class MultiCamera:
         """
         if self._is_dict:
             return list(self._transport.keys())
-        if hasattr(self._transport, 'camera_names'):
+        if self._is_multi:
             return self._transport.camera_names
         return self.CAMERA_NAMES
 
@@ -88,55 +109,12 @@ class MultiCamera:
             if camera_name in self._transport:
                 return self._transport[camera_name].get_frame()
             return None
-        
-        # Multi-camera transport
-        if hasattr(self._transport, 'get_frame'):
-            # Check if transport's get_frame accepts camera_name
-            try:
-                return self._transport.get_frame(camera_name)
-            except TypeError:
-                # Single camera transport
-                return self._transport.get_frame()
-        return None
 
-    def get_head_frame(self) -> Optional[np.ndarray]:
-        """
-        Get the latest head/front camera frame.
+        if self._is_multi:
+            return self._transport.get_frame(camera_name)
 
-        Returns:
-            BGR image as numpy array, or None if not available
-        """
-        if self._is_dict:
-            return self.get_frame("head")
-        if hasattr(self._transport, 'get_head_frame'):
-            return self._transport.get_head_frame()
-        return self.get_frame("head")
-
-    def get_left_frame(self) -> Optional[np.ndarray]:
-        """
-        Get the latest left wrist camera frame.
-
-        Returns:
-            BGR image as numpy array, or None if not available
-        """
-        if self._is_dict:
-            return self.get_frame("left")
-        if hasattr(self._transport, 'get_left_frame'):
-            return self._transport.get_left_frame()
-        return self.get_frame("left")
-
-    def get_right_frame(self) -> Optional[np.ndarray]:
-        """
-        Get the latest right wrist camera frame.
-
-        Returns:
-            BGR image as numpy array, or None if not available
-        """
-        if self._is_dict:
-            return self.get_frame("right")
-        if hasattr(self._transport, 'get_right_frame'):
-            return self._transport.get_right_frame()
-        return self.get_frame("right")
+        # Single-camera transport -- ignore camera_name
+        return self._transport.get_frame()
 
     def get_all_frames(self) -> Dict[str, np.ndarray]:
         """
@@ -146,9 +124,11 @@ class MultiCamera:
             Dictionary mapping camera name to frame
 
         Example:
-            >>> frames = bot.cameras.get_all_frames()
-            >>> if "head" in frames:
-            ...     cv2.imshow("Head Camera", frames["head"])
+            ```python
+            frames = bot.cameras.get_all_frames()
+            if "head" in frames:
+                cv2.imshow("Head Camera", frames["head"])
+            ```
         """
         if self._is_dict:
             frames = {}
@@ -157,20 +137,17 @@ class MultiCamera:
                 if frame is not None:
                     frames[name] = frame
             return frames
-        
-        # Multi-camera transport
-        if hasattr(self._transport, 'get_all_frames'):
-            return self._transport.get_all_frames()
-        
-        # Fallback: try each camera individually
-        frames = {}
-        for name in self.camera_names:
-            frame = self.get_frame(name)
-            if frame is not None:
-                frames[name] = frame
-        return frames
 
-    def get_frame_shape(self, camera_name: str = "head") -> Optional[Tuple[int, int, int]]:
+        if self._is_multi:
+            return self._transport.get_all_frames()
+
+        # Single-camera transport -- return under default name
+        frame = self._transport.get_frame()
+        return {"head": frame} if frame is not None else {}
+
+    def get_frame_shape(
+        self, camera_name: str = "head"
+    ) -> Optional[Tuple[int, int, int]]:
         """
         Get the frame dimensions for a specific camera.
 

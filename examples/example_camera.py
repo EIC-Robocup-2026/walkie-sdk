@@ -9,12 +9,18 @@ Usage:
     uv run python examples/example_camera.py
 
 Requirements:
-    - Robot running WebRTC camera server on port 8554
+    - Robot running Zenoh camera server
     - OpenCV installed (opencv-python)
 
 Controls:
     - Press 'q' to quit
     - Press 's' to save a snapshot
+
+Tip:
+    For multi-camera setups (e.g. head + wrist), or to use a local USB
+    camera, pass the ``cameras={}`` dict to WalkieRobot instead of
+    camera_protocol. See examples/example_usb_camera.py and the
+    cameras guide in the docs for details.
 """
 
 import sys
@@ -28,7 +34,7 @@ NAMESPACE = ""  # Optional: "robot1" for namespaced topics
 
 # Protocol selection
 ROS_PROTOCOL = "rosbridge"
-CAMERA_PROTOCOL = "webrtc"
+CAMERA_PROTOCOL = "zenoh"
 
 
 def main():
@@ -134,7 +140,7 @@ def main():
                 )
 
                 # Add robot pose if available
-                pose = bot.status.get_pose()
+                pose = bot.status.get_position()
                 if pose:
                     cv2.putText(
                         display_frame,

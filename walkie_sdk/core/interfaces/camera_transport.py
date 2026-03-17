@@ -2,11 +2,11 @@
 CameraTransportInterface - Abstract interface for camera/video streams.
 
 Defines the contract that any camera transport implementation must fulfill,
-allowing the SDK to work with different camera protocols (WebRTC, Zenoh, etc.)
+allowing the SDK to work with different camera protocols (Zenoh, USB, etc.)
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -16,9 +16,8 @@ class CameraTransportInterface(ABC):
     Abstract interface for camera/video streams.
 
     Implementations:
-    - WebRTCCamera: WebRTC stream (for rosbridge setup)
     - ZenohCamera: Zenoh video stream
-    - SharedMemoryCamera: Direct memory access (same-host)
+    - USBCamera: Local USB camera via OpenCV
 
     All implementations must provide thread-safe frame access.
     """
@@ -93,3 +92,52 @@ class CameraTransportInterface(ABC):
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         """Context manager exit - disconnect from camera."""
         self.disconnect()
+
+
+class MultiCameraTransportInterface(CameraTransportInterface):
+    """
+    Abstract interface for multi-camera transports.
+
+    Extends CameraTransportInterface with named camera access.
+    Implementations provide access to multiple cameras (e.g. head, left, right)
+    through a unified interface.
+
+    Implementations:
+    - ZenohCamera (with multi_camera=True)
+    """
+
+    @abstractmethod
+    def get_frame(self, camera_name: Optional[str] = None) -> Optional[np.ndarray]:
+        """
+        Get the latest frame from a specific camera.
+
+        Args:
+            camera_name: Name of camera (e.g. "head", "left", "right").
+                         If None, returns the default camera frame.
+
+        Returns:
+            BGR image as numpy array (HxWx3, uint8), or None if not available
+        """
+        pass
+
+    @abstractmethod
+    def get_all_frames(self) -> Dict[str, np.ndarray]:
+        """
+        Get the latest frames from all available cameras.
+
+        Returns:
+            Dictionary mapping camera name to BGR numpy array.
+            Only includes cameras that have frames available.
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def camera_names(self) -> List[str]:
+        """
+        Get list of available camera names.
+
+        Returns:
+            List of camera name strings (e.g. ["head", "left", "right"])
+        """
+        pass

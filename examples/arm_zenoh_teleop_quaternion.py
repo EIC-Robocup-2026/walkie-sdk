@@ -1,9 +1,10 @@
+import argparse
 import zenoh
 import time
 import json
 import threading
 import math
-from walkie_sdk.robot import WalkieRobot
+from walkie_sdk import WalkieRobot
 from walkie_sdk.utils.converters import (
     quaternion_to_euler,
     euler_to_quaternion,
@@ -14,8 +15,6 @@ from walkie_sdk.utils.converters import (
 robot = None
 # Pose topics for the end-effector visualization (one per group)
 _pose_topics = {}
-# Axis triad names for the end-effector visualization (one per group)
-_axis_names = {}
 # Initial EE poses keyed by group name: {group: (x, y, z, qx, qy, qz, qw)}
 _initial_ee_pose = {}
 
@@ -197,7 +196,6 @@ def _invert_transform(tf):
 # So: ros_roll = c_pitch, ros_pitch = -c_yaw, ros_yaw = c_roll
 
 
-
 def remap_controller_to_ros(cx, cy, cz, cqx, cqy, cqz, cqw):
     """
     Remap controller-frame position + quaternion to ROS base_footprint frame.
@@ -226,6 +224,7 @@ def remap_controller_to_ros(cx, cy, cz, cqx, cqy, cqz, cqw):
     ros_quat = quaternion_multiply(ros_quat, offset_quat)
     ros_qx, ros_qy, ros_qz, ros_qw = ros_quat
     return (ros_x, ros_y, ros_z, ros_qx, ros_qy, ros_qz, ros_qw)
+
 
 # ---------------------------------------------------------------------------
 # Zenoh callback
@@ -348,24 +347,6 @@ def listener(sample):
             )
             print(f" -> Updated pose on topic '{pose_topic}'")
 
-        # 8. Visualize end-effector target as an axis triad (RGB arrows) in RViz2
-        axis_name = f"ee_target_{group}"
-        if group not in _axis_names:
-            _axis_names[group] = robot.draw_axis(
-                position=[target_x, target_y, target_z],
-                quaternion=[target_qx, target_qy, target_qz, target_qw],
-                axis_name=axis_name,
-                scale=0.1,
-            )
-            print(f" -> Created axis triad '{_axis_names[group]}'")
-        else:
-            robot.update_axis(
-                axis_name=axis_name,
-                position=[target_x, target_y, target_z],
-                quaternion=[target_qx, target_qy, target_qz, target_qw],
-            )
-            print(f" -> Updated axis triad '{axis_name}'")
-
     except json.JSONDecodeError:
         print(f"[Error] Invalid JSON format: {sample.payload.to_string()}")
     except Exception as e:
@@ -377,9 +358,16 @@ def main():
     global teleop_status
     teleop_status = "IN_PROGRESS"
 
+    parser = argparse.ArgumentParser(description="Zenoh arm teleoperation (quaternion)")
+    parser.add_argument("--ip", default="127.0.0.1", help="Robot IP address")
+    parser.add_argument("--ros-port", type=int, default=9090, help="ROS bridge port")
+    args = parser.parse_args()
+
     # 1. Initialize Robot Connection
     print("Connecting to WalkieRobot...")
-    robot = WalkieRobot(ip="10.0.0.204", ros_port=9090, camera_protocol='none',arm_mode='custom_ik')
+    robot = WalkieRobot(
+        ip=args.ip, ros_port=args.ros_port, camera_protocol="none", arm_mode="custom_ik"
+    )
     # robot = WalkieRobot(ip="10.206.61.14", ros_port=9090, camera_protocol='none',arm_mode='custom_ik')
 
     try:

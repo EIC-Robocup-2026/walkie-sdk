@@ -5,7 +5,7 @@ Provides get_frame() function and streaming status by wrapping
 a camera transport implementation.
 
 This module uses the CameraTransportInterface abstraction, allowing it
-to work with any camera transport implementation (WebRTC, ROS Image, Zenoh).
+to work with any camera transport implementation (Zenoh, USB, etc.).
 """
 
 from typing import TYPE_CHECKING, Optional, Tuple
@@ -24,16 +24,18 @@ class Camera:
     video frames regardless of the underlying protocol.
 
     This class works with any transport that implements CameraTransportInterface,
-    making it protocol-agnostic (works with WebRTC, ROS Image topics, Zenoh, etc.).
+    making it protocol-agnostic (works with Zenoh, USB, etc.).
 
     Args:
         transport: Camera transport instance implementing CameraTransportInterface
 
     Example:
-        >>> frame = bot.camera.get_frame()
-        >>> if frame is not None:
-        ...     cv2.imshow("Robot Camera", frame)
-        ...     cv2.waitKey(1)
+        ```python
+        frame = bot.camera.get_frame()
+        if frame is not None:
+            cv2.imshow("Robot Camera", frame)
+            cv2.waitKey(1)
+        ```
     """
 
     def __init__(self, transport: "CameraTransportInterface"):
@@ -71,11 +73,13 @@ class Camera:
             BGR image as numpy array (HxWx3, uint8), or None if no frame available
 
         Example:
-            >>> frame = bot.camera.get_frame()
-            >>> if frame is not None:
-            ...     # Frame is OpenCV-compatible BGR numpy array
-            ...     height, width, channels = frame.shape
-            ...     cv2.imwrite("snapshot.jpg", frame)
+            ```python
+            frame = bot.camera.get_frame()
+            if frame is not None:
+                # Frame is OpenCV-compatible BGR numpy array
+                height, width, channels = frame.shape
+                cv2.imwrite("snapshot.jpg", frame)
+            ```
         """
         return self._transport.get_frame()
 

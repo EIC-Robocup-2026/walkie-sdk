@@ -1,10 +1,15 @@
+import argparse
 import time
 
 from walkie_sdk import WalkieRobot, SPHERE, TEXT_VIEW_FACING
 
+parser = argparse.ArgumentParser(description="Walkie-SDK tools demo")
+parser.add_argument("--ip", default="127.0.0.1", help="Robot IP address")
+args = parser.parse_args()
+
 # Initialize Robot (Zenoh Protocol)
 bot = WalkieRobot(
-    ip="100.87.162.10",
+    ip=args.ip,
     ros_protocol="rosbridge",
     camera_protocol="zenoh",
 )
@@ -57,18 +62,8 @@ if result_3d:
             frame_id="map",
         )
 
-    # Draw an axis triad at each detection position
-    for i, pos in enumerate(result_3d):
-        bot.draw_axis(
-            position=pos,
-            quaternion=[0.0, 0.0, 0.0, 1.0],
-            axis_name=f"detection_{i}",
-            scale=0.15,
-        )
-
     print(f"Visualized {len(result_3d)} detections in RViz2")
     print("  - Sphere markers on topic: /walkie/viz_markers")
-    print("  - Axis triads on topic:    /walkie/viz_axis")
 
     # Keep markers visible for a few seconds before disconnecting
     time.sleep(3)

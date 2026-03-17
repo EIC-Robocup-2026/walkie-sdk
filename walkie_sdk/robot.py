@@ -35,7 +35,7 @@ class WalkieRobot:
 
     Auto-connects to the robot on initialization and provides access to:
     - .nav: Navigation controls (go_to, cancel, stop)
-    - .status: Telemetry data (get_pose, get_velocity)
+    - .status: Telemetry data (get_position, get_velocity)
     - .camera: Camera frames (get_frame) - if enabled
     - .viz: Visualization markers for RViz2 (draw_marker, clear_markers)
 
@@ -47,11 +47,10 @@ class WalkieRobot:
             - "auto": Auto-detect best available protocol
         ros_port: Port for ROS transport (default: 9090 for rosbridge)
         camera_protocol: Camera stream protocol to use:
-            - "webrtc": WebRTC stream (default, pairs with rosbridge)
-            - "zenoh": Zenoh video stream (pairs with zenoh)
-            - "shm": Shared memory (same-host only)
+            - "zenoh": Zenoh video stream (default)
+            - "usb": Local USB camera via OpenCV
             - "none": Disable camera functionality
-        camera_port: Port for camera stream (default: 8554 for WebRTC)
+        camera_port: Port for camera stream
         timeout: Connection timeout in seconds (default: 10.0)
         namespace: ROS namespace for topics/actions (default: "" = no namespace)
         arm_mode: Default arm control mode:
@@ -64,22 +63,24 @@ class WalkieRobot:
         ValueError: If invalid protocol specified
 
     Example:
-        >>> from walkie_sdk import WalkieRobot
-        >>>
-        >>> # Default: WebSocket + WebRTC (no ROS2 needed on client)
-        >>> bot = WalkieRobot(ip="192.168.1.100")
-        >>>
-        >>> bot.status.get_pose()
-        {'x': 0.0, 'y': 0.0, 'heading': 0.0}
-        >>>
-        >>> bot.nav.go_to(x=2.0, y=1.0, heading=0.0)
-        'SUCCEEDED'
-        >>>
-        >>> bot.disconnect()
+        ```python
+        from walkie_sdk import WalkieRobot
+
+        # Default: WebSocket + Zenoh camera (no ROS2 needed on client)
+        bot = WalkieRobot(ip="192.168.1.100")
+
+        bot.status.get_position()
+        # {'x': 0.0, 'y': 0.0, 'heading': 0.0}
+
+        bot.nav.go_to(x=2.0, y=1.0, heading=0.0)
+        # 'SUCCEEDED'
+
+        bot.disconnect()
 
         # With namespace:
-        >>> bot = WalkieRobot(ip="192.168.1.100", namespace="robot1")
+        bot = WalkieRobot(ip="192.168.1.100", namespace="robot1")
         # Topics will be /robot1/odom, /robot1/cmd_vel, etc.
+        ```
     """
 
     def __init__(
@@ -87,22 +88,19 @@ class WalkieRobot:
         ip: str,
         ros_protocol: str = "rosbridge",
         ros_port: int = 9090,
-        camera_protocol: str = "webrtc",
-        camera_port: int = 8554,
+        camera_protocol: str = "zenoh",
+        camera_port: int = 7447,
         timeout: float = 10.0,
         namespace: str = "",
         arm_mode: str = "custom_ik",
         arm_target_pose_topic: str = "/target_pose",
         # Legacy parameters for backward compatibility
         ws_port: Optional[int] = None,
-        webrtc_port: Optional[int] = None,
         enable_camera: bool = True,
     ):
         # Handle legacy parameter names for backward compatibility
         if ws_port is not None:
             ros_port = ws_port
-        if webrtc_port is not None:
-            camera_port = webrtc_port
         if not enable_camera:
             camera_protocol = "none"
 
@@ -222,7 +220,7 @@ class WalkieRobot:
         Telemetry/status provider.
 
         Provides:
-        - get_pose(): Get current pose {x, y, heading}
+        - get_position(): Get current pose {x, y, heading}
         - get_velocity(): Get current velocity {linear, angular}
         """
         return self._status
@@ -268,40 +266,35 @@ class WalkieRobot:
         Returns None if camera was disabled or failed to connect.
 
         Example:
-            >>> frames = bot.cameras.get_all_frames()
-            >>> head = bot.cameras.get_head_frame()
+            ```python
+            frames = bot.cameras.get_all_frames()
+            head = bot.cameras.get_frame("head")
+            ```
         """
         return self._multi_camera
 
     @property
     def viz(self) -> Visualization:
         """
-        Visualization marker controller for RViz2.
+            Visualization marker controller for RViz2.
 
-        Provides:
-        - draw_marker(position, quaternion, frame_id, ...): Publish a single marker
-        - draw_markers(markers): Publish multiple markers as MarkerArray
-        - update_marker(marker_id, ...): Update an existing marker
-        - delete_marker(marker_id): Delete a specific marker
-        - clear_markers(): Remove all markers
-        - draw_pose(position, quaternion, frame_id, topic): Publish a PoseStamped
-        - update_pose(position, quaternion, topic): Update an existing PoseStamped
-        - draw_axis(position, quaternion, axis_name, ...): Draw RGB axis triad
-        - update_axis(axis_name, position, quaternion, ...): Update axis triad
+            Provides:
+            - draw_marker(position, quaternion, frame_id, ...): Publish a single marker
+            - draw_markers(markers): Publish multiple markers as MarkerArray
+            - update_marker(marker_id, ...): Update an existing marker
+            - delete_marker(marker_id): Delete a specific marker
+            - clear_markers(): Remove all markers
+            - draw_pose(position, quaternion, frame_id, topic): Publish a PoseStamped
+            - update_pose(position, quaternion, topic): Update an existing PoseStamped
 
         Example:
-            >>> bot.viz.draw_marker(
-            ...     position=[1.0, 2.0, 0.0],
-            ...     quaternion=[0.0, 0.0, 0.0, 1.0],
-            ... )
-            >>> bot.viz.draw_pose(
-            ...     position=[1.0, 2.0, 0.0],
-            ...     quaternion=[0.0, 0.0, 0.0, 1.0],
-            ...     topic="walkie/target_pose/left_arm",
-            ... )
+            ```python
+            bot.viz.draw_marker([1.0, 2.0, 0.0])  # Red arrow
+            bot.viz.draw_pose([1.0, 2.0, 0.0])    # Pose triad
+            ```
         """
         return self._viz
-    
+
     @property
     def tools(self) -> Tools:
         """Tools module for utility functions."""
@@ -310,7 +303,7 @@ class WalkieRobot:
     def draw_marker(
         self,
         position,
-        quaternion,
+        quaternion=None,
         frame_id: str = "base_link",
         **kwargs,
     ) -> int:
@@ -322,7 +315,7 @@ class WalkieRobot:
 
         Args:
             position: [x, y, z] position in the reference frame.
-            quaternion: [x, y, z, w] orientation quaternion.
+            quaternion: [x, y, z, w] orientation quaternion. Defaults to identity.
             frame_id: TF reference frame (default: "base_link").
             **kwargs: Additional marker options (marker_type, scale, color, etc.)
 
@@ -330,10 +323,13 @@ class WalkieRobot:
             The marker ID that was used.
 
         Example:
-            >>> bot.draw_marker([1.0, 2.0, 0.0], [0.0, 0.0, 0.0, 1.0])
-            0
+            ```python
+            bot.draw_marker([1.0, 2.0, 0.0])
+            ```
         """
-        return self._viz.draw_marker(position, quaternion, frame_id, **kwargs)
+        return self._viz.draw_marker(
+            position=position, quaternion=quaternion, frame_id=frame_id, **kwargs
+        )
 
     def update_marker(
         self,
@@ -358,8 +354,10 @@ class WalkieRobot:
             **kwargs: Additional fields to update (frame_id, scale, color, etc.)
 
         Example:
-            >>> mid = bot.draw_marker([0, 0, 0], [0, 0, 0, 1])
-            >>> bot.update_marker(mid, position=[1.0, 2.0, 0.0])
+            ```python
+            mid = bot.draw_marker([0, 0, 0])
+            bot.update_marker(mid, position=[1.0, 2.0, 0.0])
+            ```
         """
         self._viz.update_marker(
             marker_id, position=position, quaternion=quaternion, **kwargs
@@ -368,7 +366,7 @@ class WalkieRobot:
     def draw_pose(
         self,
         position,
-        quaternion,
+        quaternion=None,
         frame_id: str = "base_link",
         **kwargs,
     ) -> str:
@@ -380,7 +378,7 @@ class WalkieRobot:
 
         Args:
             position: [x, y, z] position in the reference frame.
-            quaternion: [x, y, z, w] orientation quaternion.
+            quaternion: [x, y, z, w] orientation quaternion. Defaults to identity.
             frame_id: TF reference frame (default: "base_link").
             **kwargs: Additional options (topic, etc.)
 
@@ -388,10 +386,14 @@ class WalkieRobot:
             The topic string that was used.
 
         Example:
-            >>> bot.draw_pose([1.0, 2.0, 0.0], [0.0, 0.0, 0.0, 1.0])
-            'walkie/target_pose'
+            ```python
+            bot.draw_pose([1.0, 2.0, 0.0])
+            # returns 'walkie/target_pose'
+            ```
         """
-        return self._viz.draw_pose(position, quaternion, frame_id, **kwargs)
+        return self._viz.draw_pose(
+            position=position, quaternion=quaternion, frame_id=frame_id, **kwargs
+        )
 
     def update_pose(
         self,
@@ -414,69 +416,12 @@ class WalkieRobot:
             **kwargs: Additional fields to update (frame_id, topic, etc.)
 
         Example:
-            >>> bot.draw_pose([0, 0, 0], [0, 0, 0, 1], topic="my_pose")
-            >>> bot.update_pose(position=[1.0, 2.0, 0.0], topic="my_pose")
+            ```python
+            bot.draw_pose([0, 0, 0], topic="my_pose")
+            bot.update_pose(position=[1.0, 2.0, 0.0], topic="my_pose")
+            ```
         """
         self._viz.update_pose(position=position, quaternion=quaternion, **kwargs)
-
-    def draw_axis(
-        self,
-        position,
-        quaternion,
-        frame_id: str = "base_link",
-        axis_name: str = "axis",
-        **kwargs,
-    ) -> str:
-        """
-        Convenience method to draw an RGB axis triad in RViz2.
-
-        Publishes 3 ARROW markers (Red=X, Green=Y, Blue=Z) at the given
-        pose.  Shortcut for bot.viz.draw_axis().
-
-        Args:
-            position: [x, y, z] origin of the axis triad.
-            quaternion: [x, y, z, w] orientation of the frame.
-            frame_id: TF reference frame (default: "base_link").
-            axis_name: Unique name for this axis set (default: "axis").
-            **kwargs: Additional options (scale, lifetime, topic).
-
-        Returns:
-            The axis_name that was used (pass to update_axis()).
-
-        Example:
-            >>> bot.draw_axis([1.0, 0.0, 0.5], [0.0, 0.0, 0.0, 1.0])
-            'axis'
-        """
-        return self._viz.draw_axis(
-            position, quaternion, frame_id=frame_id, axis_name=axis_name, **kwargs
-        )
-
-    def update_axis(
-        self,
-        axis_name: str,
-        position=None,
-        quaternion=None,
-        **kwargs,
-    ) -> None:
-        """
-        Convenience method to update an existing axis triad.
-
-        Only pass the fields you want to change.  Shortcut for
-        bot.viz.update_axis().
-
-        Args:
-            axis_name: Name of the axis set (returned by draw_axis()).
-            position: New [x, y, z] origin (or None to keep current).
-            quaternion: New [x, y, z, w] orientation (or None to keep current).
-            **kwargs: Additional fields (frame_id, scale, lifetime).
-
-        Example:
-            >>> bot.draw_axis([0, 0, 0], [0, 0, 0, 1], axis_name="target")
-            >>> bot.update_axis("target", position=[1.0, 2.0, 0.0])
-        """
-        self._viz.update_axis(
-            axis_name, position=position, quaternion=quaternion, **kwargs
-        )
 
     @property
     def ip(self) -> str:
@@ -532,14 +477,6 @@ class WalkieRobot:
         # Stop telemetry
         self._status.stop()
 
-        # Stop camera
-        if self._camera is not None:
-            try:
-                self._camera.stop()
-            except Exception:
-                pass
-
-        # Disconnect camera transport
         if self._camera_transport is not None:
             try:
                 self._camera_transport.disconnect()

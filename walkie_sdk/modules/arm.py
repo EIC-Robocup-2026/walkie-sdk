@@ -20,9 +20,9 @@ from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.converters import euler_to_quaternion
 from walkie_sdk.utils.namespace import apply_namespace
 
-# Default arm topic names (without namespace)
+# Default arm topic names (without namespace, no leading slash)
 DEFAULT_ARM_COMMANDS_TOPIC = "walkie/arm/commands"
-DEFAULT_ARM_STATES_TOPIC = "/joint_states"
+DEFAULT_ARM_STATES_TOPIC = "joint_states"
 ARM_COMMANDS_TYPE = "sensor_msgs/msg/JointState"
 ARM_STATES_TYPE = "sensor_msgs/msg/JointState"
 
@@ -80,12 +80,9 @@ class Arm:
         )
         self._target_pose_topic = target_pose_topic
         self._states_lock = threading.Lock()
-        self._latest_states: Optional[Dict[str, any]] = None
+        self._latest_states: Optional[Dict[str, Any]] = None
         self._subscribed = False
         self._msg_count = 0  # Debug counter
-
-        # Try to subscribe to joint states (may fail if transport not connected yet)
-        self._setup_state_subscription()
 
     def _setup_state_subscription(self):
         """Setup subscription to joint states."""
@@ -275,7 +272,7 @@ class Arm:
         return False
 
     # tested
-    def get_joint_states(self) -> Optional[Dict[str, any]]:
+    def get_joint_states(self) -> Optional[Dict[str, Any]]:
         """
         Get current joint states.
 
@@ -351,7 +348,7 @@ class Arm:
                     elif name.startswith("left_gripper"):
                         if i < len(positions):
                             left_gripper = positions[i]
-                    elif name.startswith("right_gripper_controller"):
+                    elif name.startswith("right_gripper"):
                         if i < len(positions):
                             right_gripper = positions[i]
 
@@ -427,7 +424,6 @@ class Arm:
 
     # ── MoveIt action helpers ──────────────────────────────────────────
 
-    # added ros2 action arm manipulator
     def _send_action_goal(
         self,
         action_name: str,
@@ -466,8 +462,7 @@ class Arm:
             thread.start()
             return "IN_PROGRESS"
 
-    # tested
-    def go_to_home(self, group_name: str) -> None:
+    def go_to_home(self, group_name: str) -> str:
         """Move the arm to its defined home position."""
         try:
             result = self._transport.call_action(
@@ -483,32 +478,30 @@ class Arm:
                 return "FAILED"
 
         except TimeoutError:
-            print("timeout error:")
+            print("[Arm] Go Home timed out")
+            return "FAILED"
         except Exception as e:
             print(f"Go Home failed: {e}")
             return "FAILED"
-
-    # tested
-    """    
-    Open: -15.71 rad
-    Close: 0.7 rad
-    """
 
     def control_gripper(
         self,
         group_name: str,
         position: float,
-        blocking: bool = True,  # NEW ARGUMENT
-        feedback_callback: Optional[
-            Callable[[Dict[str, Any]], None]
-        ] = None,  # NEW ARGUMENT
+        blocking: bool = True,
+        feedback_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
     ) -> str:
         """
         Open or close the gripper.
 
         Args:
-            open: True to open, False to close.
-            callback: Optional callback for action completion.
+            group_name: MoveIt planning group name (e.g., "left_gripper").
+            position: Gripper position (0.7 = closed, -15.71 = open).
+            blocking: Wait for action to complete (default: True).
+            feedback_callback: Optional callback for action feedback.
+
+        Returns:
+            Status string: "SUCCEEDED", "FAILED", or "IN_PROGRESS".
         """
         goal_msg = {"group_name": group_name, "position": position}
 
@@ -579,7 +572,6 @@ class Arm:
             feedback_callback=feedback_callback,
         )
 
-    # tested
     def go_to_pose_relative(
         self,
         x: float,
@@ -590,11 +582,9 @@ class Arm:
         yaw: float,
         group_name: str,
         cartesian_path: bool = False,
-        blocking: bool = True,  # NEW ARGUMENT
-        feedback_callback: Optional[
-            Callable[[Dict[str, Any]], None]
-        ] = None,  # NEW ARGUMENT
-    ) -> None:
+        blocking: bool = True,
+        feedback_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+    ) -> str:
         """
         Move the arm to a specific Cartesian pose using an absolute coordinate action.
         """
@@ -609,7 +599,6 @@ class Arm:
             "cartesian_path": cartesian_path,
         }
 
-        # Assuming the action name is 'go_to_pose'
         return self._send_action_goal(
             action_name="go_to_pose_relative",
             action_type=f"{MOVEIT_ACTION_INTERFACE}/GoToPoseRelative",
@@ -617,6 +606,7 @@ class Arm:
             blocking=blocking,
             feedback_callback=feedback_callback,
         )
+
     def go_to_pose_quaternion(
         self,
         x: float,
@@ -778,63 +768,3 @@ class Arm:
             blocking=blocking,
             feedback_callback=feedback_callback,
         )
-
-    """
-    got o pose qurtanion
-
-    ros2 action send_goal /move_action moveit_msgs/action/MoveGroup "{
-
-    request: {
-
-        group_name: 'left_arm',
-
-        goal_constraints: [{
-
-        position_constraints: [{
-
-            header: {frame_id: 'base_footprint'},
-
-            link_name: 'left_link7',
-
-            constraint_region: {
-
-            primitives: [{type: 1, dimensions: [0.1, 0.1, 0.1]}],
-
-            primitive_poses: [{position: {x: 0.38, y: 0.19, z: 0.58}}]
-
-            },
-
-            weight: 1.0
-
-        }],
-
-        orientation_constraints: [{
-
-            header: {frame_id: 'base_footprint'},
-
-            link_name: 'left_link7',
-
-            orientation: {x: -0.5, y: -0.5, z: 0.5, w: 0.5},
-
-            absolute_x_axis_tolerance: 0.1,
-
-            absolute_y_axis_tolerance: 0.1,
-
-            absolute_z_axis_tolerance: 0.1,
-
-            weight: 1.0
-
-        }]
-
-        }],
-
-        allowed_planning_time: 10.0,
-
-        max_velocity_scaling_factor: 0.1,
-
-        max_acceleration_scaling_factor: 0.1
-
-    }
-
-    }"
-    """

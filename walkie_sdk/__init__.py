@@ -10,10 +10,10 @@ Supports multiple protocols for flexibility:
 Example:
     from walkie_sdk import WalkieRobot
 
-    # Default: WebSocket + WebRTC
+    # Default: WebSocket + Zenoh camera
     bot = WalkieRobot(ip="192.168.1.100")
 
-    print(f"Pose: {bot.status.get_pose()}")
+    print(f"Pose: {bot.status.get_position()}")
     bot.nav.go_to(x=2.0, y=1.0, heading=0.0)
 """
 
@@ -28,7 +28,6 @@ from walkie_sdk.modules.visualization import (
     CUBE,
     CUBE_LIST,
     CYLINDER,
-    DEFAULT_AXIS_TOPIC,
     LINE_LIST,
     LINE_STRIP,
     MESH_RESOURCE,
@@ -42,7 +41,7 @@ from walkie_sdk.modules.visualization import (
 from walkie_sdk.robot import WalkieRobot
 from walkie_sdk.modules.multi_camera import MultiCamera
 
-__version__ = "0.3.0"
+__version__ = "0.2.0"
 
 __all__ = [
     # Main class
@@ -69,7 +68,6 @@ __all__ = [
     "TEXT_VIEW_FACING",
     "MESH_RESOURCE",
     "TRIANGLE_LIST",
-    "DEFAULT_AXIS_TOPIC",
     # Version
     "__version__",
 ]

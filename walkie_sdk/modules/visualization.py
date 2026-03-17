@@ -1,14 +1,13 @@
 """
 Visualization - RViz2 marker publishing module.
 
-Provides draw_marker(), draw_markers(), draw_pose(), draw_axis(), and
+Provides draw_marker(), draw_markers(), draw_pose(), and
 clear_markers() for publishing visualization markers and poses to RViz2.
 
 This module uses ROSTransportInterface abstraction, allowing it
 to work with any transport implementation (rosbridge, zenoh).
 """
 
-import math
 import threading
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -44,41 +43,6 @@ POSE_STAMPED_MSG_TYPE = "geometry_msgs/msg/PoseStamped"
 DEFAULT_MARKER_TOPIC = "walkie/viz_markers"
 DEFAULT_MARKER_ARRAY_TOPIC = "walkie/viz_markers_array"
 DEFAULT_POSE_TOPIC = "walkie/target_pose"
-DEFAULT_AXIS_TOPIC = "walkie/viz_axis"
-
-
-# ── Local quaternion helpers (avoids circular import from utils) ────────
-
-
-def _quat_multiply(
-    q1: Tuple[float, float, float, float],
-    q2: Tuple[float, float, float, float],
-) -> Tuple[float, float, float, float]:
-    """Hamilton product q1 * q2.  Format: (x, y, z, w)."""
-    x1, y1, z1, w1 = q1
-    x2, y2, z2, w2 = q2
-    return (
-        w1 * x2 + x1 * w2 + y1 * z2 - z1 * y2,
-        w1 * y2 - x1 * z2 + y1 * w2 + z1 * x2,
-        w1 * z2 + x1 * y2 - y1 * x2 + z1 * w2,
-        w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2,
-    )
-
-
-# Pre-computed rotation quaternions used by draw_axis():
-#   Default ARROW marker points along +X, so:
-#   - X axis: identity              (already +X)
-#   - Y axis: +90 deg around Z      -> points +Y
-#   - Z axis: -90 deg around Y      -> points +Z
-_HALF_SQRT2 = math.sqrt(2.0) / 2.0
-_AXIS_ROT_X = (0.0, 0.0, 0.0, 1.0)  # identity
-_AXIS_ROT_Y = (0.0, 0.0, _HALF_SQRT2, _HALF_SQRT2)  # 90 deg around Z
-_AXIS_ROT_Z = (0.0, -_HALF_SQRT2, 0.0, _HALF_SQRT2)  # -90 deg around Y
-
-# RGB colours for axes
-_AXIS_COLOR_X = [1.0, 0.0, 0.0, 1.0]  # red
-_AXIS_COLOR_Y = [0.0, 1.0, 0.0, 1.0]  # green
-_AXIS_COLOR_Z = [0.0, 0.0, 1.0, 1.0]  # blue
 
 
 def _build_marker_msg(
@@ -221,12 +185,14 @@ class Visualization:
         namespace: ROS namespace prefix for topics (default: "" = no namespace)
 
     Example:
-        >>> viz = Visualization(transport, namespace="robot1")
-        >>> viz.draw_marker(
-        ...     position=[1.0, 2.0, 0.0],
-        ...     quaternion=[0.0, 0.0, 0.0, 1.0],
-        ...     frame_id="base_link",
-        ... )
+        ```python
+        viz = Visualization(transport, namespace="robot1")
+        viz.draw_marker(
+            position=[1.0, 2.0, 0.0],
+            quaternion=[0.0, 0.0, 0.0, 1.0],
+            frame_id="base_link",
+        )
+        ```
     """
 
     def __init__(self, transport: ROSTransportInterface, namespace: str = ""):
@@ -240,10 +206,6 @@ class Visualization:
         # Cache of pose parameters keyed by topic for update_pose()
         self._poses: Dict[str, Dict[str, Any]] = {}
         self._poses_lock = threading.Lock()
-        # Cache of axis parameters keyed by axis_name for update_axis()
-        # Each entry stores: {position, quaternion, frame_id, scale, lifetime, ns, topic, ids}
-        self._axes: Dict[str, Dict[str, Any]] = {}
-        self._axes_lock = threading.Lock()
 
     @property
     def namespace(self) -> str:
@@ -269,7 +231,7 @@ class Visualization:
     def draw_marker(
         self,
         position: List[float],
-        quaternion: List[float],
+        quaternion: Optional[List[float]] = None,
         frame_id: str = "base_link",
         marker_type: int = ARROW,
         scale: Optional[List[float]] = None,
@@ -286,11 +248,10 @@ class Visualization:
 
         Args:
             position: [x, y, z] position in the reference frame.
-            quaternion: [x, y, z, w] orientation quaternion.
+            quaternion: [x, y, z, w] orientation quaternion. Defaults to identity [0,0,0,1].
             frame_id: TF reference frame (default: "base_link").
-            marker_type: Marker shape type. Use module constants:
-                ARROW (0), CUBE (1), SPHERE (2), CYLINDER (3),
-                LINE_STRIP (4), TEXT_VIEW_FACING (9), etc.
+            marker_type: Marker shape type (default: ARROW). Use module constants:
+                ARROW (0), CUBE (1), SPHERE (2), etc.
             scale: [sx, sy, sz] marker scale in meters.
                 Defaults: ARROW=[0.2, 0.05, 0.05], others=[0.1, 0.1, 0.1].
             color: [r, g, b, a] color (0.0-1.0). Default: [1.0, 0.0, 0.0, 1.0] (red).
@@ -309,26 +270,26 @@ class Visualization:
             ConnectionError: If not connected to ROS transport.
 
         Example:
-            >>> # Draw a red arrow at position (1, 2, 0) in base_link frame
-            >>> viz.draw_marker(
-            ...     position=[1.0, 2.0, 0.0],
-            ...     quaternion=[0.0, 0.0, 0.0, 1.0],
-            ... )
-            0
+            ```python
+            # Draw a red arrow at position (1, 2, 0)
+            viz.draw_marker([1.0, 2.0, 0.0])
 
-            >>> # Draw a green sphere with custom scale
-            >>> viz.draw_marker(
-            ...     position=[3.0, 0.0, 0.5],
-            ...     quaternion=[0.0, 0.0, 0.0, 1.0],
-            ...     frame_id="map",
-            ...     marker_type=SPHERE,
-            ...     color=[0.0, 1.0, 0.0, 0.8],
-            ...     scale=[0.2, 0.2, 0.2],
-            ... )
-            1
+            # Draw a green sphere with custom scale
+            viz.draw_marker(
+                position=[3.0, 0.0, 0.5],
+                quaternion=[0.0, 0.0, 0.0, 1.0],
+                frame_id="map",
+                marker_type=SPHERE,
+                color=[0.0, 1.0, 0.0, 0.8],
+                scale=[0.2, 0.2, 0.2],
+            )
+            ```
         """
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
+
+        if quaternion is None:
+            quaternion = [0.0, 0.0, 0.0, 1.0]
 
         if marker_id is None:
             marker_id = self._get_next_id()
@@ -422,14 +383,16 @@ class Visualization:
             KeyError: If the marker_id was not previously created with draw_marker().
 
         Example:
-            >>> # Create a marker
-            >>> mid = viz.draw_marker([0, 0, 0], [0, 0, 0, 1])
-            >>>
-            >>> # Update only its position (everything else stays the same)
-            >>> viz.update_marker(mid, position=[1.0, 2.0, 0.0])
-            >>>
-            >>> # Update position and color together
-            >>> viz.update_marker(mid, position=[3.0, 0.0, 0.0], color=[0, 1, 0, 1])
+            ```python
+            # Create a marker
+            mid = viz.draw_marker([0, 0, 0], [0, 0, 0, 1])
+
+            # Update only its position (everything else stays the same)
+            viz.update_marker(mid, position=[1.0, 2.0, 0.0])
+
+            # Update position and color together
+            viz.update_marker(mid, position=[3.0, 0.0, 0.0], color=[0, 1, 0, 1])
+            ```
         """
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
@@ -499,7 +462,7 @@ class Visualization:
             markers: List of marker parameter dicts. Each dict accepts the same
                 keyword arguments as draw_marker():
                 - position (required): [x, y, z]
-                - quaternion (required): [x, y, z, w]
+                - quaternion: [x, y, z, w] (optional, default identity)
                 - frame_id: str (default: "base_link")
                 - marker_type: int (default: ARROW)
                 - scale: [sx, sy, sz]
@@ -518,21 +481,21 @@ class Visualization:
             ConnectionError: If not connected to ROS transport.
 
         Example:
-            >>> viz.draw_markers([
-            ...     {
-            ...         "position": [1.0, 0.0, 0.0],
-            ...         "quaternion": [0.0, 0.0, 0.0, 1.0],
-            ...         "marker_type": ARROW,
-            ...         "color": [1.0, 0.0, 0.0, 1.0],
-            ...     },
-            ...     {
-            ...         "position": [2.0, 0.0, 0.0],
-            ...         "quaternion": [0.0, 0.0, 0.0, 1.0],
-            ...         "marker_type": SPHERE,
-            ...         "color": [0.0, 1.0, 0.0, 1.0],
-            ...     },
-            ... ])
-            [0, 1]
+            ```python
+            viz.draw_markers([
+                {
+                    "position": [1.0, 0.0, 0.0],
+                    # quaternion defaults to identity
+                    # marker_type defaults to ARROW
+                    "color": [1.0, 0.0, 0.0, 1.0],
+                },
+                {
+                    "position": [2.0, 0.0, 0.0],
+                    "marker_type": SPHERE,
+                    "color": [0.0, 1.0, 0.0, 1.0],
+                },
+            ])
+            ```
         """
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
@@ -548,7 +511,7 @@ class Visualization:
             msg = _build_marker_msg(
                 marker_id=mid,
                 position=params["position"],
-                quaternion=params["quaternion"],
+                quaternion=params.get("quaternion", [0.0, 0.0, 0.0, 1.0]),
                 frame_id=params.get("frame_id", "base_link"),
                 marker_type=params.get("marker_type", ARROW),
                 action=ADD,
@@ -623,7 +586,9 @@ class Visualization:
             ConnectionError: If not connected to ROS transport.
 
         Example:
-            >>> viz.clear_markers()
+            ```python
+            viz.clear_markers()
+            ```
         """
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
@@ -648,7 +613,7 @@ class Visualization:
     def draw_pose(
         self,
         position: List[float],
-        quaternion: List[float],
+        quaternion: Optional[List[float]] = None,
         frame_id: str = "base_link",
         topic: str = DEFAULT_POSE_TOPIC,
     ) -> str:
@@ -661,7 +626,7 @@ class Visualization:
 
         Args:
             position: [x, y, z] position in the reference frame.
-            quaternion: [x, y, z, w] orientation quaternion.
+            quaternion: [x, y, z, w] orientation quaternion. Defaults to identity [0,0,0,1].
             frame_id: TF reference frame (default: "base_link").
             topic: ROS topic to publish on (default: "walkie/target_pose").
                 Use unique topics for multiple simultaneous poses, e.g.
@@ -674,22 +639,25 @@ class Visualization:
             ConnectionError: If not connected to ROS transport.
 
         Example:
-            >>> viz.draw_pose(
-            ...     position=[1.0, 2.0, 0.0],
-            ...     quaternion=[0.0, 0.0, 0.0, 1.0],
-            ... )
-            'walkie/target_pose'
+            ```python
+            # Draw pose with default identity orientation
+            viz.draw_pose([1.0, 2.0, 0.0])
+            # returns 'walkie/target_pose'
 
-            >>> # Multiple poses on different topics
-            >>> viz.draw_pose(
-            ...     position=[0.5, 0.0, 0.3],
-            ...     quaternion=[0.0, 0.0, 0.0, 1.0],
-            ...     topic="walkie/target_pose/left_arm",
-            ... )
-            'walkie/target_pose/left_arm'
+            # Multiple poses on different topics
+            viz.draw_pose(
+                position=[0.5, 0.0, 0.3],
+                quaternion=[0.0, 0.0, 0.0, 1.0],
+                topic="walkie/target_pose/left_arm",
+            )
+            # returns 'walkie/target_pose/left_arm'
+            ```
         """
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
+
+        if quaternion is None:
+            quaternion = [0.0, 0.0, 0.0, 1.0]
 
         msg = _build_pose_stamped_msg(
             position=position,
@@ -735,10 +703,12 @@ class Visualization:
             KeyError: If the topic was not previously used with draw_pose().
 
         Example:
-            >>> topic = viz.draw_pose([0, 0, 0], [0, 0, 0, 1])
-            >>>
-            >>> # Update only position (orientation stays the same)
-            >>> viz.update_pose(position=[1.0, 2.0, 0.0], topic=topic)
+            ```python
+            topic = viz.draw_pose([0, 0, 0], [0, 0, 0, 1])
+
+            # Update only position (orientation stays the same)
+            viz.update_pose(position=[1.0, 2.0, 0.0], topic=topic)
+            ```
         """
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
@@ -771,199 +741,3 @@ class Visualization:
         # Update the cache with merged values
         with self._poses_lock:
             self._poses[topic] = cached
-
-    # ── Axis (RGB triad) helpers ───────────────────────────────────────
-
-    def draw_axis(
-        self,
-        position: List[float],
-        quaternion: List[float],
-        frame_id: str = "base_link",
-        axis_name: str = "axis",
-        scale: float = 0.15,
-        lifetime: float = 0.0,
-        topic: str = DEFAULT_AXIS_TOPIC,
-    ) -> str:
-        """
-        Draw an RGB axis triad (3 arrows: Red=X, Green=Y, Blue=Z).
-
-        Publishes a MarkerArray with three ARROW markers that share the
-        same origin but point along the local X, Y, and Z axes of the
-        given orientation.  Useful for visualising a pose / frame.
-
-        Args:
-            position: [x, y, z] origin of the axis triad.
-            quaternion: [x, y, z, w] orientation of the frame.
-            frame_id: TF reference frame (default: "base_link").
-            axis_name: Unique name for this axis set.  Used as the marker
-                namespace and as the key for update_axis() / delete later.
-            scale: Arrow length in metres (default: 0.15).  Shaft and head
-                diameters are derived automatically.
-            lifetime: Duration in seconds (0 = forever).
-            topic: ROS topic to publish on (default: "walkie/viz_axis").
-
-        Returns:
-            The *axis_name* that was used (pass to update_axis()).
-
-        Raises:
-            ConnectionError: If not connected to ROS transport.
-
-        Example:
-            >>> viz.draw_axis(
-            ...     position=[1.0, 0.0, 0.5],
-            ...     quaternion=[0.0, 0.0, 0.0, 1.0],
-            ...     axis_name="ee_target",
-            ... )
-            'ee_target'
-        """
-        if not self._transport.is_connected:
-            raise ConnectionError("Not connected to robot")
-
-        base_q = (
-            float(quaternion[0]),
-            float(quaternion[1]),
-            float(quaternion[2]),
-            float(quaternion[3]),
-        )
-
-        arrow_scale = [float(scale), float(scale) * 0.12, float(scale) * 0.2]
-
-        ids: List[int] = []
-        marker_msgs: List[Dict[str, Any]] = []
-
-        for axis_rot, color in (
-            (_AXIS_ROT_X, _AXIS_COLOR_X),
-            (_AXIS_ROT_Y, _AXIS_COLOR_Y),
-            (_AXIS_ROT_Z, _AXIS_COLOR_Z),
-        ):
-            q = _quat_multiply(base_q, axis_rot)
-            mid = self._get_next_id()
-            ids.append(mid)
-
-            msg = _build_marker_msg(
-                marker_id=mid,
-                position=position,
-                quaternion=[q[0], q[1], q[2], q[3]],
-                frame_id=frame_id,
-                marker_type=ARROW,
-                action=ADD,
-                scale=arrow_scale,
-                color=list(color),
-                lifetime=lifetime,
-                ns=axis_name,
-            )
-            marker_msgs.append(msg)
-
-        array_msg = {"markers": marker_msgs}
-        full_topic = self._resolve_topic(topic)
-        self._transport.publish(full_topic, MARKER_ARRAY_MSG_TYPE, array_msg)
-
-        # Cache for update_axis()
-        with self._axes_lock:
-            self._axes[axis_name] = {
-                "position": list(position),
-                "quaternion": list(quaternion),
-                "frame_id": frame_id,
-                "scale": scale,
-                "lifetime": lifetime,
-                "topic": topic,
-                "ids": ids,
-            }
-
-        return axis_name
-
-    def update_axis(
-        self,
-        axis_name: str,
-        position: Optional[List[float]] = None,
-        quaternion: Optional[List[float]] = None,
-        frame_id: Optional[str] = None,
-        scale: Optional[float] = None,
-        lifetime: Optional[float] = None,
-    ) -> None:
-        """
-        Update an existing axis triad with only the changed fields.
-
-        Merges the provided parameters with the cached values from the
-        original draw_axis() call, then republishes.  Only pass the
-        fields you want to change.
-
-        Args:
-            axis_name: Name of the axis set (returned by draw_axis()).
-            position: New [x, y, z] origin (or None to keep current).
-            quaternion: New [x, y, z, w] orientation (or None to keep current).
-            frame_id: New reference frame (or None to keep current).
-            scale: New arrow length in metres (or None to keep current).
-            lifetime: New lifetime in seconds (or None to keep current).
-
-        Raises:
-            ConnectionError: If not connected to ROS transport.
-            KeyError: If axis_name was not previously created with draw_axis().
-
-        Example:
-            >>> viz.draw_axis([0, 0, 0], [0, 0, 0, 1], axis_name="target")
-            >>> viz.update_axis("target", position=[1.0, 2.0, 0.0])
-        """
-        if not self._transport.is_connected:
-            raise ConnectionError("Not connected to robot")
-
-        with self._axes_lock:
-            if axis_name not in self._axes:
-                raise KeyError(
-                    f"Axis '{axis_name}' not found. Create it first with draw_axis()."
-                )
-            cached = self._axes[axis_name].copy()
-
-        # Merge
-        if position is not None:
-            cached["position"] = list(position)
-        if quaternion is not None:
-            cached["quaternion"] = list(quaternion)
-        if frame_id is not None:
-            cached["frame_id"] = frame_id
-        if scale is not None:
-            cached["scale"] = scale
-        if lifetime is not None:
-            cached["lifetime"] = lifetime
-
-        base_q = (
-            float(cached["quaternion"][0]),
-            float(cached["quaternion"][1]),
-            float(cached["quaternion"][2]),
-            float(cached["quaternion"][3]),
-        )
-        arrow_scale = [
-            float(cached["scale"]),
-            float(cached["scale"]) * 0.12,
-            float(cached["scale"]) * 0.2,
-        ]
-        ids = cached["ids"]
-
-        marker_msgs: List[Dict[str, Any]] = []
-        for mid, axis_rot, color in zip(
-            ids,
-            (_AXIS_ROT_X, _AXIS_ROT_Y, _AXIS_ROT_Z),
-            (_AXIS_COLOR_X, _AXIS_COLOR_Y, _AXIS_COLOR_Z),
-        ):
-            q = _quat_multiply(base_q, axis_rot)
-            msg = _build_marker_msg(
-                marker_id=mid,
-                position=cached["position"],
-                quaternion=[q[0], q[1], q[2], q[3]],
-                frame_id=cached["frame_id"],
-                marker_type=ARROW,
-                action=ADD,
-                scale=arrow_scale,
-                color=list(color),
-                lifetime=cached["lifetime"],
-                ns=axis_name,
-            )
-            marker_msgs.append(msg)
-
-        array_msg = {"markers": marker_msgs}
-        full_topic = self._resolve_topic(cached["topic"])
-        self._transport.publish(full_topic, MARKER_ARRAY_MSG_TYPE, array_msg)
-
-        # Update cache
-        with self._axes_lock:
-            self._axes[axis_name] = cached

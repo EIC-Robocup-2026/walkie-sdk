@@ -1,15 +1,14 @@
 """
-Example: Visualization Markers, Poses, and Axis Triads in RViz2
+Example: Visualization Markers and Poses in RViz2
 
-Demonstrates how to publish visualization markers, PoseStamped messages,
-and axis triads using the Walkie SDK. These are visible in RViz2.
+Demonstrates how to publish visualization markers and PoseStamped messages
+using the Walkie SDK. These are visible in RViz2.
 
 RViz2 Setup:
   1. Open RViz2
   2. Add a "Marker" display, set topic to /walkie/viz_markers
-  3. Add a "MarkerArray" display, set topic to /walkie/viz_axis
-  4. Add a "Pose" display, set topic to /walkie/target_pose
-  5. Markers, poses, and axis triads will appear in the 3D view
+  3. Add a "Pose" display, set topic to /walkie/target_pose
+  4. Markers and poses will appear in the 3D view
 
 Usage:
     python example_visualization.py
@@ -31,7 +30,9 @@ robot = WalkieRobot(
 # 1. Draw a red arrow at (1, 0, 0) in base_link frame (default)
 marker_id = robot.draw_marker(
     position=[1.0, 0.0, 0.0],
-    quaternion=[0.0, 0.0, 0.0, 1.0],
+    # quaternion defaults to [0,0,0,1] (identity)
+    # marker_type defaults to ARROW
+    # color defaults to RED
 )
 print(f"Drew arrow marker with id={marker_id}")
 
@@ -182,58 +183,6 @@ while time.time() - start_time < 5.0:
     time.sleep(0.05)  # 20 Hz
 
 print("Continuous pose update done.")
-
-# --- Axis Triad Examples ---
-
-# 10. Draw an axis triad (RGB arrows: Red=X, Green=Y, Blue=Z)
-print("\nDrawing axis triad at (1, 0, 0) in base_link frame...")
-axis_name = robot.draw_axis(
-    position=[1.0, 0.0, 0.0],
-    quaternion=[0.0, 0.0, 0.0, 1.0],
-    axis_name="demo_axis",
-)
-print(f"Drew axis triad with name='{axis_name}'")
-
-# 11. Draw a second axis triad rotated 45 degrees around Z
-print("Drawing rotated axis triad at (2, 0, 0)...")
-yaw_45 = math.pi / 4
-robot.draw_axis(
-    position=[2.0, 0.0, 0.0],
-    quaternion=[0.0, 0.0, math.sin(yaw_45 / 2), math.cos(yaw_45 / 2)],
-    axis_name="rotated_axis",
-    scale=0.3,
-)
-print("Drew rotated axis triad")
-
-# 12. Continuously update an axis triad (circular motion with rotation, 5s)
-print("\nStarting continuous axis update (circle path, 5 seconds)...")
-robot.draw_axis(
-    position=[1.0, 0.0, 0.5],
-    quaternion=[0.0, 0.0, 0.0, 1.0],
-    axis_name="moving_axis",
-    scale=0.2,
-)
-
-start_time = time.time()
-radius = 1.0
-while time.time() - start_time < 5.0:
-    t = time.time() - start_time
-    angle = t * 2.0
-    x = radius * math.cos(angle)
-    y = radius * math.sin(angle)
-
-    # Orient the axis to face the direction of travel (yaw = angle)
-    qz = math.sin(angle / 2.0)
-    qw = math.cos(angle / 2.0)
-
-    robot.update_axis(
-        axis_name="moving_axis",
-        position=[x, y, 0.5],
-        quaternion=[0.0, 0.0, qz, qw],
-    )
-    time.sleep(0.05)  # 20 Hz
-
-print("Continuous axis update done.")
 
 # --- Deletion Examples ---
 
