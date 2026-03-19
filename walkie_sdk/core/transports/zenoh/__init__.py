@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Any, Callable, Dict, Optional, Tuple, List
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
@@ -17,10 +17,10 @@ import numpy as np
 try:
     import zenoh
     from zenoh_ros2_sdk import (
-        ZenohSession,
         ROS2Publisher,
-        ROS2Subscriber,
         ROS2ServiceClient,
+        ROS2Subscriber,
+        ZenohSession,
     )
 
     ZENOH_AVAILABLE = True
@@ -34,7 +34,6 @@ except ImportError:
     cv2 = None
 
 from walkie_sdk.core.interfaces import CameraTransportInterface, ROSTransportInterface
-from walkie_sdk.core.interfaces.camera_transport import MultiCameraTransportInterface
 
 ROS_DOMAIN_ID = 23
 
@@ -268,10 +267,10 @@ class ZenohTransport(ROSTransportInterface[Any]):
         pass
 
 
-class ZenohCamera(MultiCameraTransportInterface):
+class ZenohCamera(CameraTransportInterface):
     """
     Camera transport implementation using Zenoh SDK.
-    Subscribes to standard 'sensor_msgs/msg/CompressedImage'.
+    Subscribes to standard 'sensor_msgs/msg/Image' (raw, uncompressed frames).
     """
 
     # Configure your ROS_DOMAIN_ID here if needed
@@ -279,19 +278,16 @@ class ZenohCamera(MultiCameraTransportInterface):
     # Define standard ROS 2 topics for camera streams
     # Adjust these topics to match your robot's actual output
     CAMERA_TOPICS = {
-        "head": f"/zed/zed_node/rgb/color/rect/image/compressed",
-        "left": f"/walkie/camera/left/compressed",
-        "right": f"/walkie/camera/right/compressed",
+        "head": "/zed_head/zed_node/rgb/color/rect/image",
+        "left": "/walkie/camera/left",
+        "right": "/walkie/camera/right",
     }
-
-    # Example ZED Topic if using standard ZED wrapper
-    # "head": f"/zed/zed_node/rgb/image_rect_color/compressed"
 
     def __init__(
         self,
         host: str,
         port: int = 7447,
-        topic: str = "walkie/camera/image/compressed",
+        topic: str = "walkie/camera/image",
         camera_name: str = "head",
         multi_camera: bool = False,
         **kwargs,
@@ -348,14 +344,14 @@ class ZenohCamera(MultiCameraTransportInterface):
         # Create subscribers for CompressedImage
         for name, topic in topics.items():
             print(f"  → Subscribing to camera topic: {topic}")
-
+            
             # Closure to capture camera name for the callback
             def make_cb(cam_id):
                 return lambda msg: self._on_frame(cam_id, msg)
 
             self._subscribers[name] = ROS2Subscriber(
                 topic=topic,
-                msg_type="sensor_msgs/msg/CompressedImage",
+                msg_type="sensor_msgs/msg/Image",
                 domain_id=ROS_DOMAIN_ID,
                 callback=make_cb(name),
                 router_ip=self._host,
@@ -375,11 +371,16 @@ class ZenohCamera(MultiCameraTransportInterface):
             self._latest_frames.clear()
 
     def _on_frame(self, name: str, msg: Any) -> None:
-        """Handle CompressedImage message."""
+        """Handle raw sensor_msgs/msg/Image message."""
         try:
-            # ROS 2 CompressedImage: 'data' field contains the bytes
-            data = msg.data
-            # print(f"Received frame for camera '{name}', size: {len(data)} bytes")
+            # Extract metadata
+            height = getattr(msg, "height", None)
+            width = getattr(msg, "width", None)
+            encoding = getattr(msg, "encoding", "")
+            data = getattr(msg, "data", None)
+
+            if data is None or height is None or width is None:
+                return
 
             # Handle different byte representations (rosbags vs standard)
             if hasattr(data, "tobytes"):
@@ -390,29 +391,49 @@ class ZenohCamera(MultiCameraTransportInterface):
                 # Fallback
                 data = bytes(data)
 
-            # Decode JPEG/PNG to OpenCV image
-            np_arr = np.frombuffer(data, np.uint8)
-            frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+            # Convert raw bytes to flat numpy array
+            np_arr = np.frombuffer(data, dtype=np.uint8)
+
+            # Reshape based on image encoding
+            if encoding == "rgb8":
+                frame = np_arr.reshape((height, width, 3))
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            elif encoding == "bgr8":
+                frame = np_arr.reshape((height, width, 3))
+            elif encoding == "bgra8":
+                frame = np_arr.reshape((height, width, 4))
+            elif encoding == "rgba8":
+                frame = np_arr.reshape((height, width, 4))
+                frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2BGRA)
+            elif encoding == "mono8":
+                frame = np_arr.reshape((height, width))
+            else:
+                # Unsupported format
+                print(f"Unsupported encoding '{encoding}' for camera '{name}'")
+                return
 
             if frame is not None:
                 with self._frame_lock:
                     self._latest_frames[name] = frame
+
         except Exception as e:
             # print(f"Frame decode error: {e}")
             pass
-
-    @property
-    def camera_names(self) -> List[str]:
-        """Get list of available camera names."""
-        if self._multi_camera:
-            return list(self.CAMERA_TOPICS.keys())
-        return [self._camera_name]
 
     def get_frame(self, camera_name: Optional[str] = None) -> Optional[np.ndarray]:
         target = camera_name or self._camera_name
         with self._frame_lock:
             frame = self._latest_frames.get(target)
             return frame.copy() if frame is not None else None
+
+    def get_head_frame(self) -> Optional[np.ndarray]:
+        return self.get_frame("head")
+
+    def get_left_frame(self) -> Optional[np.ndarray]:
+        return self.get_frame("left")
+
+    def get_right_frame(self) -> Optional[np.ndarray]:
+        return self.get_frame("right")
 
     def get_all_frames(self) -> Dict[str, np.ndarray]:
         with self._frame_lock:
