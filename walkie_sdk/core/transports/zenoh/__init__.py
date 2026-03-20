@@ -34,6 +34,7 @@ except ImportError:
     cv2 = None
 
 from walkie_sdk.core.interfaces import CameraTransportInterface, ROSTransportInterface
+from walkie_sdk.config.zenoh_topics import CAMERA_TOPICS 
 
 ROS_DOMAIN_ID = 23
 
@@ -273,16 +274,6 @@ class ZenohCamera(CameraTransportInterface):
     Subscribes to standard 'sensor_msgs/msg/Image' (raw, uncompressed frames).
     """
 
-    # Configure your ROS_DOMAIN_ID here if needed
-
-    # Define standard ROS 2 topics for camera streams
-    # Adjust these topics to match your robot's actual output
-    CAMERA_TOPICS = {
-        "head": "/zed_head/zed_node/rgb/color/rect/image",
-        "left": "/walkie/camera/left",
-        "right": "/walkie/camera/right",
-    }
-
     def __init__(
         self,
         host: str,
@@ -333,15 +324,15 @@ class ZenohCamera(CameraTransportInterface):
         # Determine which topics to subscribe to
         topics = {}
         if self._multi_camera:
-            topics = self.CAMERA_TOPICS
+            topics = CAMERA_TOPICS
         else:
             # Use specific topic for requested camera
-            if self._camera_name in self.CAMERA_TOPICS:
-                topics[self._camera_name] = self.CAMERA_TOPICS[self._camera_name]
+            if self._camera_name in CAMERA_TOPICS:
+                topics[self._camera_name] = CAMERA_TOPICS[self._camera_name]
             else:
                 topics[self._camera_name] = self._default_topic
 
-        # Create subscribers for CompressedImage
+        # Create subscribers for each camera topic
         for name, topic in topics.items():
             print(f"  → Subscribing to camera topic: {topic}")
             

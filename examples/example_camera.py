@@ -55,7 +55,7 @@ def main():
             ros_protocol=ROS_PROTOCOL,
             ros_port=9090,
             camera_protocol=CAMERA_PROTOCOL,
-            camera_port=8554,
+            camera_port=7447,
             timeout=10.0,
             namespace=NAMESPACE,
         )
@@ -102,6 +102,7 @@ def main():
         while True:
             # Get latest frame
             frame = bot.camera.get_frame()
+
 
             if frame is not None:
                 frame_count += 1
