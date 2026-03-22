@@ -11,8 +11,10 @@ to work with any transport implementation (rosbridge, zenoh).
 import threading
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+import walkie_sdk
 from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.namespace import apply_namespace
+from walkie_sdk.config.ros_topics import VIZ_TOPICS
 
 # visualization_msgs/msg/Marker type constants
 ARROW = 0
@@ -35,14 +37,14 @@ DELETE = 2
 DELETEALL = 3
 
 # ROS message types
-MARKER_MSG_TYPE = "visualization_msgs/msg/Marker"
-MARKER_ARRAY_MSG_TYPE = "visualization_msgs/msg/MarkerArray"
-POSE_STAMPED_MSG_TYPE = "geometry_msgs/msg/PoseStamped"
+MARKER_MSG_TYPE = VIZ_TOPICS["markers_type"]
+MARKER_ARRAY_MSG_TYPE = VIZ_TOPICS["markers_array_type"]
+POSE_STAMPED_MSG_TYPE = VIZ_TOPICS["target_pose_type"]
 
 # Default topic names
-DEFAULT_MARKER_TOPIC = "walkie/viz_markers"
-DEFAULT_MARKER_ARRAY_TOPIC = "walkie/viz_markers_array"
-DEFAULT_POSE_TOPIC = "walkie/target_pose"
+DEFAULT_MARKER_TOPIC = VIZ_TOPICS["markers"]
+DEFAULT_MARKER_ARRAY_TOPIC = VIZ_TOPICS["markers_array"]
+DEFAULT_POSE_TOPIC = VIZ_TOPICS["target_pose"]
 
 
 def _build_marker_msg(

@@ -12,17 +12,18 @@ from typing import Any, Dict, Optional, List
 from walkie_sdk.utils import converters
 from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.namespace import apply_namespace
+from walkie_sdk.config.ros_topics import OB_POSE_TOPIC
 
 # -----------------------------------------------------------------------------
 # Constants (Topics, Services, Types)
 # -----------------------------------------------------------------------------
 # For Publishing (Request)
-OBJECT_POSE_TOPIC = "/yolo/detections_2d"
-DETECTION_2D_TYPE = "vision_msgs/msg/Detection2DArray"
+OBJECT_POSE_TOPIC = OB_POSE_TOPIC["object_pose"]
+DETECTION_2D_TYPE = OB_POSE_TOPIC["object_pose_type"]
 
 # For Subscribing (Response)
-DETECT_3D_TOPIC = "/ob_detection/poses"
-DETECTION_3D_TYPE = "geometry_msgs/msg/PoseArray"  # Fixed typo: Detextion -> Detection
+DETECT_3D_TOPIC = OB_POSE_TOPIC["object_pose_response"]
+DETECTION_3D_TYPE = OB_POSE_TOPIC["object_pose_response_type"] 
 
 
 class Tools:

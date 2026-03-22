@@ -19,18 +19,20 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.converters import euler_to_quaternion
 from walkie_sdk.utils.namespace import apply_namespace
+from walkie_sdk.config.ros_topics import ARM_TOPICS, ARM_ACTIONS
 
 # Default arm topic names (without namespace, no leading slash)
-DEFAULT_ARM_COMMANDS_TOPIC = "walkie/arm/commands"
-DEFAULT_ARM_STATES_TOPIC = "joint_states"
-ARM_COMMANDS_TYPE = "sensor_msgs/msg/JointState"
-ARM_STATES_TYPE = "sensor_msgs/msg/JointState"
+DEFAULT_ARM_COMMANDS_TOPIC = ARM_TOPICS["commands"]
+DEFAULT_ARM_STATES_TOPIC = ARM_TOPICS["states"]
+ARM_COMMANDS_TYPE = ARM_TOPICS["commands_type"]
+ARM_STATES_TYPE = ARM_TOPICS["states_type"]
 
-MOVEIT_ACTION_INTERFACE = "my_robot_interfaces/action"
+MOVEIT_ACTION_INTERFACE = ARM_ACTIONS["moveit"]
 
 # Custom IK defaults
-DEFAULT_TARGET_POSE_TOPIC = "/target_pose"
-TARGET_POSE_TYPE = "geometry_msgs/msg/PoseStamped"
+DEFAULT_TARGET_POSE_TOPIC = ARM_TOPICS["target_pose"]
+TARGET_POSE_TYPE = ARM_TOPICS["target_pose_type"]
+
 
 
 class ArmControlMode(Enum):

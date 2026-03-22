@@ -14,12 +14,13 @@ from typing import Any, Callable, Dict, Optional
 from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.converters import euler_to_quaternion
 from walkie_sdk.utils.namespace import apply_namespace
+from walkie_sdk.config.ros_topics import NAV_TOPICS, NAV_ACTIONS
 
 # Default Nav2 action and topic names (without namespace)
-DEFAULT_NAV2_ACTION_NAME = "navigate_to_pose"
-NAV2_ACTION_TYPE = "nav2_msgs/action/NavigateToPose"
-DEFAULT_CMD_VEL_TOPIC = "cmd_vel"
-CMD_VEL_TYPE = "geometry_msgs/msg/Twist"
+DEFAULT_NAV2_ACTION_NAME = NAV_ACTIONS["navigate_to_pose"]
+NAV2_ACTION_TYPE = NAV_ACTIONS["navigate_to_pose_type"]
+DEFAULT_CMD_VEL_TOPIC = NAV_TOPICS["cmd_vel"]
+CMD_VEL_TYPE = NAV_TOPICS["cmd_vel_type"]
 
 
 class Navigation:

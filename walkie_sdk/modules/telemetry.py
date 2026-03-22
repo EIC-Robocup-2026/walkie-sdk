@@ -14,10 +14,11 @@ from typing import Any, Dict, Optional
 from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.converters import quaternion_to_euler
 from walkie_sdk.utils.namespace import apply_namespace
+from walkie_sdk.config.ros_topics import TELEMETRY_TOPICS
 
 # Default ROS topic names and types (without namespace)
-DEFAULT_ODOM_TOPIC = "current_pose"
-ODOM_TYPE = "nav_msgs/msg/Odometry"
+DEFAULT_ODOM_TOPIC = TELEMETRY_TOPICS["odom"]
+ODOM_TYPE = TELEMETRY_TOPICS["odom_type"]
 
 
 class Telemetry:

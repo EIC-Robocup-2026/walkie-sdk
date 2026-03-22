@@ -34,7 +34,7 @@ except ImportError:
     cv2 = None
 
 from walkie_sdk.core.interfaces import CameraTransportInterface, ROSTransportInterface
-from walkie_sdk.config.zenoh_topics import CAMERA_TOPICS 
+from walkie_sdk.config.ros_topics import CAMERA_TOPICS 
 
 ROS_DOMAIN_ID = 23
 
