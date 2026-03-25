@@ -28,6 +28,8 @@ from walkie_sdk.modules.telemetry import Telemetry
 from walkie_sdk.modules.visualization import Visualization
 from walkie_sdk.modules.tools import Tools
 
+from walkie_sdk.config.ros_topics import load_config
+
 
 class WalkieRobot:
     """
@@ -97,7 +99,12 @@ class WalkieRobot:
         # Legacy parameters for backward compatibility
         ws_port: Optional[int] = None,
         enable_camera: bool = True,
+        config_path: str = None, 
     ):
+        # Load custom config if provided
+        if config_path:
+            load_config(config_path)
+
         # Handle legacy parameter names for backward compatibility
         if ws_port is not None:
             ros_port = ws_port
