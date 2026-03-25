@@ -10,7 +10,7 @@
       
       
       
-        <link rel="canonical" href="https://walkie-team.github.io/walkie-sdk/guides/cameras/">
+        <link rel="canonical" href="https://EIC-Robocup-2026.github.io/walkie-sdk/guides/cameras/">
       
       
         <link rel="prev" href="../protocols/">
@@ -23,7 +23,7 @@
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -196,13 +196,13 @@
     
     
       <div class="md-header__source">
-        <a href="https://github.com/walkie-team/walkie-sdk" title="Go to repository" class="md-source" data-md-component="source">
+        <a href="https://github.com/EIC-Robocup-2026/walkie-sdk" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
   </div>
   <div class="md-source__repository">
-    walkie-team/walkie-sdk
+    EIC-Robocup-2026/walkie-sdk
   </div>
 </a>
       </div>
@@ -242,13 +242,13 @@
   </label>
   
     <div class="md-nav__source">
-      <a href="https://github.com/walkie-team/walkie-sdk" title="Go to repository" class="md-source" data-md-component="source">
+      <a href="https://github.com/EIC-Robocup-2026/walkie-sdk" title="Go to repository" class="md-source" data-md-component="source">
   <div class="md-source__icon md-icon">
     
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
   </div>
   <div class="md-source__repository">
-    walkie-team/walkie-sdk
+    EIC-Robocup-2026/walkie-sdk
   </div>
 </a>
     </div>
@@ -1300,17 +1300,17 @@
 
 <h1 id="camera-setup">Camera Setup<a class="headerlink" href="#camera-setup" title="Permanent link">&para;</a></h1>
 <p>The SDK provides flexible camera access through multiple protocols and a
-unified API. Cameras can come from network streams (Zenoh, WebRTC), shared
-memory, or local USB devices -- and you can mix them.</p>
+unified API. Cameras can come from network streams (Zenoh) or local USB
+devices -- and you can mix them.</p>
 <h2 id="single-camera">Single Camera<a class="headerlink" href="#single-camera" title="Permanent link">&para;</a></h2>
 <p>The simplest setup uses one camera protocol for all cameras:</p>
-<div class="tabbed-set tabbed-alternate" data-tabs="1:4"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><input id="__tabbed_1_3" name="__tabbed_1" type="radio" /><input id="__tabbed_1_4" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">WebRTC</label><label for="__tabbed_1_2">Zenoh</label><label for="__tabbed_1_3">USB</label><label for="__tabbed_1_4">Shared Memory</label></div>
+<div class="tabbed-set tabbed-alternate" data-tabs="1:2"><input checked="checked" id="__tabbed_1_1" name="__tabbed_1" type="radio" /><input id="__tabbed_1_2" name="__tabbed_1" type="radio" /><div class="tabbed-labels"><label for="__tabbed_1_1">Zenoh</label><label for="__tabbed_1_2">USB</label></div>
 <div class="tabbed-content">
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">bot</span> <span class="o">=</span> <span class="n">WalkieRobot</span><span class="p">(</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>    <span class="n">ip</span><span class="o">=</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">camera_protocol</span><span class="o">=</span><span class="s2">&quot;webrtc&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">camera_port</span><span class="o">=</span><span class="mi">8554</span><span class="p">,</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">ros_protocol</span><span class="o">=</span><span class="s2">&quot;zenoh&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">camera_protocol</span><span class="o">=</span><span class="s2">&quot;zenoh&quot;</span><span class="p">,</span>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">)</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">frame</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">camera</span><span class="o">.</span><span class="n">get_frame</span><span class="p">()</span>
 </code></pre></div>
@@ -1318,97 +1318,79 @@ memory, or local USB devices -- and you can mix them.</p>
 <div class="tabbed-block">
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">bot</span> <span class="o">=</span> <span class="n">WalkieRobot</span><span class="p">(</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">ip</span><span class="o">=</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">ros_protocol</span><span class="o">=</span><span class="s2">&quot;zenoh&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>    <span class="n">camera_protocol</span><span class="o">=</span><span class="s2">&quot;zenoh&quot;</span><span class="p">,</span>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="p">)</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">frame</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">camera</span><span class="o">.</span><span class="n">get_frame</span><span class="p">()</span>
-</code></pre></div>
-</div>
-<div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">bot</span> <span class="o">=</span> <span class="n">WalkieRobot</span><span class="p">(</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="n">ip</span><span class="o">=</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">camera_protocol</span><span class="o">=</span><span class="s2">&quot;usb&quot;</span><span class="p">,</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="p">)</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">frame</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">camera</span><span class="o">.</span><span class="n">get_frame</span><span class="p">()</span>
-</code></pre></div>
-</div>
-<div class="tabbed-block">
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">bot</span> <span class="o">=</span> <span class="n">WalkieRobot</span><span class="p">(</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">ip</span><span class="o">=</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">camera_protocol</span><span class="o">=</span><span class="s2">&quot;shm&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="p">)</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="n">frame</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">camera</span><span class="o">.</span><span class="n">get_frame</span><span class="p">()</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">camera_protocol</span><span class="o">=</span><span class="s2">&quot;usb&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="p">)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">frame</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">camera</span><span class="o">.</span><span class="n">get_frame</span><span class="p">()</span>
 </code></pre></div>
 </div>
 </div>
 </div>
 <h2 id="multi-camera-same-protocol">Multi-Camera (Same Protocol)<a class="headerlink" href="#multi-camera-same-protocol" title="Permanent link">&para;</a></h2>
-<p>When all cameras use the same protocol, use <code>multi_camera=True</code> (Zenoh) or
-the default behavior of SHM:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Zenoh multi-camera</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">bot</span> <span class="o">=</span> <span class="n">WalkieRobot</span><span class="p">(</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">ip</span><span class="o">=</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="n">ros_protocol</span><span class="o">=</span><span class="s2">&quot;zenoh&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>    <span class="n">camera_protocol</span><span class="o">=</span><span class="s2">&quot;zenoh&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>    <span class="n">multi_camera</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="p">)</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="c1"># Access individual cameras</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="n">head</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">get_frame</span><span class="p">(</span><span class="s2">&quot;head&quot;</span><span class="p">)</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="n">left</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">get_frame</span><span class="p">(</span><span class="s2">&quot;left&quot;</span><span class="p">)</span>
-<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="n">right</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">get_frame</span><span class="p">(</span><span class="s2">&quot;right&quot;</span><span class="p">)</span>
-<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
-<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a><span class="c1"># Get all at once</span>
-<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="n">frames</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">get_all_frames</span><span class="p">()</span>
-<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a><span class="c1"># {&quot;head&quot;: np.ndarray, &quot;left&quot;: np.ndarray, ...}</span>
+<p>When all cameras use the same protocol, use <code>multi_camera=True</code> (Zenoh):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Zenoh multi-camera</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">bot</span> <span class="o">=</span> <span class="n">WalkieRobot</span><span class="p">(</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">ip</span><span class="o">=</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">ros_protocol</span><span class="o">=</span><span class="s2">&quot;zenoh&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">camera_protocol</span><span class="o">=</span><span class="s2">&quot;zenoh&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="n">multi_camera</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="p">)</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="c1"># Access individual cameras</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="n">head</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">get_frame</span><span class="p">(</span><span class="s2">&quot;head&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">left</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">get_frame</span><span class="p">(</span><span class="s2">&quot;left&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">right</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">get_frame</span><span class="p">(</span><span class="s2">&quot;right&quot;</span><span class="p">)</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="c1"># Get all at once</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="n">frames</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">get_all_frames</span><span class="p">()</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="c1"># {&quot;head&quot;: np.ndarray, &quot;left&quot;: np.ndarray, ...}</span>
 </code></pre></div>
 <h2 id="mixed-camera-transports">Mixed Camera Transports<a class="headerlink" href="#mixed-camera-transports" title="Permanent link">&para;</a></h2>
 <p>When different cameras use different protocols, pass a <code>cameras</code> dict to
 <code>WalkieRobot</code>. Each key is a camera name, and each value specifies its
 protocol and configuration:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">bot</span> <span class="o">=</span> <span class="n">WalkieRobot</span><span class="p">(</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>    <span class="n">ip</span><span class="o">=</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">ros_protocol</span><span class="o">=</span><span class="s2">&quot;zenoh&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="n">ros_port</span><span class="o">=</span><span class="mi">7447</span><span class="p">,</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>    <span class="n">cameras</span><span class="o">=</span><span class="p">{</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>        <span class="s2">&quot;head&quot;</span><span class="p">:</span> <span class="p">{</span>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>            <span class="s2">&quot;protocol&quot;</span><span class="p">:</span> <span class="s2">&quot;zenoh&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>            <span class="s2">&quot;topic&quot;</span><span class="p">:</span> <span class="s2">&quot;/zed/zed_node/rgb/color/rect/image/compressed&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>        <span class="p">},</span>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>        <span class="s2">&quot;wrist&quot;</span><span class="p">:</span> <span class="p">{</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>            <span class="s2">&quot;protocol&quot;</span><span class="p">:</span> <span class="s2">&quot;usb&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>            <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="s2">&quot;/dev/v4l/by-id/usb-Logitech_C920-video-index0&quot;</span><span class="p">,</span>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>            <span class="s2">&quot;width&quot;</span><span class="p">:</span> <span class="mi">640</span><span class="p">,</span>
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>            <span class="s2">&quot;height&quot;</span><span class="p">:</span> <span class="mi">480</span><span class="p">,</span>
-<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>        <span class="p">},</span>
-<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>    <span class="p">},</span>
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">bot</span> <span class="o">=</span> <span class="n">WalkieRobot</span><span class="p">(</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="n">ip</span><span class="o">=</span><span class="s2">&quot;192.168.1.100&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">ros_protocol</span><span class="o">=</span><span class="s2">&quot;zenoh&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">ros_port</span><span class="o">=</span><span class="mi">7447</span><span class="p">,</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">cameras</span><span class="o">=</span><span class="p">{</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>        <span class="s2">&quot;head&quot;</span><span class="p">:</span> <span class="p">{</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>            <span class="s2">&quot;protocol&quot;</span><span class="p">:</span> <span class="s2">&quot;zenoh&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>            <span class="s2">&quot;topic&quot;</span><span class="p">:</span> <span class="s2">&quot;/zed/zed_node/rgb/color/rect/image/compressed&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>        <span class="p">},</span>
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>        <span class="s2">&quot;wrist&quot;</span><span class="p">:</span> <span class="p">{</span>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>            <span class="s2">&quot;protocol&quot;</span><span class="p">:</span> <span class="s2">&quot;usb&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>            <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="s2">&quot;/dev/v4l/by-id/usb-Logitech_C920-video-index0&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>            <span class="s2">&quot;width&quot;</span><span class="p">:</span> <span class="mi">640</span><span class="p">,</span>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a>            <span class="s2">&quot;height&quot;</span><span class="p">:</span> <span class="mi">480</span><span class="p">,</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>        <span class="p">},</span>
+<a id="__codelineno-3-16" name="__codelineno-3-16" href="#__codelineno-3-16"></a>    <span class="p">},</span>
+<a id="__codelineno-3-17" name="__codelineno-3-17" href="#__codelineno-3-17"></a><span class="p">)</span>
 </code></pre></div>
 <p>The <code>cameras</code> parameter overrides <code>camera_protocol</code>. Each camera connects
 independently -- if one fails, the others still work.</p>
 <h3 id="accessing-mixed-cameras">Accessing Mixed Cameras<a class="headerlink" href="#accessing-mixed-cameras" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># By name</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">head_frame</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">get_frame</span><span class="p">(</span><span class="s2">&quot;head&quot;</span><span class="p">)</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">wrist_frame</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">get_frame</span><span class="p">(</span><span class="s2">&quot;wrist&quot;</span><span class="p">)</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="c1"># All at once</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">frames</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">get_all_frames</span><span class="p">()</span>
-<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>
-<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="c1"># Single-camera accessor defaults to &quot;head&quot; (or first camera)</span>
-<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="n">frame</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">camera</span><span class="o">.</span><span class="n">get_frame</span><span class="p">()</span>
-<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>
-<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="c1"># List available cameras</span>
-<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="nb">print</span><span class="p">(</span><span class="n">bot</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">camera_names</span><span class="p">)</span>  <span class="c1"># [&quot;head&quot;, &quot;wrist&quot;]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># By name</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">head_frame</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">get_frame</span><span class="p">(</span><span class="s2">&quot;head&quot;</span><span class="p">)</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">wrist_frame</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">get_frame</span><span class="p">(</span><span class="s2">&quot;wrist&quot;</span><span class="p">)</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1"># All at once</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="n">frames</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">get_all_frames</span><span class="p">()</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="c1"># Single-camera accessor defaults to &quot;head&quot; (or first camera)</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="n">frame</span> <span class="o">=</span> <span class="n">bot</span><span class="o">.</span><span class="n">camera</span><span class="o">.</span><span class="n">get_frame</span><span class="p">()</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="c1"># List available cameras</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="nb">print</span><span class="p">(</span><span class="n">bot</span><span class="o">.</span><span class="n">cameras</span><span class="o">.</span><span class="n">camera_names</span><span class="p">)</span>  <span class="c1"># [&quot;head&quot;, &quot;wrist&quot;]</span>
 </code></pre></div>
 <h2 id="usb-camera-setup">USB Camera Setup<a class="headerlink" href="#usb-camera-setup" title="Permanent link">&para;</a></h2>
 <h3 id="finding-your-camera">Finding Your Camera<a class="headerlink" href="#finding-your-camera" title="Permanent link">&para;</a></h3>
 <p>USB cameras are identified by device path. Use stable paths to avoid issues
 when devices are plugged/unplugged or after reboot:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># List available USB cameras with stable paths</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>ls<span class="w"> </span>/dev/v4l/by-id/
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="c1"># Example output:</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># usb-Logitech_HD_Pro_Webcam_C920_12345678-video-index0</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="c1"># usb-046d_C922_Pro_Stream_Webcam-video-index0</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># List available USB cameras with stable paths</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>ls<span class="w"> </span>/dev/v4l/by-id/
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># Example output:</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="c1"># usb-Logitech_HD_Pro_Webcam_C920_12345678-video-index0</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="c1"># usb-046d_C922_Pro_Stream_Webcam-video-index0</span>
 </code></pre></div>
 <h3 id="device-identification-methods">Device Identification Methods<a class="headerlink" href="#device-identification-methods" title="Permanent link">&para;</a></h3>
 <table>
@@ -1448,23 +1430,23 @@ when devices are plugged/unplugged or after reboot:</p>
 reboots and don't change when other USB devices are plugged in.</p>
 </div>
 <h3 id="usb-camera-configuration">USB Camera Configuration<a class="headerlink" href="#usb-camera-configuration" title="Permanent link">&para;</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="n">cameras</span><span class="o">=</span><span class="p">{</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="s2">&quot;wrist&quot;</span><span class="p">:</span> <span class="p">{</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>        <span class="s2">&quot;protocol&quot;</span><span class="p">:</span> <span class="s2">&quot;usb&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>        <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="s2">&quot;/dev/v4l/by-id/usb-Logitech_C920-video-index0&quot;</span><span class="p">,</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>        <span class="s2">&quot;width&quot;</span><span class="p">:</span> <span class="mi">640</span><span class="p">,</span>       <span class="c1"># optional, camera default if omitted</span>
-<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>        <span class="s2">&quot;height&quot;</span><span class="p">:</span> <span class="mi">480</span><span class="p">,</span>      <span class="c1"># optional</span>
-<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>        <span class="s2">&quot;fps&quot;</span><span class="p">:</span> <span class="mi">30</span><span class="p">,</span>          <span class="c1"># optional</span>
-<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>    <span class="p">},</span>
-<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="n">cameras</span><span class="o">=</span><span class="p">{</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>    <span class="s2">&quot;wrist&quot;</span><span class="p">:</span> <span class="p">{</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>        <span class="s2">&quot;protocol&quot;</span><span class="p">:</span> <span class="s2">&quot;usb&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>        <span class="s2">&quot;device&quot;</span><span class="p">:</span> <span class="s2">&quot;/dev/v4l/by-id/usb-Logitech_C920-video-index0&quot;</span><span class="p">,</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>        <span class="s2">&quot;width&quot;</span><span class="p">:</span> <span class="mi">640</span><span class="p">,</span>       <span class="c1"># optional, camera default if omitted</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>        <span class="s2">&quot;height&quot;</span><span class="p">:</span> <span class="mi">480</span><span class="p">,</span>      <span class="c1"># optional</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>        <span class="s2">&quot;fps&quot;</span><span class="p">:</span> <span class="mi">30</span><span class="p">,</span>          <span class="c1"># optional</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>    <span class="p">},</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="testing-usb-cameras">Testing USB Cameras<a class="headerlink" href="#testing-usb-cameras" title="Permanent link">&para;</a></h3>
 <p>Use the included test script to verify your USB camera:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Auto-detect first available camera</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>examples/example_usb_camera.py
-<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># Specify a device</span>
-<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>examples/example_usb_camera.py<span class="w"> </span>/dev/v4l/by-id/usb-Logitech_C920-video-index0
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Auto-detect first available camera</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>examples/example_usb_camera.py
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># Specify a device</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>examples/example_usb_camera.py<span class="w"> </span>/dev/v4l/by-id/usb-Logitech_C920-video-index0
 </code></pre></div>
 <h3 id="auto-retry">Auto-Retry<a class="headerlink" href="#auto-retry" title="Permanent link">&para;</a></h3>
 <p>The USB camera transport automatically retries if the device disconnects.

@@ -59,6 +59,7 @@ class WalkieRobot:
             - "moveit": MoveIt motion planning (default)
             - "custom_ik": Publish Pose to custom IK solver for teleop
         arm_target_pose_topic: Topic for custom IK mode (default: "/target_pose")
+        config_path: Path to custom ROS topics configuration file (optional)
 
     Raises:
         ConnectionError: If connection to robot fails
@@ -96,10 +97,10 @@ class WalkieRobot:
         namespace: str = "",
         arm_mode: str = "custom_ik",
         arm_target_pose_topic: str = "/target_pose",
+        config_path: str = None,
         # Legacy parameters for backward compatibility
         ws_port: Optional[int] = None,
         enable_camera: bool = True,
-        config_path: str = None, 
     ):
         # Load custom config if provided
         if config_path:

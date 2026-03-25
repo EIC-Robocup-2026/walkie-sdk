@@ -13,6 +13,19 @@ bot = WalkieRobot(ip="192.168.1.100")
 This auto-connects using the default protocols (rosbridge + Zenoh camera).
 See [Protocol Selection](../guides/protocols.md) for other options.
 
+### Custom Configuration
+
+You can provide a custom configuration file to override default topic names and settings:
+
+```python
+bot = WalkieRobot(
+    ip="192.168.1.100",
+    config_path="ros_topics.yaml"
+)
+```
+
+This allows you to customize ROS topics, actions, and other parameters for your specific robot setup. See the [ros_topics.yaml](../../ros_topics.yaml) file in the repository root for the configuration format and available options.
+
 ## 2. Read Telemetry
 
 ```python
