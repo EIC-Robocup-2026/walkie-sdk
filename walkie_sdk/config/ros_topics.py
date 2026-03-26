@@ -42,6 +42,10 @@ NAV_ACTIONS = {
 TELEMETRY_TOPICS = {
     "odom": os.getenv("WALKIE_TELEMETRY_ODOM", "current_pose"),
     "odom_type": os.getenv("WALKIE_TELEMETRY_ODOM_TYPE", "nav_msgs/msg/Odometry"),
+
+    "zed_point_cloud": os.getenv("WALKIE_TELEMETRY_ZED_POINT_CLOUD", "/zed_head/zed_node/point_cloud/cloud_registered"),
+    "point_cloud_type": os.getenv("WALKIE_TELEMETRY_POINT_CLOUD_TYPE", "sensor_msgs/msg/PointCloud2"),
+
 }
 
 # ── Visualization Topics ───────────────────────────────────────
