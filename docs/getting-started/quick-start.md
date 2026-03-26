@@ -37,6 +37,19 @@ if pose:
 velocity = bot.status.get_velocity()
 if velocity:
     print(f"Speed: {velocity['linear']:.2f} m/s")
+
+pc_info = bot.status.get_point_cloud_info()
+if pc_info:
+    print(
+        f"ZED Point Cloud: {pc_info.get('width')}x{pc_info.get('height')} "
+        f"fields={pc_info.get('fields')}"
+    )
+
+    full_cloud = bot.status.get_full_point_cloud()
+    if full_cloud:
+        print(f"Extracted: {len(full_cloud)} points")
+        print(f"First 3: {full_cloud[:3]}")
+        print(f"Last 3:  {full_cloud[-3:]}")
 ```
 
 ## 3. Camera

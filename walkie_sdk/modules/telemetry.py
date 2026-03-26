@@ -269,6 +269,18 @@ class Telemetry:
 
         Returns:
             Dictionary with width, height, field names, and a sample point.
+
+        Example:
+            ```python
+            pc_info = bot.status.get_point_cloud_info()
+            if pc_info:
+                print(
+                    f"{pc_info['width']}x{pc_info['height']} "
+                    f"fields={pc_info.get('fields')}"
+                )
+                # Example keys: width, height, num_points, fields, is_dense,
+                # point_step, and sample_point_xyz
+            ```
         """
         with self._lock:
             if hasattr(self, '_point_cloud_metadata'):
@@ -281,6 +293,15 @@ class Telemetry:
         
         Returns:
             A list of tuples containing (x, y, z) floats, or None if no data is available.
+
+        Example:
+            ```python
+            full_cloud = bot.status.get_full_point_cloud()
+            if full_cloud:
+                print(f"Extracted {len(full_cloud)} points")
+                print("First 3:", full_cloud[:3])
+                print("Last 3:", full_cloud[-3:])
+            ```
         """
         with self._lock:
             msg = self._zed_point_cloud
