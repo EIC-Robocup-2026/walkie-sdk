@@ -1,5 +1,7 @@
 # ros_topics.yaml
 
+ROS_DOMAIN_ID: 23
+
 CAMERA_TOPICS:
   head: "/zed_head/zed_node/rgb/color/rect/image"
   left: "/walkie/camera/left"

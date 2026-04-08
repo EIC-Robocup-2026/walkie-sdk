@@ -58,6 +58,7 @@ def main():
             camera_port=7447,
             timeout=10.0,
             namespace=NAMESPACE,
+            #config_path="examples/ros_topics.yaml"
         )
     except ConnectionError as e:
         print(f"❌ Connection failed: {e}")

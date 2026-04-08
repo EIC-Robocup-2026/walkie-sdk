@@ -13,6 +13,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 
+from walkie_sdk.config.ros_topics import ROS_DOMAIN_ID
+
 # Import Zenoh and the SDK components
 try:
     import zenoh
@@ -33,10 +35,8 @@ try:
 except ImportError:
     cv2 = None
 
+from walkie_sdk.config.ros_topics import CAMERA_TOPICS
 from walkie_sdk.core.interfaces import CameraTransportInterface, ROSTransportInterface
-from walkie_sdk.config.ros_topics import CAMERA_TOPICS 
-
-ROS_DOMAIN_ID = 23
 
 
 def _msg_to_dict(msg: Any) -> Dict[str, Any]:
@@ -335,10 +335,12 @@ class ZenohCamera(CameraTransportInterface):
         # Create subscribers for each camera topic
         for name, topic in topics.items():
             print(f"  → Subscribing to camera topic: {topic}")
-            
+
             # Closure to capture camera name for the callback
             def make_cb(cam_id):
                 return lambda msg: self._on_frame(cam_id, msg)
+            
+            print("Zenoh started at ROS_DOMAIN_ID:",ROS_DOMAIN_ID)
 
             self._subscribers[name] = ROS2Subscriber(
                 topic=topic,
