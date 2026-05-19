@@ -62,6 +62,8 @@ OB_POSE_TOPIC = {
     "object_pose_response_type": os.getenv("WALKIE_OBJECT_POSE_RESPONSE_TYPE", "geometry_msgs/msg/PoseArray"),
 }
 
+ROS_DOMAIN_ID = int(os.getenv("WALKIE_ROS_DOMAIN_ID", "23"))
+
 def load_config(yaml_path: str):
     """
     Load topics from a YAML file and update the global dictionaries in-place.

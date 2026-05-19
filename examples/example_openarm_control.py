@@ -55,18 +55,19 @@ def main():
             
 
             # --- get input from keyboard ---
-            input = get_input("Enter joint1-joint7", defaults["j1_j7"])
-            if input.lower() == 'q': break
-            defaults["j1_j7"] = input # Update default for next time
-            
+            joint_input = get_input("Enter joint1-joint7", defaults["j1_j7"])
+            if joint_input.lower() == 'q': break
+            defaults["j1_j7"] = joint_input
+
             try:
-                j1, j2, j3, j4, j5, j6, j7 = map(float, input.split())
+                j1, j2, j3, j4, j5, j6, j7 = map(float, joint_input.split())
             except ValueError:
                 print("Error: Please enter 7 numbers separated by space (e.g. 0.0 0.0 0.0 0.0 0.0 0.0 0.0)")
                 continue
 
             # --- send command to robot ---
-            print(f" >> Sent: {input}")
+            # TODO: bot.arm.set_joint_positions(left_arm=[j1, j2, j3, j4, j5, j6, j7])
+            print(f" >> Sent: {joint_input}")
 
     except KeyboardInterrupt:
         print("\nStopping publisher...")

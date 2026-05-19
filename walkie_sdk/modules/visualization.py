@@ -11,7 +11,6 @@ to work with any transport implementation (rosbridge, zenoh).
 import threading
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-import walkie_sdk
 from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.namespace import apply_namespace
 from walkie_sdk.config.ros_topics import VIZ_TOPICS
@@ -36,15 +35,6 @@ MODIFY = 0  # Same as ADD
 DELETE = 2
 DELETEALL = 3
 
-# ROS message types
-MARKER_MSG_TYPE = VIZ_TOPICS["markers_type"]
-MARKER_ARRAY_MSG_TYPE = VIZ_TOPICS["markers_array_type"]
-POSE_STAMPED_MSG_TYPE = VIZ_TOPICS["target_pose_type"]
-
-# Default topic names
-DEFAULT_MARKER_TOPIC = VIZ_TOPICS["markers"]
-DEFAULT_MARKER_ARRAY_TOPIC = VIZ_TOPICS["markers_array"]
-DEFAULT_POSE_TOPIC = VIZ_TOPICS["target_pose"]
 
 
 def _build_marker_msg(
@@ -243,7 +233,7 @@ class Visualization:
         ns: str = "",
         text: str = "",
         frame_locked: bool = False,
-        topic: str = DEFAULT_MARKER_TOPIC,
+        topic: str = None,
     ) -> int:
         """
         Publish a single visualization marker to RViz2.
@@ -290,6 +280,9 @@ class Visualization:
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
 
+        if topic is None:
+            topic = VIZ_TOPICS["markers"]
+
         if quaternion is None:
             quaternion = [0.0, 0.0, 0.0, 1.0]
 
@@ -323,7 +316,7 @@ class Visualization:
         )
 
         full_topic = self._resolve_topic(topic)
-        self._transport.publish(full_topic, MARKER_MSG_TYPE, msg)
+        self._transport.publish(full_topic, VIZ_TOPICS["markers_type"], msg)
 
         # Cache params for update_marker()
         cache_key = (topic, marker_id)
@@ -357,7 +350,7 @@ class Visualization:
         ns: Optional[str] = None,
         text: Optional[str] = None,
         frame_locked: Optional[bool] = None,
-        topic: str = DEFAULT_MARKER_TOPIC,
+        topic: str = None,
     ) -> None:
         """
         Update an existing marker with only the changed fields.
@@ -398,6 +391,9 @@ class Visualization:
         """
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
+
+        if topic is None:
+            topic = VIZ_TOPICS["markers"]
 
         cache_key = (topic, marker_id)
         with self._markers_lock:
@@ -446,7 +442,7 @@ class Visualization:
         )
 
         full_topic = self._resolve_topic(topic)
-        self._transport.publish(full_topic, MARKER_MSG_TYPE, msg)
+        self._transport.publish(full_topic, VIZ_TOPICS["markers_type"], msg)
 
         # Update the cache with merged values
         with self._markers_lock:
@@ -455,7 +451,7 @@ class Visualization:
     def draw_markers(
         self,
         markers: List[Dict[str, Any]],
-        topic: str = DEFAULT_MARKER_ARRAY_TOPIC,
+        topic: str = None,
     ) -> List[int]:
         """
         Publish multiple markers as a MarkerArray to RViz2.
@@ -502,6 +498,9 @@ class Visualization:
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
 
+        if topic is None:
+            topic = VIZ_TOPICS["markers_array"]
+
         marker_msgs = []
         used_ids = []
 
@@ -530,14 +529,14 @@ class Visualization:
 
         array_msg = {"markers": marker_msgs}
         full_topic = self._resolve_topic(topic)
-        self._transport.publish(full_topic, MARKER_ARRAY_MSG_TYPE, array_msg)
+        self._transport.publish(full_topic, VIZ_TOPICS["markers_array_type"], array_msg)
         return used_ids
 
     def delete_marker(
         self,
         marker_id: int,
         ns: str = "",
-        topic: str = DEFAULT_MARKER_TOPIC,
+        topic: str = None,
     ) -> None:
         """
         Delete a specific marker by ID.
@@ -553,6 +552,9 @@ class Visualization:
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
 
+        if topic is None:
+            topic = VIZ_TOPICS["markers"]
+
         msg = _build_marker_msg(
             marker_id=marker_id,
             position=[0.0, 0.0, 0.0],
@@ -562,7 +564,7 @@ class Visualization:
         )
 
         full_topic = self._resolve_topic(topic)
-        self._transport.publish(full_topic, MARKER_MSG_TYPE, msg)
+        self._transport.publish(full_topic, VIZ_TOPICS["markers_type"], msg)
 
         # Remove from cache
         cache_key = (topic, marker_id)
@@ -572,7 +574,7 @@ class Visualization:
     def clear_markers(
         self,
         ns: str = "",
-        topic: str = DEFAULT_MARKER_TOPIC,
+        topic: str = None,
     ) -> None:
         """
         Clear all markers from RViz2.
@@ -595,6 +597,9 @@ class Visualization:
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
 
+        if topic is None:
+            topic = VIZ_TOPICS["markers"]
+
         msg = _build_marker_msg(
             marker_id=0,
             position=[0.0, 0.0, 0.0],
@@ -604,7 +609,7 @@ class Visualization:
         )
 
         full_topic = self._resolve_topic(topic)
-        self._transport.publish(full_topic, MARKER_MSG_TYPE, msg)
+        self._transport.publish(full_topic, VIZ_TOPICS["markers_type"], msg)
 
         # Reset auto-increment counter and clear cache
         with self._id_lock:
@@ -617,7 +622,7 @@ class Visualization:
         position: List[float],
         quaternion: Optional[List[float]] = None,
         frame_id: str = "base_link",
-        topic: str = DEFAULT_POSE_TOPIC,
+        topic: str = None,
     ) -> str:
         """
         Publish a PoseStamped message to RViz2.
@@ -658,6 +663,9 @@ class Visualization:
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
 
+        if topic is None:
+            topic = VIZ_TOPICS["target_pose"]
+
         if quaternion is None:
             quaternion = [0.0, 0.0, 0.0, 1.0]
 
@@ -668,7 +676,7 @@ class Visualization:
         )
 
         full_topic = self._resolve_topic(topic)
-        self._transport.publish(full_topic, POSE_STAMPED_MSG_TYPE, msg)
+        self._transport.publish(full_topic, VIZ_TOPICS["target_pose_type"], msg)
 
         # Cache params for update_pose()
         with self._poses_lock:
@@ -685,7 +693,7 @@ class Visualization:
         position: Optional[List[float]] = None,
         quaternion: Optional[List[float]] = None,
         frame_id: Optional[str] = None,
-        topic: str = DEFAULT_POSE_TOPIC,
+        topic: str = None,
     ) -> None:
         """
         Update an existing PoseStamped with only the changed fields.
@@ -715,6 +723,9 @@ class Visualization:
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
 
+        if topic is None:
+            topic = VIZ_TOPICS["target_pose"]
+
         with self._poses_lock:
             if topic not in self._poses:
                 raise KeyError(
@@ -738,7 +749,7 @@ class Visualization:
         )
 
         full_topic = self._resolve_topic(topic)
-        self._transport.publish(full_topic, POSE_STAMPED_MSG_TYPE, msg)
+        self._transport.publish(full_topic, VIZ_TOPICS["target_pose_type"], msg)
 
         # Update the cache with merged values
         with self._poses_lock:
