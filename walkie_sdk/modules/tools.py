@@ -12,17 +12,7 @@ from typing import Any, Dict, Optional, List
 from walkie_sdk.utils import converters
 from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.namespace import apply_namespace
-
-# -----------------------------------------------------------------------------
-# Constants (Topics, Services, Types)
-# -----------------------------------------------------------------------------
-# For Publishing (Request)
-OBJECT_POSE_TOPIC = "/yolo/detections_2d"
-DETECTION_2D_TYPE = "vision_msgs/msg/Detection2DArray"
-
-# For Subscribing (Response)
-DETECT_3D_TOPIC = "/ob_detection/poses"
-DETECTION_3D_TYPE = "geometry_msgs/msg/PoseArray"  # Fixed typo: Detextion -> Detection
+from walkie_sdk.config.ros_topics import OB_POSE_TOPIC
 
 
 class Tools:
@@ -94,7 +84,7 @@ class Tools:
         if self._subscribed:
             return
 
-        topic = apply_namespace(DETECT_3D_TOPIC, self._namespace)
+        topic = apply_namespace(OB_POSE_TOPIC["object_pose_response"], self._namespace)
 
         def callback(msg: Dict):
             # 1. Store the data
@@ -109,7 +99,7 @@ class Tools:
         try:
             print(f"[Tools] Subscribing to: {topic}")
             self._subscription = self._transport.subscribe(
-                topic, DETECTION_3D_TYPE, callback
+                topic, OB_POSE_TOPIC["object_pose_response_type"], callback
             )
             self._subscribed = True
         except Exception as e:
@@ -164,8 +154,8 @@ class Tools:
             # print("publishing to topic")
             # print(f"publish to topic: {OBJECT_POSE_TOPIC} ,with msg_type: {DETECTION_2D_TYPE}")
             # print(msg)
-            topic = apply_namespace(OBJECT_POSE_TOPIC, self._namespace)
-            self._transport.publish(topic, DETECTION_2D_TYPE, msg)
+            topic = apply_namespace(OB_POSE_TOPIC["object_pose"], self._namespace)
+            self._transport.publish(topic, OB_POSE_TOPIC["object_pose_type"], msg)
 
             # 4. Wait for the response
             # This blocks until the callback runs OR timeout expires

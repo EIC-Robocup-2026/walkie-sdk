@@ -19,18 +19,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.converters import euler_to_quaternion
 from walkie_sdk.utils.namespace import apply_namespace
-
-# Default arm topic names (without namespace, no leading slash)
-DEFAULT_ARM_COMMANDS_TOPIC = "walkie/arm/commands"
-DEFAULT_ARM_STATES_TOPIC = "joint_states"
-ARM_COMMANDS_TYPE = "sensor_msgs/msg/JointState"
-ARM_STATES_TYPE = "sensor_msgs/msg/JointState"
-
-MOVEIT_ACTION_INTERFACE = "my_robot_interfaces/action"
-
-# Custom IK defaults
-DEFAULT_TARGET_POSE_TOPIC = "/target_pose"
-TARGET_POSE_TYPE = "geometry_msgs/msg/PoseStamped"
+from walkie_sdk.config.ros_topics import ARM_TOPICS, ARM_ACTIONS
 
 
 class ArmControlMode(Enum):
@@ -69,7 +58,7 @@ class Arm:
         transport: ROSTransportInterface,
         namespace: str = "",
         default_mode: ArmControlMode = ArmControlMode.MOVEIT,
-        target_pose_topic: str = DEFAULT_TARGET_POSE_TOPIC,
+        target_pose_topic: str = None,
     ):
         self._transport = transport
         self._namespace = namespace
@@ -78,7 +67,7 @@ class Arm:
             if isinstance(default_mode, str)
             else default_mode
         )
-        self._target_pose_topic = target_pose_topic
+        self._target_pose_topic = target_pose_topic or ARM_TOPICS["target_pose"]
         self._states_lock = threading.Lock()
         self._latest_states: Optional[Dict[str, Any]] = None
         self._subscribed = False
@@ -104,9 +93,9 @@ class Arm:
                 self._latest_states = msg
 
         try:
-            states_topic = apply_namespace(DEFAULT_ARM_STATES_TOPIC, self._namespace)
+            states_topic = apply_namespace(ARM_TOPICS["states"], self._namespace)
             print(f"[Arm] Subscribing to topic: '{states_topic}'")
-            self._transport.subscribe(states_topic, ARM_STATES_TYPE, state_callback)
+            self._transport.subscribe(states_topic, ARM_TOPICS["states_type"], state_callback)
             self._subscribed = True
             print(f"[Arm] Successfully subscribed to '{states_topic}'")
         except Exception as e:
@@ -128,12 +117,12 @@ class Arm:
     @property
     def arm_commands_topic(self) -> str:
         """Get the full arm commands topic name with namespace."""
-        return apply_namespace(DEFAULT_ARM_COMMANDS_TOPIC, self._namespace)
+        return apply_namespace(ARM_TOPICS["commands"], self._namespace)
 
     @property
     def arm_states_topic(self) -> str:
         """Get the full arm states topic name with namespace."""
-        return apply_namespace(DEFAULT_ARM_STATES_TOPIC, self._namespace)
+        return apply_namespace(ARM_TOPICS["states"], self._namespace)
 
     @property
     def default_mode(self) -> ArmControlMode:
@@ -220,7 +209,7 @@ class Arm:
             }
 
             # Publish command
-            self._transport.publish(self.arm_commands_topic, ARM_COMMANDS_TYPE, msg)
+            self._transport.publish(self.arm_commands_topic, ARM_TOPICS["commands_type"], msg)
 
             return True
         except Exception as e:
@@ -416,7 +405,7 @@ class Arm:
                     },
                 },
             }
-            self._transport.publish(self._target_pose_topic, TARGET_POSE_TYPE, msg)
+            self._transport.publish(self._target_pose_topic, ARM_TOPICS["target_pose_type"], msg)
             return True
         except Exception as e:
             print(f"[Arm] Error publishing target pose: {e}")
@@ -467,7 +456,7 @@ class Arm:
         try:
             result = self._transport.call_action(
                 action_name="go_to_home",
-                action_type=f"{MOVEIT_ACTION_INTERFACE}/GoToHome",
+                action_type=f"{ARM_ACTIONS['interface']}/GoToHome",
                 goal={"group_name": group_name},
             )
 
@@ -507,7 +496,7 @@ class Arm:
 
         return self._send_action_goal(
             action_name="control_gripper",
-            action_type=f"{MOVEIT_ACTION_INTERFACE}/ControlGripper",
+            action_type=f"{ARM_ACTIONS['interface']}/ControlGripper",
             goal_msg=goal_msg,
             blocking=blocking,
             feedback_callback=feedback_callback,
@@ -566,7 +555,7 @@ class Arm:
 
         return self._send_action_goal(
             action_name="go_to_pose",
-            action_type=f"{MOVEIT_ACTION_INTERFACE}/GoToPose",
+            action_type=f"{ARM_ACTIONS['interface']}/GoToPose",
             goal_msg=goal_msg,
             blocking=blocking,
             feedback_callback=feedback_callback,
@@ -601,7 +590,7 @@ class Arm:
 
         return self._send_action_goal(
             action_name="go_to_pose_relative",
-            action_type=f"{MOVEIT_ACTION_INTERFACE}/GoToPoseRelative",
+            action_type=f"{ARM_ACTIONS['interface']}/GoToPoseRelative",
             goal_msg=goal_msg,
             blocking=blocking,
             feedback_callback=feedback_callback,
@@ -661,7 +650,7 @@ class Arm:
         # Uses the GoToPoseQuaternion action type defined in your robot interfaces
         return self._send_action_goal(
             action_name="go_to_pose_quat",
-            action_type=f"{MOVEIT_ACTION_INTERFACE}/GoToPoseQuaternion",
+            action_type=f"{ARM_ACTIONS['interface']}/GoToPoseQuaternion",
             goal_msg=goal_msg,
             blocking=blocking,
             feedback_callback=feedback_callback,

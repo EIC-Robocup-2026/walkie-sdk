@@ -14,10 +14,7 @@ from typing import Any, Dict, Optional
 from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.converters import quaternion_to_euler
 from walkie_sdk.utils.namespace import apply_namespace
-
-# Default ROS topic names and types (without namespace)
-DEFAULT_ODOM_TOPIC = "current_pose"
-ODOM_TYPE = "nav_msgs/msg/Odometry"
+from walkie_sdk.config.ros_topics import TELEMETRY_TOPICS
 
 
 class Telemetry:
@@ -62,7 +59,7 @@ class Telemetry:
     @property
     def odom_topic(self) -> str:
         """Get the full odom topic name with namespace."""
-        return apply_namespace(DEFAULT_ODOM_TOPIC, self._namespace)
+        return apply_namespace(TELEMETRY_TOPICS["odom"], self._namespace)
 
     def start(self) -> None:
         """
@@ -79,7 +76,7 @@ class Telemetry:
         try:
             self._odom_subscription = self._transport.subscribe(
                 topic=self.odom_topic,
-                message_type=ODOM_TYPE,
+                message_type=TELEMETRY_TOPICS["odom_type"],
                 callback=self._on_odom,
                 throttle_rate=100,  # 10 Hz max
                 queue_size=1,

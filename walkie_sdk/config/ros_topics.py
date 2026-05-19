@@ -1,0 +1,95 @@
+"""
+Walkie SDK - Centralized ROS 2 Topics Configuration
+"""
+import os
+import yaml
+
+# ── Camera Topics ──────────────────────────────────────────────
+CAMERA_TOPICS = {
+    "head": os.getenv("WALKIE_CAM_HEAD", "/zed_head/zed_node/rgb/color/rect/image"),
+    "left": os.getenv("WALKIE_CAM_LEFT", "/walkie/camera/left"),
+    "right": os.getenv("WALKIE_CAM_RIGHT", "/walkie/camera/right"),
+    "default": os.getenv("WALKIE_CAM_DEFAULT", "walkie/camera/image"),
+}
+
+# ── Arm Topics ─────────────────────────────────────────────────
+ARM_TOPICS = {
+    "commands": os.getenv("WALKIE_ARM_COMMANDS", "walkie/arm/commands"),
+    "states": os.getenv("WALKIE_ARM_STATES", "joint_states"),
+    "target_pose": os.getenv("WALKIE_ARM_TARGET_POSE", "/target_pose"),
+    "commands_type": os.getenv("WALKIE_ARM_COMMANDS_TYPE", "sensor_msgs/msg/JointState"),
+    "states_type": os.getenv("WALKIE_ARM_STATES_TYPE", "sensor_msgs/msg/JointState"),
+    "target_pose_type": os.getenv("WALKIE_ARM_TARGET_POSE_TYPE", "geometry_msgs/msg/PoseStamped"),
+}
+
+ARM_ACTIONS = {
+    "interface": os.getenv("WALKIE_ARM_ACTION_INTERFACE", "my_robot_interfaces/action"),
+    "move_group": os.getenv("WALKIE_ARM_ACTION_MOVE_GROUP", "moveit_msgs/action/MoveGroup"),
+}
+
+# ── Navigation Topics & Actions ────────────────────────────────
+NAV_TOPICS = {
+    "cmd_vel": os.getenv("WALKIE_NAV_CMD_VEL", "cmd_vel"),
+    "cmd_vel_type": os.getenv("WALKIE_NAV_CMD_VEL_TYPE", "geometry_msgs/msg/Twist"),
+}
+
+NAV_ACTIONS = {
+    "navigate_to_pose": os.getenv("WALKIE_NAV_ACTION_NAV2", "navigate_to_pose"),
+    "navigate_to_pose_type": os.getenv("WALKIE_NAV_ACTION_NAV2_TYPE", "nav2_msgs/action/NavigateToPose"),
+}
+
+# ── Telemetry Topics ───────────────────────────────────────────
+TELEMETRY_TOPICS = {
+    "odom": os.getenv("WALKIE_TELEMETRY_ODOM", "current_pose"),
+    "odom_type": os.getenv("WALKIE_TELEMETRY_ODOM_TYPE", "nav_msgs/msg/Odometry"),
+}
+
+# ── Visualization Topics ───────────────────────────────────────
+VIZ_TOPICS = {
+    "markers": os.getenv("WALKIE_VIZ_MARKERS", "walkie/viz_markers"),
+    "markers_array": os.getenv("WALKIE_VIZ_MARKERS_ARRAY", "walkie/viz_markers_array"),
+    "target_pose": os.getenv("WALKIE_VIZ_TARGET_POSE", "walkie/target_pose"),
+    "markers_type": os.getenv("WALKIE_VIZ_MARKERS_TYPE", "visualization_msgs/msg/Marker"),
+    "markers_array_type": os.getenv("WALKIE_VIZ_MARKERS_ARRAY_TYPE", "visualization_msgs/msg/MarkerArray"),
+    "target_pose_type": os.getenv("WALKIE_VIZ_TARGET_POSE_TYPE", "geometry_msgs/msg/PoseStamped"),
+}
+
+# ── Object Pose Topics ─────────────────────────────────────────
+OB_POSE_TOPIC = {
+    "object_pose": os.getenv("WALKIE_OBJECT_POSE_TOPIC", "/yolo/detections_2d"),
+    "object_pose_response": os.getenv("WALKIE_OBJECT_POSE_RESPONSE_TOPIC", "/ob_detection/poses"),
+    "object_pose_type": os.getenv("WALKIE_OBJECT_POSE_TYPE", "vision_msgs/msg/Detection2DArray"),
+    "object_pose_response_type": os.getenv("WALKIE_OBJECT_POSE_RESPONSE_TYPE", "geometry_msgs/msg/PoseArray"),
+}
+
+ROS_DOMAIN_ID = int(os.getenv("WALKIE_ROS_DOMAIN_ID", "23"))
+
+def load_config(yaml_path: str):
+    """
+    Load topics from a YAML file and update the global dictionaries in-place.
+    """
+    if not os.path.isfile(yaml_path):
+        print(f"[Walkie SDK] Config file '{yaml_path}' not found. Using defaults/env vars.")
+        return
+
+    try:
+        with open(yaml_path, 'r') as file:
+            config = yaml.safe_load(file)
+            
+        if not config:
+            return
+            
+        # Update dictionaries in-place so all imported references reflect the new YAML values
+        if "CAMERA_TOPICS" in config: CAMERA_TOPICS.update(config["CAMERA_TOPICS"])
+        if "ARM_TOPICS" in config: ARM_TOPICS.update(config["ARM_TOPICS"])
+        if "ARM_ACTIONS" in config: ARM_ACTIONS.update(config["ARM_ACTIONS"])
+        if "NAV_TOPICS" in config: NAV_TOPICS.update(config["NAV_TOPICS"])
+        if "NAV_ACTIONS" in config: NAV_ACTIONS.update(config["NAV_ACTIONS"])
+        if "TELEMETRY_TOPICS" in config: TELEMETRY_TOPICS.update(config["TELEMETRY_TOPICS"])
+        if "VIZ_TOPICS" in config: VIZ_TOPICS.update(config["VIZ_TOPICS"])
+        if "OB_POSE_TOPIC" in config: OB_POSE_TOPIC.update(config["OB_POSE_TOPIC"])
+        
+        print(f"[Walkie SDK] Loaded custom topics from '{yaml_path}'")
+
+    except Exception as e:
+        print(f"[Walkie SDK] Failed to load config from '{yaml_path}': {e}")

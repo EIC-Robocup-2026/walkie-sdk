@@ -14,12 +14,7 @@ from typing import Any, Callable, Dict, Optional
 from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.converters import euler_to_quaternion
 from walkie_sdk.utils.namespace import apply_namespace
-
-# Default Nav2 action and topic names (without namespace)
-DEFAULT_NAV2_ACTION_NAME = "navigate_to_pose"
-NAV2_ACTION_TYPE = "nav2_msgs/action/NavigateToPose"
-DEFAULT_CMD_VEL_TOPIC = "cmd_vel"
-CMD_VEL_TYPE = "geometry_msgs/msg/Twist"
+from walkie_sdk.config.ros_topics import NAV_TOPICS, NAV_ACTIONS
 
 
 class Navigation:
@@ -57,12 +52,12 @@ class Navigation:
     @property
     def nav2_action_name(self) -> str:
         """Get the full Nav2 action name with namespace."""
-        return apply_namespace(DEFAULT_NAV2_ACTION_NAME, self._namespace)
+        return apply_namespace(NAV_ACTIONS["navigate_to_pose"], self._namespace)
 
     @property
     def cmd_vel_topic(self) -> str:
         """Get the full cmd_vel topic name with namespace."""
-        return apply_namespace(DEFAULT_CMD_VEL_TOPIC, self._namespace)
+        return apply_namespace(NAV_TOPICS["cmd_vel"], self._namespace)
 
     def go_to(
         self,
@@ -142,7 +137,7 @@ class Navigation:
         try:
             result = self._transport.call_action(
                 action_name=self.nav2_action_name,
-                action_type=NAV2_ACTION_TYPE,
+                action_type=NAV_ACTIONS["navigate_to_pose_type"],
                 goal=goal_msg,
                 feedback_callback=feedback_callback,
                 timeout=timeout,
@@ -173,7 +168,7 @@ class Navigation:
         try:
             result = self._transport.call_action(
                 action_name=self.nav2_action_name,
-                action_type=NAV2_ACTION_TYPE,
+                action_type=NAV_ACTIONS["navigate_to_pose_type"],
                 goal=goal_msg,
                 feedback_callback=feedback_callback,
                 timeout=None,
@@ -236,7 +231,7 @@ class Navigation:
         }
 
         try:
-            self._transport.publish(self.cmd_vel_topic, CMD_VEL_TYPE, zero_twist)
+            self._transport.publish(self.cmd_vel_topic, NAV_TOPICS["cmd_vel_type"], zero_twist)
             # Also cancel any ongoing navigation
             self._transport.cancel_action()
             self._navigation_status = "STOPPED"

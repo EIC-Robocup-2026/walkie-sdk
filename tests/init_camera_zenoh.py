@@ -29,20 +29,21 @@ def main():
     print("  - Transport: Zenoh")
     print("  - Camera: Zenoh (ZED Topic)")
     print("Sending robot to home position...")
-    bot.arm.go_to_home(group_name="left_arm")
-    time.sleep(5)
-    print("Moving robot arm to initial pose...")
-    bot.arm.go_to_pose(
-        group_name="left_arm",
-        x=0.38,
-        y=0.19,
-        z=0.58,
-        roll=-1.57,
-        pitch=0.0,
-        yaw=1.57,
-        cartesian_path=False,
-        blocking=True,
-    )
+    
+    #bot.arm.go_to_home(group_name="left_arm")
+    #time.sleep(5)
+    # print("Moving robot arm to initial pose...")
+    # bot.arm.go_to_pose(
+    #     group_name="left_arm",
+    #     x=0.38,
+    #     y=0.19,
+    #     z=0.58,
+    #     roll=-1.57,
+    #     pitch=0.0,
+    #     yaw=1.57,
+    #     cartesian_path=False,
+    #     blocking=True,
+    # )
 
     # 2. Main Viewer Loop
     try:

@@ -1,0 +1,45 @@
+# ros_topics.yaml
+
+CAMERA_TOPICS:
+  head: "/zed_head/zed_node/rgb/color/rect/image"
+  left: "/walkie/camera/left"
+  right: "/walkie/camera/right"
+  default: "walkie/camera/image"
+
+ARM_TOPICS:
+  commands: "walkie/arm/commands"
+  states: "joint_states"
+  target_pose: "/target_pose"
+  commands_type: "sensor_msgs/msg/JointState"
+  states_type: "sensor_msgs/msg/JointState"
+  target_pose_type: "geometry_msgs/msg/PoseStamped"
+
+ARM_ACTIONS:
+  interface: "my_robot_interfaces/action"
+  move_group: "moveit_msgs/action/MoveGroup"
+
+NAV_TOPICS:
+  cmd_vel: "cmd_vel"
+  cmd_vel_type: "geometry_msgs/msg/Twist"
+
+NAV_ACTIONS:
+  navigate_to_pose: "navigate_to_pose"
+  navigate_to_pose_type: "nav2_msgs/action/NavigateToPose"
+
+TELEMETRY_TOPICS:
+  odom: "current_pose"
+  odom_type: "nav_msgs/msg/Odometry"
+
+VIZ_TOPICS:
+  markers: "walkie/viz_markers"
+  markers_array: "walkie/viz_markers_array"
+  target_pose: "walkie/target_pose"
+  markers_type: "visualization_msgs/msg/Marker"
+  markers_array_type: "visualization_msgs/msg/MarkerArray"
+  target_pose_type: "geometry_msgs/msg/PoseStamped"
+
+OB_POSE_TOPIC:
+  object_pose: "/yolo/detections_2d"
+  object_pose_response: "/ob_detection/poses"
+  object_pose_type: "vision_msgs/msg/Detection2DArray"
+  object_pose_response_type: "geometry_msgs/msg/PoseArray"
