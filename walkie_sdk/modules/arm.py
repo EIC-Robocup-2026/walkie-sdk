@@ -456,7 +456,7 @@ class Arm:
         try:
             result = self._transport.call_action(
                 action_name="go_to_home",
-                action_type=f"{ARM_ACTIONS["interface"]}/GoToHome",
+                action_type=f"{ARM_ACTIONS['interface']}/GoToHome",
                 goal={"group_name": group_name},
             )
 
@@ -496,7 +496,7 @@ class Arm:
 
         return self._send_action_goal(
             action_name="control_gripper",
-            action_type=f"{ARM_ACTIONS["interface"]}/ControlGripper",
+            action_type=f"{ARM_ACTIONS['interface']}/ControlGripper",
             goal_msg=goal_msg,
             blocking=blocking,
             feedback_callback=feedback_callback,
@@ -555,7 +555,7 @@ class Arm:
 
         return self._send_action_goal(
             action_name="go_to_pose",
-            action_type=f"{ARM_ACTIONS["interface"]}/GoToPose",
+            action_type=f"{ARM_ACTIONS['interface']}/GoToPose",
             goal_msg=goal_msg,
             blocking=blocking,
             feedback_callback=feedback_callback,
@@ -590,7 +590,7 @@ class Arm:
 
         return self._send_action_goal(
             action_name="go_to_pose_relative",
-            action_type=f"{ARM_ACTIONS["interface"]}/GoToPoseRelative",
+            action_type=f"{ARM_ACTIONS['interface']}/GoToPoseRelative",
             goal_msg=goal_msg,
             blocking=blocking,
             feedback_callback=feedback_callback,
@@ -650,7 +650,7 @@ class Arm:
         # Uses the GoToPoseQuaternion action type defined in your robot interfaces
         return self._send_action_goal(
             action_name="go_to_pose_quat",
-            action_type=f"{ARM_ACTIONS["interface"]}/GoToPoseQuaternion",
+            action_type=f"{ARM_ACTIONS['interface']}/GoToPoseQuaternion",
             goal_msg=goal_msg,
             blocking=blocking,
             feedback_callback=feedback_callback,
