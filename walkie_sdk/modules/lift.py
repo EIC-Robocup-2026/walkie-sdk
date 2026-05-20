@@ -14,6 +14,7 @@ Normalized:   0.0              → 1.0
 """
 
 import threading
+import time
 from typing import Optional
 
 from walkie_sdk.core.interfaces import ROSTransportInterface
@@ -21,8 +22,10 @@ from walkie_sdk.utils.namespace import apply_namespace
 from walkie_sdk.config.ros_topics import LIFT_TOPICS
 
 LIFT_MAX_CM = 74.35
-LIFT_DEFAULT_SPEED = 2.0   # cm/s
-LIFT_DEFAULT_ACCEL = 1.0   # cm/s²
+LIFT_DEFAULT_SPEED = 2.0
+LIFT_DEFAULT_ACCEL = 1.0
+LIFT_DEFAULT_TIMEOUT = 30.0
+LIFT_DEFAULT_TOLERANCE = 0.02  # normalized (≈ 1.5 cm)
 
 
 class Lift:
@@ -44,6 +47,7 @@ class Lift:
         self._lock = threading.Lock()
         self._latest_pos_m: Optional[float] = None
         self._subscribed = False
+        self._status: Optional[str] = None
 
     def _setup_state_subscription(self) -> None:
         """Subscribe to lift joint states. Called after transport connects."""
@@ -87,13 +91,51 @@ class Lift:
         """Full lift joint states topic name with namespace."""
         return apply_namespace(LIFT_TOPICS["states"], self._namespace)
 
+    @property
+    def status(self) -> Optional[str]:
+        """Current lift status: ``'SUCCEEDED'``, ``'TIMEOUT'``, ``'IN_PROGRESS'``, or None."""
+        return self._status
+
+    @property
+    def is_moving(self) -> bool:
+        """True if a non-blocking move is currently in progress."""
+        return self._status == "IN_PROGRESS"
+
+    def _publish_command(self, pos_cm: float, speed: float, accel: float) -> None:
+        msg = {"data": [float(pos_cm), float(speed), float(accel)]}
+        self._transport.publish(self.cmd_topic, LIFT_TOPICS["cmd_type"], msg)
+
+    def _wait_until_reached(self, target_norm: float, tolerance: float, timeout: float) -> str:
+        """Poll position until within tolerance or timeout. Returns 'SUCCEEDED' or 'TIMEOUT'."""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            current = self.get(norm_pos=True)
+            if current is not None and abs(current - target_norm) <= tolerance:
+                return "SUCCEEDED"
+            time.sleep(0.05)
+        return "TIMEOUT"
+
+    def _send_blocking(self, pos_cm: float, speed: float, accel: float, target_norm: float, tolerance: float, timeout: float) -> str:
+        self._publish_command(pos_cm, speed, accel)
+        result = self._wait_until_reached(target_norm, tolerance, timeout)
+        self._status = result
+        return result
+
+    def _send_async(self, pos_cm: float, speed: float, accel: float, target_norm: float, tolerance: float, timeout: float) -> None:
+        """Background thread: publish command then wait for position."""
+        self._publish_command(pos_cm, speed, accel)
+        self._status = self._wait_until_reached(target_norm, tolerance, timeout)
+
     def set(
         self,
         pos: float,
         speed: float = LIFT_DEFAULT_SPEED,
         accel: float = LIFT_DEFAULT_ACCEL,
         norm_pos: bool = True,
-    ) -> None:
+        blocking: bool = True,
+        timeout: float = LIFT_DEFAULT_TIMEOUT,
+        tolerance: float = LIFT_DEFAULT_TOLERANCE,
+    ) -> str:
         """
         Send a position command to the lift.
 
@@ -104,25 +146,45 @@ class Lift:
             accel: Acceleration in cm/s² (default: 1.0).
             norm_pos: If True (default), treat pos as normalized 0.0–1.0.
                       If False, treat pos as real position in cm.
+            blocking: If True (default), wait until the lift reaches the target
+                      position before returning. If False, return immediately.
+            timeout: Maximum seconds to wait when blocking=True (default: 30.0).
+            tolerance: Acceptable error in normalized units to consider the
+                       target reached (default: 0.02 ≈ 1.5 cm).
+
+        Returns:
+            ``"SUCCEEDED"`` when position reached, ``"TIMEOUT"`` if timed out,
+            or ``"IN_PROGRESS"`` when blocking=False.
 
         Example:
             ```python
-            bot.lift.set(0.5)                          # midpoint (normalized)
-            bot.lift.set(37.175, norm_pos=False)       # midpoint in cm
-            bot.lift.set(1.0, speed=5.0, accel=2.0)   # top, fast
+            bot.lift.set(0.5)                        # midpoint, wait until reached
+            bot.lift.set(1.0, speed=5.0, accel=2.0) # top, fast, blocking
+            bot.lift.set(0.0, blocking=False)        # fire-and-forget
+            bot.lift.set(37.0, norm_pos=False)       # 37 cm, blocking
             ```
         """
         if norm_pos:
             if pos < 0.0 or pos > 1.0:
                 print(f"[Lift] pos {pos} out of normalized range [0,1], clamping.")
-            pos_cm = max(0.0, min(1.0, pos)) * LIFT_MAX_CM
+            target_norm = max(0.0, min(1.0, pos))
+            pos_cm = target_norm * LIFT_MAX_CM
         else:
             if pos < 0.0 or pos > LIFT_MAX_CM:
                 print(f"[Lift] pos {pos} out of range [0, {LIFT_MAX_CM}] cm, clamping.")
             pos_cm = max(0.0, min(LIFT_MAX_CM, pos))
+            target_norm = pos_cm / LIFT_MAX_CM
 
-        msg = {"data": [float(pos_cm), float(speed), float(accel)]}
-        self._transport.publish(self.cmd_topic, LIFT_TOPICS["cmd_type"], msg)
+        if not blocking:
+            self._status = "IN_PROGRESS"
+            threading.Thread(
+                target=self._send_async,
+                args=(pos_cm, speed, accel, target_norm, tolerance, timeout),
+                daemon=True,
+            ).start()
+            return "IN_PROGRESS"
+
+        return self._send_blocking(pos_cm, speed, accel, target_norm, tolerance, timeout)
 
     def get(self, norm_pos: bool = True) -> Optional[float]:
         """
@@ -137,7 +199,7 @@ class Lift:
 
         Example:
             ```python
-            bot.lift.get()              # e.g. 0.5  (normalized)
+            bot.lift.get()               # e.g. 0.5  (normalized)
             bot.lift.get(norm_pos=False) # e.g. 37.175  (cm)
             ```
         """
