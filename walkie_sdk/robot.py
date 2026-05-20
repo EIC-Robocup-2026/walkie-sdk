@@ -475,8 +475,9 @@ class WalkieRobot:
         """
         Set ROS namespace for topics/actions.
 
-        Updates namespace for both navigation and telemetry modules.
-        Note: Telemetry subscription will use old namespace until restart.
+        Updates namespace for navigation, telemetry, arm, lift, and visualization modules.
+        Telemetry subscription keeps using the previous namespace until restart.
+        Arm and lift subscriptions re-subscribe immediately using the new namespace.
         """
         self._namespace = value
         self._nav.namespace = value
