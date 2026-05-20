@@ -38,8 +38,6 @@ VIZ_TOPICS:
   markers_array_type: "visualization_msgs/msg/MarkerArray"
   target_pose_type: "geometry_msgs/msg/PoseStamped"
 
-OB_POSE_TOPIC:
-  object_pose: "/yolo/detections_2d"
-  object_pose_response: "/ob_detection/poses"
-  object_pose_type: "vision_msgs/msg/Detection2DArray"
-  object_pose_response_type: "geometry_msgs/msg/PoseArray"
+OB_POSE_SERVICE:
+  service_name: "get_3d_poses"
+  service_type: "perception/srv/GetObPose"
