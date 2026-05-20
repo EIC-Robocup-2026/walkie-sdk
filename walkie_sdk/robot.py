@@ -22,6 +22,7 @@ from walkie_sdk.core.interfaces import (
 )
 from walkie_sdk.modules.arm import Arm, ArmControlMode
 from walkie_sdk.modules.camera import Camera
+from walkie_sdk.modules.lift import Lift
 from walkie_sdk.modules.multi_camera import MultiCamera
 from walkie_sdk.modules.navigation import Navigation
 from walkie_sdk.modules.telemetry import Telemetry
@@ -178,6 +179,9 @@ class WalkieRobot:
         # Visualization module (marker publishing for RViz2)
         self._viz = Visualization(self._transport, namespace=namespace)
 
+        # Lift module
+        self._lift = Lift(self._transport, namespace=namespace)
+
         # Auto-connect
         self._connect()
 
@@ -197,6 +201,9 @@ class WalkieRobot:
 
         # Setup arm subscription (must be done after transport is connected)
         self._arm._setup_state_subscription()
+
+        # Setup lift subscription
+        self._lift._setup_state_subscription()
 
         # Connect camera if enabled
         if self._camera_transport is not None:
@@ -302,6 +309,28 @@ class WalkieRobot:
             ```
         """
         return self._viz
+
+    @property
+    def lift(self) -> Lift:
+        """
+        Lift controller.
+
+        Provides:
+        - set(pos, speed, accel, norm_pos=True): Send position command
+        - get(norm_pos=True): Read current position
+
+        Positions are normalized 0.0–1.0 by default (0.0 = bottom, 1.0 = top).
+        Pass norm_pos=False to use real centimeters (0.0–74.35 cm).
+
+        Example:
+            ```python
+            bot.lift.set(0.5)              # move to midpoint (normalized)
+            bot.lift.get()                 # e.g. 0.5
+            bot.lift.set(37.0, norm_pos=False)  # 37 cm
+            bot.lift.get(norm_pos=False)   # e.g. 37.0
+            ```
+        """
+        return self._lift
 
     @property
     def tools(self) -> Tools:
@@ -453,6 +482,7 @@ class WalkieRobot:
         self._nav.namespace = value
         self._status.namespace = value
         self._arm.namespace = value
+        self._lift.namespace = value
         self._viz.namespace = value
 
     @property

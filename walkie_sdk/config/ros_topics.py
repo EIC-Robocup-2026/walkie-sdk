@@ -60,6 +60,14 @@ OB_POSE_SERVICE = {
     "service_type": os.getenv("WALKIE_OB_POSE_SERVICE_TYPE", "perception/srv/GetObPose"),
 }
 
+# ── Lift Topics ────────────────────────────────────────────────
+LIFT_TOPICS = {
+    "cmd":         os.getenv("WALKIE_LIFT_CMD",          "lift/cmd"),
+    "cmd_type":    os.getenv("WALKIE_LIFT_CMD_TYPE",     "std_msgs/msg/Float64MultiArray"),
+    "states":      os.getenv("WALKIE_LIFT_STATES",       "lift/joint_states"),
+    "states_type": os.getenv("WALKIE_LIFT_STATES_TYPE",  "sensor_msgs/msg/JointState"),
+}
+
 ROS_DOMAIN_ID = int(os.getenv("WALKIE_ROS_DOMAIN_ID", "23"))
 
 def load_config(yaml_path: str):
@@ -86,6 +94,7 @@ def load_config(yaml_path: str):
         if "TELEMETRY_TOPICS" in config: TELEMETRY_TOPICS.update(config["TELEMETRY_TOPICS"])
         if "VIZ_TOPICS" in config: VIZ_TOPICS.update(config["VIZ_TOPICS"])
         if "OB_POSE_SERVICE" in config: OB_POSE_SERVICE.update(config["OB_POSE_SERVICE"])
+        if "LIFT_TOPICS" in config: LIFT_TOPICS.update(config["LIFT_TOPICS"])
         
         print(f"[Walkie SDK] Loaded custom topics from '{yaml_path}'")
 
