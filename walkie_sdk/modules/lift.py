@@ -117,6 +117,7 @@ class Lift:
 
     def _send_blocking(self, pos_cm: float, speed: float, accel: float, target_norm: float, tolerance: float, timeout: float) -> str:
         self._publish_command(pos_cm, speed, accel)
+        self._status = "IN_PROGRESS"
         result = self._wait_until_reached(target_norm, tolerance, timeout)
         self._status = result
         return result
