@@ -54,12 +54,10 @@ VIZ_TOPICS = {
     "target_pose_type": os.getenv("WALKIE_VIZ_TARGET_POSE_TYPE", "geometry_msgs/msg/PoseStamped"),
 }
 
-# ── Object Pose Topics ─────────────────────────────────────────
-OB_POSE_TOPIC = {
-    "object_pose": os.getenv("WALKIE_OBJECT_POSE_TOPIC", "/yolo/detections_2d"),
-    "object_pose_response": os.getenv("WALKIE_OBJECT_POSE_RESPONSE_TOPIC", "/ob_detection/poses"),
-    "object_pose_type": os.getenv("WALKIE_OBJECT_POSE_TYPE", "vision_msgs/msg/Detection2DArray"),
-    "object_pose_response_type": os.getenv("WALKIE_OBJECT_POSE_RESPONSE_TYPE", "geometry_msgs/msg/PoseArray"),
+# ── Object Pose Service ────────────────────────────────────────
+OB_POSE_SERVICE = {
+    "service_name": os.getenv("WALKIE_OB_POSE_SERVICE_NAME", "get_3d_poses"),
+    "service_type": os.getenv("WALKIE_OB_POSE_SERVICE_TYPE", "perception/srv/GetObPose"),
 }
 
 ROS_DOMAIN_ID = int(os.getenv("WALKIE_ROS_DOMAIN_ID", "23"))
@@ -87,7 +85,7 @@ def load_config(yaml_path: str):
         if "NAV_ACTIONS" in config: NAV_ACTIONS.update(config["NAV_ACTIONS"])
         if "TELEMETRY_TOPICS" in config: TELEMETRY_TOPICS.update(config["TELEMETRY_TOPICS"])
         if "VIZ_TOPICS" in config: VIZ_TOPICS.update(config["VIZ_TOPICS"])
-        if "OB_POSE_TOPIC" in config: OB_POSE_TOPIC.update(config["OB_POSE_TOPIC"])
+        if "OB_POSE_SERVICE" in config: OB_POSE_SERVICE.update(config["OB_POSE_SERVICE"])
         
         print(f"[Walkie SDK] Loaded custom topics from '{yaml_path}'")
 
