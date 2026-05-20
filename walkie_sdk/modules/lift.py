@@ -115,16 +115,8 @@ class Lift:
             time.sleep(0.05)
         return "TIMEOUT"
 
-    def _send_blocking(self, pos_cm: float, speed: float, accel: float, target_norm: float, tolerance: float, timeout: float) -> str:
-        self._publish_command(pos_cm, speed, accel)
-        self._status = "IN_PROGRESS"
-        result = self._wait_until_reached(target_norm, tolerance, timeout)
-        self._status = result
-        return result
-
-    def _send_async(self, pos_cm: float, speed: float, accel: float, target_norm: float, tolerance: float, timeout: float) -> None:
-        """Background thread: publish command then wait for position."""
-        self._publish_command(pos_cm, speed, accel)
+    def _poll_and_update_status(self, target_norm: float, tolerance: float, timeout: float) -> None:
+        """Background thread: poll position and update status when reached or timed out."""
         self._status = self._wait_until_reached(target_norm, tolerance, timeout)
 
     def set(
@@ -176,16 +168,20 @@ class Lift:
             pos_cm = max(0.0, min(LIFT_MAX_CM, pos))
             target_norm = pos_cm / LIFT_MAX_CM
 
+        self._publish_command(pos_cm, speed, accel)
+
         if not blocking:
             self._status = "IN_PROGRESS"
             threading.Thread(
-                target=self._send_async,
-                args=(pos_cm, speed, accel, target_norm, tolerance, timeout),
+                target=self._poll_and_update_status,
+                args=(target_norm, tolerance, timeout),
                 daemon=True,
             ).start()
             return "IN_PROGRESS"
 
-        return self._send_blocking(pos_cm, speed, accel, target_norm, tolerance, timeout)
+        result = self._wait_until_reached(target_norm, tolerance, timeout)
+        self._status = result
+        return result
 
     def get(self, norm_pos: bool = True) -> Optional[float]:
         """
