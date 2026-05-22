@@ -29,6 +29,7 @@ The hardware scripts are **not** collected by `pytest` (`pyproject.toml` pins `t
   - [`test_navigation.py`](#test_navigationpy) — `bot.nav` ⚠️
   - [`test_arm.py`](#test_armpy) — `bot.arm` ⚠️
   - [`test_tools_bbox.py`](#test_tools_bboxpy) — `bot.tools`
+  - [`test_yolo_viz.py`](#test_yolo_vizpy) — YOLO → 3D positions
 - [Safety](#safety)
 - [Troubleshooting quick-reference](#troubleshooting-quick-reference)
 
@@ -481,6 +482,53 @@ uv run python tests/test_tools_bbox_interactive.py --ip "$IP" --cam-port 7447
 
 **If it returns None / times out:** wrong `WALKIE_OB_POSE_SERVICE_NAME`/`_TYPE`, or the perception node isn't running.
 **If markers don't appear (or are in the wrong place):** the RViz Fixed Frame doesn't match `--viz-frame` — the service likely returns poses in a camera/optical frame, not `map`. Set `--viz-frame` to that frame (check `ros2 topic echo` / your perception node).
+
+---
+
+## `test_yolo_viz.py`
+
+**Module:** `bot.camera` + `bot.tools.bboxes_to_positions()` + `bot.viz`. **Motion:** none.
+Runs a **YOLO model locally** (ultralytics) on the robot's camera feed, draws detected boxes + class labels on the feed, feeds the boxes into the perception service, and publishes RViz2 markers **labeled with each object's class name and 3D position**.
+
+**Extra dependency (YOLO is not installed by default):**
+```bash
+uv sync --extra yolo                                   # installs ultralytics (+ torch)
+# or one-off, no install:
+uv run --with ultralytics python tests/test_yolo_viz.py --ip "$IP"
+```
+The weights (default `yolov8n.pt`) auto-download on first run.
+
+**Server needs:** rosbridge + zenoh camera + `get_3d_poses` service. Open RViz2 (Fixed Frame = `--viz-frame`, Marker display on `walkie/viz_markers`) to see the 3D markers.
+
+**Controls (in the OpenCV window):** `Space/Enter` query · `A` toggle auto-query · `C` clear markers · `Q/Esc` quit.
+
+| Param | Default | Notes |
+|-------|---------|-------|
+| `--ip` | `127.0.0.1` | |
+| `--port` | `9090` | rosbridge port |
+| `--cam-port` | `7447` | zenoh camera port |
+| `--timeout` | `5.0` | service-call timeout |
+| `--namespace` | `""` | |
+| `--model` | `yolov8n.pt` | YOLO weights (any ultralytics model) |
+| `--conf` | `0.25` | detection confidence threshold |
+| `--device` | auto | `cpu` / `0` (GPU index) |
+| `--viz-frame` | `map` | TF frame for the 3D markers |
+| `--auto` | off | auto-query every `--interval` seconds |
+| `--interval` | `2.0` | auto-query period (s) |
+
+**Commands**
+
+```bash
+uv run --with ultralytics python tests/test_yolo_viz.py --ip "$IP"
+uv run --with ultralytics python tests/test_yolo_viz.py --ip "$IP" --model yolov8s.pt --conf 0.4
+uv run --with ultralytics python tests/test_yolo_viz.py --ip "$IP" --auto --interval 2.0
+uv run --with ultralytics python tests/test_yolo_viz.py --ip "$IP" --viz-frame camera_link --device cpu
+```
+
+**Notes / gotchas:**
+- The OpenCV window shows live boxes (`class conf`) plus a HUD list of the last query's `class: (x, y, z)`; RViz2 shows a sphere + `class (x,y,z)` label per object.
+- 3D positions are matched to detections **by order** (the service returns poses in input order). If the service returns a different count, only the first *n* are labeled (a warning is printed).
+- Same frame caveat as `--viz` above: if markers land wrong, set `--viz-frame` to the service's actual output frame.
 
 ---
 

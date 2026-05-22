@@ -47,6 +47,9 @@ docs = [
     "mkdocs-material>=9.0",
     "mkdocstrings[python]>=0.25",
 ]
+yolo = [
+    "ultralytics>=8.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests/unit"]
