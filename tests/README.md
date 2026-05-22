@@ -444,9 +444,15 @@ uv run python tests/test_arm.py --ip "$IP" --namespace robot1 --mode moveit --ye
 ## `test_tools_bbox.py`
 
 **Module:** `bot.tools.bboxes_to_positions()`. **Motion:** none.
-Calls the perception service to turn 2D bounding boxes into 3D positions. (An interactive variant, `test_tools_bbox_interactive.py`, overlays results on the camera feed.)
+Calls the perception service to turn 2D bounding boxes into 3D positions.
 
-**Server needs:** `get_3d_poses` service (`perception/srv/GetObPose`).
+**Visualizing results — two options:**
+- **`test_tools_bbox.py --viz`** — runs the fixed-bbox tests and publishes each returned 3D position as an RViz2 marker (colored sphere + text label). Best for a quick, repeatable check.
+- **`test_tools_bbox_interactive.py`** — draw boxes on the live camera feed with the mouse, then press Space to query; results are overlaid on the feed **and** published as RViz2 markers. Best for exploratory testing.
+
+To see markers: open RViz2, set **Fixed Frame** to your `--viz-frame`, and add a **Marker** display on `walkie/viz_markers` (prefixed with your namespace if set).
+
+**Server needs:** `get_3d_poses` service (`perception/srv/GetObPose`). For `--viz`, also rosbridge (already required) + RViz2 to view.
 
 | Param | Default | Notes |
 |-------|---------|-------|
@@ -454,6 +460,9 @@ Calls the perception service to turn 2D bounding boxes into 3D positions. (An in
 | `--port` | `9090` | |
 | `--timeout` | `5.0` | service-call timeout |
 | `--namespace` | `""` | |
+| `--viz` | off | publish returned positions as RViz2 markers |
+| `--viz-frame` | `map` | TF frame for the markers — set to the frame the service returns poses in |
+| `--viz-hold` | `3.0` | seconds to keep each visualized result on screen |
 
 **Commands**
 
@@ -461,11 +470,17 @@ Calls the perception service to turn 2D bounding boxes into 3D positions. (An in
 uv run python tests/test_tools_bbox.py --ip "$IP"
 uv run python tests/test_tools_bbox.py --ip "$IP" --timeout 10
 uv run python tests/test_tools_bbox.py --ip "$IP" --namespace robot1
+
+# Visualize in RViz2
+uv run python tests/test_tools_bbox.py --ip "$IP" --viz
+uv run python tests/test_tools_bbox.py --ip "$IP" --viz --viz-frame camera_link --viz-hold 5
+
 # Interactive (needs zenoh camera): adds --cam-port
 uv run python tests/test_tools_bbox_interactive.py --ip "$IP" --cam-port 7447
 ```
 
 **If it returns None / times out:** wrong `WALKIE_OB_POSE_SERVICE_NAME`/`_TYPE`, or the perception node isn't running.
+**If markers don't appear (or are in the wrong place):** the RViz Fixed Frame doesn't match `--viz-frame` — the service likely returns poses in a camera/optical frame, not `map`. Set `--viz-frame` to that frame (check `ros2 topic echo` / your perception node).
 
 ---
 
