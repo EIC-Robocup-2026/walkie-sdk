@@ -309,7 +309,9 @@ uv run python tests/test_visualization.py --ip "$IP" --namespace robot1
 ## `test_lift.py`
 
 **Module:** `bot.lift`. ⚠️ **MOVES THE LIFT.**
-Reads initial position, then moves to bottom / top / midpoint / a real-cm target, tests non-blocking + status polling, and custom speed/accel.
+Position convention: `0.0` = bottom, `1.0` = top. Reads initial position (expected near the top), then moves to the mid of the allowed band → the lowest allowed position → top → a real-cm target, tests non-blocking + status polling, and custom speed/accel.
+
+> **Safety floor:** the robot currently can't travel below the midpoint. The test **never commands below `--min-pos` (default `0.5`)** — every target is clamped to `[min_pos, 1.0]`. Raise the floor with `--min-pos 0.6`; once the hardware limit is removed, pass `--min-pos 0.0` to exercise the full range (bottom included).
 
 **Server needs:** lift driver — command topic `lift/cmd` (`Float64MultiArray`), feedback `lift/joint_states` (`JointState`). Travel range 0–74.35 cm.
 
@@ -319,18 +321,21 @@ Reads initial position, then moves to bottom / top / midpoint / a real-cm target
 | `--port` | `9090` | |
 | `--timeout` | `60.0` | max seconds to wait for each move (lift is slow) |
 | `--tolerance` | `0.02` | normalized position tolerance (≈1.5 cm) |
+| `--min-pos` | `0.5` | lowest normalized position the test may command (safety floor) |
 | `--namespace` | `""` | |
 
 **Commands**
 
 ```bash
-uv run python tests/test_lift.py --ip "$IP"
+uv run python tests/test_lift.py --ip "$IP"                            # floor 0.5 (current limit)
+uv run python tests/test_lift.py --ip "$IP" --min-pos 0.6              # raise the floor
+uv run python tests/test_lift.py --ip "$IP" --min-pos 0.0              # full range (limit removed)
 uv run python tests/test_lift.py --ip "$IP" --timeout 90               # very slow lift
 uv run python tests/test_lift.py --ip "$IP" --tolerance 0.03           # if it just misses target
 uv run python tests/test_lift.py --ip "$IP" --namespace robot1
 ```
 
-**If TIMEOUT while sitting at target:** raise `--timeout` first, then loosen `--tolerance`. **If no initial data:** wrong `WALKIE_LIFT_STATES` topic.
+**If TIMEOUT while sitting at target:** raise `--timeout` first, then loosen `--tolerance`. **If no initial data:** wrong `WALKIE_LIFT_STATES` topic. The `[guard]` line in the output means a requested target was clamped up to the floor.
 
 ---
 
