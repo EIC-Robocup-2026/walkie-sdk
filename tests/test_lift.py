@@ -208,6 +208,20 @@ def test_custom_speed_accel(bot: WalkieRobot, timeout: float, tolerance: float, 
     return True
 
 
+def test_park_at_top(bot: WalkieRobot, timeout: float, tolerance: float) -> bool:
+    _section("TEST 8: park — return to top (norm=1.0) as the final state")
+    print(f"  Calling set(1.0, blocking=True, timeout={timeout}s) ...")
+    result = bot.lift.set(1.0, blocking=True, timeout=timeout, tolerance=tolerance)
+    pos_norm = bot.lift.get(norm_pos=True)
+    pos_cm = bot.lift.get(norm_pos=False)
+    print(f"  Result: {result}  |  pos norm={pos_norm:.4f}  real={pos_cm:.2f} cm")
+    if result != "SUCCEEDED":
+        _fail(f"expected SUCCEEDED, got {result} (pos={pos_norm:.4f}, tolerance={tolerance})")
+        return False
+    _pass(f"parked at top — norm={pos_norm:.4f}  real={pos_cm:.2f} cm")
+    return True
+
+
 # ── Main ───────────────────────────────────────────────────────────────────
 
 
@@ -249,6 +263,7 @@ def main():
         results.append(test_blocking_real_position_mode(bot, args.timeout, args.tolerance, args.min_pos))
         results.append(test_non_blocking_move(bot, args.timeout, args.tolerance, args.min_pos))
         results.append(test_custom_speed_accel(bot, args.timeout, args.tolerance, args.min_pos))
+        results.append(test_park_at_top(bot, args.timeout, args.tolerance))
     except KeyboardInterrupt:
         print("\nInterrupted by user.")
     finally:

@@ -309,7 +309,7 @@ uv run python tests/test_visualization.py --ip "$IP" --namespace robot1
 ## `test_lift.py`
 
 **Module:** `bot.lift`. ⚠️ **MOVES THE LIFT.**
-Position convention: `0.0` = bottom, `1.0` = top. Reads initial position (expected near the top), then moves to the mid of the allowed band → the lowest allowed position → top → a real-cm target, tests non-blocking + status polling, and custom speed/accel.
+Position convention: `0.0` = bottom, `1.0` = top. Reads initial position (expected near the top), then moves to the mid of the allowed band → the lowest allowed position → top → a real-cm target, tests non-blocking + status polling and custom speed/accel, and finally **parks at the top (`1.0`)** so the lift ends raised.
 
 > **Safety floor:** the robot currently can't travel below the midpoint. The test **never commands below `--min-pos` (default `0.5`)** — every target is clamped to `[min_pos, 1.0]`. Raise the floor with `--min-pos 0.6`; once the hardware limit is removed, pass `--min-pos 0.0` to exercise the full range (bottom included).
 
