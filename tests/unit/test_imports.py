@@ -20,11 +20,6 @@ def test_import_protocol_enums():
     assert CameraProtocol is not None
 
 
-def test_import_arm_control_mode():
-    from walkie_sdk import ArmControlMode
-
-    assert ArmControlMode is not None
-
 
 def test_import_visualization_constants():
     from walkie_sdk import (

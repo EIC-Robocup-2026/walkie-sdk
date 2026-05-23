@@ -14,17 +14,28 @@ CAMERA_TOPICS = {
 
 # ── Arm Topics ─────────────────────────────────────────────────
 ARM_TOPICS = {
-    "commands": os.getenv("WALKIE_ARM_COMMANDS", "walkie/arm/commands"),
     "states": os.getenv("WALKIE_ARM_STATES", "joint_states"),
-    "target_pose": os.getenv("WALKIE_ARM_TARGET_POSE", "/target_pose"),
-    "commands_type": os.getenv("WALKIE_ARM_COMMANDS_TYPE", "sensor_msgs/msg/JointState"),
     "states_type": os.getenv("WALKIE_ARM_STATES_TYPE", "sensor_msgs/msg/JointState"),
-    "target_pose_type": os.getenv("WALKIE_ARM_TARGET_POSE_TYPE", "geometry_msgs/msg/PoseStamped"),
+    "jtc_left": os.getenv("WALKIE_ARM_JTC_LEFT", "left_joint_trajectory_controller/joint_trajectory"),
+    "jtc_right": os.getenv("WALKIE_ARM_JTC_RIGHT", "right_joint_trajectory_controller/joint_trajectory"),
+    "jtc_type": os.getenv("WALKIE_ARM_JTC_TYPE", "trajectory_msgs/msg/JointTrajectory"),
 }
 
 ARM_ACTIONS = {
     "interface": os.getenv("WALKIE_ARM_ACTION_INTERFACE", "my_robot_interfaces/action"),
-    "move_group": os.getenv("WALKIE_ARM_ACTION_MOVE_GROUP", "moveit_msgs/action/MoveGroup"),
+    "go_to_pose":             os.getenv("WALKIE_ARM_ACTION_GO_TO_POSE", "go_to_pose"),
+    "go_to_pose_quat":        os.getenv("WALKIE_ARM_ACTION_GO_TO_POSE_QUAT", "go_to_pose_quat"),
+    "go_to_pose_relative":    os.getenv("WALKIE_ARM_ACTION_GO_TO_POSE_RELATIVE", "go_to_pose_relative"),
+    "go_to_home":             os.getenv("WALKIE_ARM_ACTION_GO_TO_HOME", "go_to_home"),
+    "control_gripper":        os.getenv("WALKIE_ARM_ACTION_CONTROL_GRIPPER", "control_gripper"),
+    "set_joint_position":     os.getenv("WALKIE_ARM_ACTION_SET_JOINT_POSITION", "set_joint_position"),
+}
+
+ARM_SERVICES = {
+    "get_ee_pose":           os.getenv("WALKIE_ARM_SVC_GET_EE_POSE", "get_ee_pose"),
+    "get_ee_pose_type":      os.getenv("WALKIE_ARM_SVC_GET_EE_POSE_TYPE", "my_robot_interfaces/srv/GetEEPose"),
+    "get_joint_states":      os.getenv("WALKIE_ARM_SVC_GET_JOINT_STATES", "get_joint_states"),
+    "get_joint_states_type": os.getenv("WALKIE_ARM_SVC_GET_JOINT_STATES_TYPE", "my_robot_interfaces/srv/GetJointStates"),
 }
 
 # ── Navigation Topics & Actions ────────────────────────────────
@@ -89,6 +100,7 @@ def load_config(yaml_path: str):
         if "CAMERA_TOPICS" in config: CAMERA_TOPICS.update(config["CAMERA_TOPICS"])
         if "ARM_TOPICS" in config: ARM_TOPICS.update(config["ARM_TOPICS"])
         if "ARM_ACTIONS" in config: ARM_ACTIONS.update(config["ARM_ACTIONS"])
+        if "ARM_SERVICES" in config: ARM_SERVICES.update(config["ARM_SERVICES"])
         if "NAV_TOPICS" in config: NAV_TOPICS.update(config["NAV_TOPICS"])
         if "NAV_ACTIONS" in config: NAV_ACTIONS.update(config["NAV_ACTIONS"])
         if "TELEMETRY_TOPICS" in config: TELEMETRY_TOPICS.update(config["TELEMETRY_TOPICS"])
