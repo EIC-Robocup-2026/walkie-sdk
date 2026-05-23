@@ -57,8 +57,8 @@ def _prompt_joints(n: int) -> list[float]:
 
 
 _GROUP_DOF = {
-    "left_arm_lift": 8,
-    "right_arm_lift": 8,
+    "left_arm_lift": 7,
+    "right_arm_lift": 7,
 }
 
 

@@ -201,59 +201,46 @@ class Arm:
     def _jtc_publish(
         self, group_name: str, joint_positions: List[float], duration: float
     ) -> str:
-        """Publish a single-point JointTrajectory to the appropriate JTC controller topic(s)."""
-        joint_names = _JTC_JOINT_NAMES.get(group_name)
-        if joint_names is None:
-            print(f"[Arm] Unknown group '{group_name}' for JTC mode.")
-            return "FAILED"
+        """Publish a single-point JointTrajectory to the arm JTC controller(s).
 
+        Always sends exactly 7 joints per arm — lift_joint is never included
+        because left/right_joint_trajectory_controller only know 7 joints and
+        have allow_partial_joints_goal=false.
+        """
         sec = int(duration)
         nanosec = int((duration - sec) * 1e9)
-        point = {
-            "positions": [float(p) for p in joint_positions],
-            "velocities": [],
-            "accelerations": [],
-            "time_from_start": {"sec": sec, "nanosec": nanosec},
-        }
 
-        if group_name in _BOTH_GROUPS:
-            n_left = len(_LEFT_JOINTS)
-            left_pos = [float(p) for p in joint_positions[:n_left]]
-            right_pos = [
-                float(p) for p in joint_positions[n_left : n_left + len(_RIGHT_JOINTS)]
-            ]
-
-            self._transport.publish(
-                apply_namespace(ARM_TOPICS["jtc_left"], self._namespace),
-                ARM_TOPICS["jtc_type"],
-                {
-                    "header": {"stamp": {"sec": 0, "nanosec": 0}, "frame_id": ""},
-                    "joint_names": _LEFT_JOINTS,
-                    "points": [{**point, "positions": left_pos}],
-                },
-            )
-            self._transport.publish(
-                apply_namespace(ARM_TOPICS["jtc_right"], self._namespace),
-                ARM_TOPICS["jtc_type"],
-                {
-                    "header": {"stamp": {"sec": 0, "nanosec": 0}, "frame_id": ""},
-                    "joint_names": _RIGHT_JOINTS,
-                    "points": [{**point, "positions": right_pos}],
-                },
-            )
-        else:
-            topic_key = "jtc_right" if group_name in _RIGHT_GROUPS else "jtc_left"
+        def _publish(topic_key: str, names: List[str], positions: List[float]) -> None:
             self._transport.publish(
                 apply_namespace(ARM_TOPICS[topic_key], self._namespace),
                 ARM_TOPICS["jtc_type"],
                 {
                     "header": {"stamp": {"sec": 0, "nanosec": 0}, "frame_id": ""},
-                    "joint_names": joint_names,
-                    "points": [point],
+                    "joint_names": names,
+                    "points": [{
+                        "positions": positions,
+                        "velocities": [],
+                        "accelerations": [],
+                        "time_from_start": {"sec": sec, "nanosec": nanosec},
+                    }],
                 },
             )
 
+        positions = [float(p) for p in joint_positions]
+
+        if group_name in _BOTH_GROUPS:
+            _publish("jtc_left",  _LEFT_JOINTS, positions[:len(_LEFT_JOINTS)])
+            _publish("jtc_right", _RIGHT_JOINTS, positions[len(_LEFT_JOINTS):len(_LEFT_JOINTS) + len(_RIGHT_JOINTS)])
+        elif group_name in ("left_arm", "left_arm_lift"):
+            _publish("jtc_left", _LEFT_JOINTS, positions[:len(_LEFT_JOINTS)])
+        elif group_name in ("right_arm", "right_arm_lift"):
+            _publish("jtc_right", _RIGHT_JOINTS, positions[:len(_RIGHT_JOINTS)])
+        else:
+            print(f"[Arm] Unknown group '{group_name}' for JTC mode.")
+            return "FAILED"
+
         return "SUCCEEDED"
+
 
     # ── Action methods ────────────────────────────────────────────────────
 
