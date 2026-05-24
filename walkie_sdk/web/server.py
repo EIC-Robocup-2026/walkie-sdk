@@ -9,9 +9,52 @@ normally done from the browser, but ``--ip`` will auto-connect on startup.
 from __future__ import annotations
 
 import argparse
+import socket
 
 from walkie_sdk.web.app import create_app
 from walkie_sdk.web.state import session
+
+
+def _local_ips() -> list[str]:
+    """Best-effort list of this machine's LAN IPv4 addresses (no loopback)."""
+    ips: set[str] = set()
+
+    # Primary outbound IP (the one on the active default route). No packet is
+    # actually sent for a UDP socket; this just picks the source address.
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(("8.8.8.8", 80))
+            ips.add(s.getsockname()[0])
+        finally:
+            s.close()
+    except OSError:
+        pass
+
+    # Anything else resolvable from the hostname.
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ips.add(info[4][0])
+    except OSError:
+        pass
+
+    return sorted(ip for ip in ips if not ip.startswith("127."))
+
+
+def _print_urls(host: str, port: int) -> None:
+    """Print copy-pasteable URLs for reaching the dashboard."""
+    lines = [f"\nWalkie web interface listening on port {port}:",
+             f"  Local:   http://127.0.0.1:{port}"]
+    if host == "0.0.0.0":
+        lines += [
+            f"  Network: http://{ip}:{port}   ← share with others on the LAN"
+            for ip in _local_ips()
+        ]
+        lines.append("  (others must be on the same network; the API has no auth)")
+    elif host not in ("127.0.0.1", "localhost"):
+        lines.append(f"  Network: http://{host}:{port}")
+    # flush so the banner shows immediately even when stdout is redirected/piped.
+    print("\n".join(lines) + "\n", flush=True)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -56,7 +99,7 @@ def main(argv: list[str] | None = None) -> None:
             print("  Start the server anyway; connect from the browser.")
 
     app = create_app()
-    print(f"Walkie web interface → http://{args.host}:{args.port}")
+    _print_urls(args.host, args.port)
     uvicorn.run(app, host=args.host, port=args.port, reload=args.reload)
 
 
