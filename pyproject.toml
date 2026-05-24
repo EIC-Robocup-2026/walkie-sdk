@@ -32,6 +32,9 @@ dependencies = [
 Homepage = "https://github.com/EIC-Robocup-2026/walkie-sdk"
 Documentation = "https://github.com/EIC-Robocup-2026/walkie-sdk#readme"
 
+[project.scripts]
+walkie-web = "walkie_sdk.web.server:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -42,6 +45,12 @@ packages = ["walkie_sdk"]
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "fastapi>=0.110",
+    "httpx>=0.27",
+]
+web = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
 ]
 docs = [
     "mkdocs-material>=9.0",

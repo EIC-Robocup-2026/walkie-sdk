@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Walkie SDK — Control Panel</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">🤖 Walkie <span>Control Panel</span></div>
+    <div class="conn-pill" id="conn-pill">
+      <span class="dot" id="conn-dot"></span>
+      <span id="conn-label">Disconnected</span>
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- Connection -->
+    <section class="card" id="card-connection">
+      <h2>Connection</h2>
+      <div class="row">
+        <label>Robot IP</label>
+        <input id="ip" type="text" placeholder="192.168.1.100" value="192.168.1.100" />
+      </div>
+      <div class="row two">
+        <div>
+          <label>ROS protocol</label>
+          <select id="ros_protocol">
+            <option value="rosbridge">rosbridge</option>
+            <option value="zenoh">zenoh</option>
+            <option value="auto">auto</option>
+          </select>
+        </div>
+        <div>
+          <label>ROS port</label>
+          <input id="ros_port" type="number" value="9090" />
+        </div>
+      </div>
+      <div class="row two">
+        <div>
+          <label>Camera protocol</label>
+          <select id="camera_protocol">
+            <option value="zenoh">zenoh</option>
+            <option value="usb">usb</option>
+            <option value="none">none</option>
+          </select>
+        </div>
+        <div>
+          <label>Namespace</label>
+          <input id="namespace" type="text" placeholder="(none)" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="primary" id="btn-connect">Connect</button>
+        <button class="ghost" id="btn-disconnect">Disconnect</button>
+      </div>
+      <p class="hint" id="conn-error"></p>
+    </section>
+
+    <!-- Telemetry -->
+    <section class="card" id="card-telemetry">
+      <h2>Telemetry</h2>
+      <div class="stat-grid">
+        <div class="stat"><span>X</span><b id="t-x">—</b><small>m</small></div>
+        <div class="stat"><span>Y</span><b id="t-y">—</b><small>m</small></div>
+        <div class="stat"><span>Heading</span><b id="t-heading">—</b><small>rad</small></div>
+        <div class="stat"><span>Linear</span><b id="t-lin">—</b><small>m/s</small></div>
+        <div class="stat"><span>Angular</span><b id="t-ang">—</b><small>rad/s</small></div>
+        <div class="stat"><span>Nav</span><b id="t-nav">—</b><small>status</small></div>
+      </div>
+    </section>
+
+    <!-- Navigation -->
+    <section class="card" id="card-nav">
+      <h2>Navigation</h2>
+      <div class="row three">
+        <div><label>X (m)</label><input id="nav_x" type="number" step="0.1" value="0.0" /></div>
+        <div><label>Y (m)</label><input id="nav_y" type="number" step="0.1" value="0.0" /></div>
+        <div><label>Heading (rad)</label><input id="nav_h" type="number" step="0.1" value="0.0" /></div>
+      </div>
+      <div class="btn-row">
+        <button class="primary" id="btn-goto">Go To</button>
+        <button class="ghost" id="btn-cancel">Cancel</button>
+        <button class="danger" id="btn-stop">■ STOP</button>
+      </div>
+    </section>
+
+    <!-- Lift -->
+    <section class="card" id="card-lift">
+      <h2>Lift</h2>
+      <div class="lift-readout">
+        <b id="lift-norm">—</b><small> norm</small>
+        <span class="sep">/</span>
+        <b id="lift-cm">—</b><small> cm</small>
+      </div>
+      <input id="lift_slider" class="slider" type="range" min="0" max="1" step="0.01" value="0" />
+      <div class="row three">
+        <div><label>Target (0–1)</label><input id="lift_pos" type="number" step="0.01" min="0" max="1" value="0.5" /></div>
+        <div><label>Speed (cm/s)</label><input id="lift_speed" type="number" step="0.5" value="2.0" /></div>
+        <div><label>Accel (cm/s²)</label><input id="lift_accel" type="number" step="0.5" value="1.0" /></div>
+      </div>
+      <div class="btn-row">
+        <button class="primary" id="btn-lift">Move Lift</button>
+        <span class="tag" id="lift-status"></span>
+      </div>
+    </section>
+
+    <!-- Arm + Gripper -->
+    <section class="card" id="card-arm">
+      <h2>Arm &amp; Gripper</h2>
+      <div class="row two">
+        <div>
+          <label>Group</label>
+          <select id="arm_group">
+            <option value="left_arm">left_arm</option>
+            <option value="right_arm">right_arm</option>
+          </select>
+        </div>
+        <div>
+          <label>Mode</label>
+          <select id="arm_mode">
+            <option value="">(default)</option>
+            <option value="custom_ik">custom_ik</option>
+            <option value="moveit">moveit</option>
+          </select>
+        </div>
+      </div>
+      <div class="row three">
+        <div><label>X</label><input id="arm_x" type="number" step="0.01" value="0.3" /></div>
+        <div><label>Y</label><input id="arm_y" type="number" step="0.01" value="0.0" /></div>
+        <div><label>Z</label><input id="arm_z" type="number" step="0.01" value="0.2" /></div>
+      </div>
+      <div class="row three">
+        <div><label>Roll</label><input id="arm_roll" type="number" step="0.05" value="0.0" /></div>
+        <div><label>Pitch</label><input id="arm_pitch" type="number" step="0.05" value="0.0" /></div>
+        <div><label>Yaw</label><input id="arm_yaw" type="number" step="0.05" value="0.0" /></div>
+      </div>
+      <div class="btn-row">
+        <button class="primary" id="btn-arm-pose">Go To Pose</button>
+        <button class="ghost" id="btn-arm-home">Home</button>
+      </div>
+      <hr />
+      <div class="row two">
+        <div>
+          <label>Gripper group</label>
+          <select id="grip_group">
+            <option value="left_gripper">left_gripper</option>
+            <option value="right_gripper">right_gripper</option>
+          </select>
+        </div>
+        <div><label>Position</label><input id="grip_pos" type="number" step="0.1" value="0.7" /></div>
+      </div>
+      <div class="btn-row">
+        <button class="ghost" id="btn-grip-open">Open</button>
+        <button class="ghost" id="btn-grip-close">Close</button>
+        <button class="primary" id="btn-grip-set">Set</button>
+      </div>
+    </section>
+
+    <!-- Camera -->
+    <section class="card wide" id="card-camera">
+      <h2>Camera</h2>
+      <div class="cam-controls">
+        <select id="cam_name"><option value="head">head</option></select>
+        <button class="ghost" id="btn-cam-start">Start stream</button>
+        <button class="ghost" id="btn-cam-stop">Stop</button>
+        <button class="ghost" id="btn-cam-snap">Snapshot</button>
+      </div>
+      <div class="cam-view">
+        <img id="cam-img" alt="camera feed" />
+        <div class="cam-placeholder" id="cam-placeholder">No stream</div>
+      </div>
+    </section>
+  </main>
+
+  <div class="toast" id="toast"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
