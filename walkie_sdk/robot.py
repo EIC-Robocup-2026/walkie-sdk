@@ -22,6 +22,7 @@ from walkie_sdk.core.interfaces import (
 )
 from walkie_sdk.modules.arm import Arm
 from walkie_sdk.modules.camera import Camera
+from walkie_sdk.modules.head import Head
 from walkie_sdk.modules.lift import Lift
 from walkie_sdk.modules.multi_camera import MultiCamera
 from walkie_sdk.modules.navigation import Navigation
@@ -175,6 +176,9 @@ class WalkieRobot:
         # Lift module
         self._lift = Lift(self._transport, namespace=namespace)
 
+        # Head tilt module
+        self._head = Head(self._transport, namespace=namespace)
+
         # Auto-connect
         self._connect()
 
@@ -324,6 +328,26 @@ class WalkieRobot:
             ```
         """
         return self._lift
+
+    @property
+    def head(self) -> Head:
+        """
+        Head tilt controller.
+
+        Provides:
+        - tilt(angle_rad): Set tilt angle in radians (positive = camera down)
+        - get_angle(): Get last commanded tilt angle, or None if not yet set
+
+        Safe range: ±π/4 rad (±45°). Values outside this range raise ValueError.
+
+        Example:
+            ```python
+            bot.head.tilt(0.5)      # tilt camera 0.5 rad downward
+            bot.head.tilt(0.0)      # look forward
+            bot.head.get_angle()    # returns 0.0
+            ```
+        """
+        return self._head
 
     @property
     def tools(self) -> Tools:
@@ -478,6 +502,7 @@ class WalkieRobot:
         self._arm.namespace = value
         self._lift.namespace = value
         self._viz.namespace = value
+        self._head.namespace = value
 
     @property
     def is_connected(self) -> bool:

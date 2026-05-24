@@ -22,6 +22,7 @@ from walkie_sdk.core.factory import (
     ROSProtocol,
     TransportFactory,
 )
+from walkie_sdk.modules.head import Head, HEAD_TILT_MIN, HEAD_TILT_MAX
 from walkie_sdk.modules.lift import Lift
 from walkie_sdk.modules.visualization import (
     ARROW,
@@ -52,6 +53,10 @@ __all__ = [
     "ROSProtocol",
     "CameraProtocol",
     "TransportFactory",
+    # Head module
+    "Head",
+    "HEAD_TILT_MIN",
+    "HEAD_TILT_MAX",
     # Lift module
     "Lift",
     # Visualization

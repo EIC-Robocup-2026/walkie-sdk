@@ -79,6 +79,12 @@ LIFT_TOPICS = {
     "states_type": os.getenv("WALKIE_LIFT_STATES_TYPE",  "sensor_msgs/msg/JointState"),
 }
 
+# ── Head Topics ────────────────────────────────────────────────
+HEAD_TOPICS = {
+    "cmd":      os.getenv("WALKIE_HEAD_CMD",      "head_servo_controller/commands"),
+    "cmd_type": os.getenv("WALKIE_HEAD_CMD_TYPE", "std_msgs/msg/Float64MultiArray"),
+}
+
 ROS_DOMAIN_ID = int(os.getenv("WALKIE_ROS_DOMAIN_ID", "23"))
 
 def load_config(yaml_path: str):
@@ -107,6 +113,7 @@ def load_config(yaml_path: str):
         if "VIZ_TOPICS" in config: VIZ_TOPICS.update(config["VIZ_TOPICS"])
         if "OB_POSE_SERVICE" in config: OB_POSE_SERVICE.update(config["OB_POSE_SERVICE"])
         if "LIFT_TOPICS" in config: LIFT_TOPICS.update(config["LIFT_TOPICS"])
+        if "HEAD_TOPICS" in config: HEAD_TOPICS.update(config["HEAD_TOPICS"])
         
         print(f"[Walkie SDK] Loaded custom topics from '{yaml_path}'")
 
