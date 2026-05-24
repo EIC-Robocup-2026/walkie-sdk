@@ -95,7 +95,11 @@ class ROSBridgeTransport(ROSTransportInterface[roslibpy.Topic]):
             start_time = time.time()
             while not self._ros.is_connected:
                 if time.time() - start_time > self._timeout:
-                    self._ros.terminate()
+                    # close() (not terminate()) so the process-wide Twisted
+                    # reactor keeps running — terminate() stops it permanently
+                    # (ReactorNotRestartable), which would poison every later
+                    # connect attempt in a long-lived process (e.g. the web server).
+                    self._ros.close()
                     self._ros = None
                     raise ConnectionError(
                         f"Connection timeout after {self._timeout}s. "
@@ -114,10 +118,17 @@ class ROSBridgeTransport(ROSTransportInterface[roslibpy.Topic]):
             ) from e
 
     def disconnect(self) -> None:
-        """Disconnect from the ROSBridge server."""
+        """Disconnect from the ROSBridge server.
+
+        Uses ``close()`` rather than ``terminate()`` so the process-wide Twisted
+        reactor stays alive and the client can reconnect later. ``terminate()``
+        stops the reactor for good (ReactorNotRestartable on the next connect),
+        which breaks reconnect in long-lived processes like the web server.
+        The reactor runs on a daemon thread, so it never blocks process exit.
+        """
         if self._ros is not None:
             try:
-                self._ros.terminate()
+                self._ros.close()
             except Exception:
                 pass
             self._ros = None
