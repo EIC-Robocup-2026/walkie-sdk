@@ -22,7 +22,6 @@ from walkie_sdk.core.factory import (
     ROSProtocol,
     TransportFactory,
 )
-from walkie_sdk.modules.arm import ArmControlMode
 from walkie_sdk.modules.lift import Lift
 from walkie_sdk.modules.visualization import (
     ARROW,
@@ -53,8 +52,6 @@ __all__ = [
     "ROSProtocol",
     "CameraProtocol",
     "TransportFactory",
-    # Arm control mode enum
-    "ArmControlMode",
     # Lift module
     "Lift",
     # Visualization

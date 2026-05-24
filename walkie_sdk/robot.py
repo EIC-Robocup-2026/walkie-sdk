@@ -20,7 +20,7 @@ from walkie_sdk.core.interfaces import (
     CameraTransportInterface,
     ROSTransportInterface,
 )
-from walkie_sdk.modules.arm import Arm, ArmControlMode
+from walkie_sdk.modules.arm import Arm
 from walkie_sdk.modules.camera import Camera
 from walkie_sdk.modules.lift import Lift
 from walkie_sdk.modules.multi_camera import MultiCamera
@@ -96,8 +96,6 @@ class WalkieRobot:
         camera_port: int = 7447,
         timeout: float = 10.0,
         namespace: str = "",
-        arm_mode: str = "custom_ik",
-        arm_target_pose_topic: str = "/target_pose",
         config_path: str = None,
         # Legacy parameters for backward compatibility
         ws_port: Optional[int] = None,
@@ -158,12 +156,7 @@ class WalkieRobot:
         # Initialize modules with transport interface (not specific implementation)
         self._nav = Navigation(self._transport, namespace=namespace)
         self._status = Telemetry(self._transport, namespace=namespace)
-        self._arm = Arm(
-            self._transport,
-            namespace=namespace,
-            default_mode=ArmControlMode(arm_mode),
-            target_pose_topic=arm_target_pose_topic,
-        )
+        self._arm = Arm(self._transport, namespace=namespace)
         self._camera: Optional[Camera] = (
             Camera(self._camera_transport) if self._camera_transport else None
         )
