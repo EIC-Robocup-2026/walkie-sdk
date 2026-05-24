@@ -7,6 +7,8 @@ good — ReactorNotRestartable — and breaks every later connect in a long-live
 process such as the web server).
 """
 
+import pytest
+
 from walkie_sdk.core.transports.rosbridge.transport import ROSBridgeTransport
 
 
@@ -47,3 +49,13 @@ def test_disconnect_is_idempotent():
 def test_is_connected_false_when_no_ros():
     t = ROSBridgeTransport(host="10.0.0.1", port=9090)
     assert t.is_connected is False
+
+
+def test_connect_unreachable_fails_fast_without_starting_reactor():
+    # Port 1 refuses immediately. The TCP pre-check must raise ConnectionError
+    # and never create a roslibpy.Ros — so a bad address can't start (and then
+    # poison) the process-wide Twisted reactor for later connects.
+    t = ROSBridgeTransport(host="127.0.0.1", port=1, timeout=2)
+    with pytest.raises(ConnectionError):
+        t.connect()
+    assert t._ros is None
