@@ -1,11 +1,14 @@
 """Head module — controls the robot's head servo tilt angle."""
 
 import math
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from walkie_sdk.config.ros_topics import HEAD_TOPICS
 from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.namespace import apply_namespace
+
+if TYPE_CHECKING:
+    from walkie_sdk.modules.joint_state_hub import JointStateHub
 
 HEAD_TILT_MIN: float = -math.pi / 4  # -0.785 rad  (45° upward)
 HEAD_TILT_MAX: float = math.pi / 4   #  0.785 rad  (45° downward)
@@ -31,9 +34,15 @@ class Head:
         ```
     """
 
-    def __init__(self, transport: ROSTransportInterface, namespace: str = "") -> None:
+    def __init__(
+        self,
+        transport: ROSTransportInterface,
+        namespace: str = "",
+        joint_state_hub: "JointStateHub" = None,
+    ) -> None:
         self._transport = transport
         self._namespace = namespace
+        self._joint_state_hub = joint_state_hub
         self._angle: Optional[float] = None
 
     # ------------------------------------------------------------------
@@ -66,7 +75,17 @@ class Head:
         self._angle = angle_rad
 
     def get_angle(self) -> Optional[float]:
-        """Return the last commanded tilt angle in radians, or None if never set."""
+        """
+        Return the current tilt angle in radians from the robot's joint state.
+
+        Reads from the shared JointStateHub (joint name: ``head_servo_joint``).
+        Falls back to the last commanded angle if the hub has no data yet,
+        or None if the joint has never been commanded.
+        """
+        if self._joint_state_hub is not None:
+            hub_val = self._joint_state_hub.get(HEAD_TOPICS["state_joint"])
+            if hub_val is not None:
+                return hub_val
         return self._angle
 
     # ------------------------------------------------------------------
