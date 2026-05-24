@@ -10,35 +10,63 @@ from __future__ import annotations
 
 import argparse
 import socket
+import subprocess
 
 from walkie_sdk.web.app import create_app
 from walkie_sdk.web.state import session
 
+# Virtual / container interfaces whose addresses outsiders can't reach.
+_SKIP_IFACE_PREFIXES = (
+    "lo", "docker", "br-", "veth", "virbr", "vmnet", "tun", "tap", "zt", "wg",
+)
+
 
 def _local_ips() -> list[str]:
-    """Best-effort list of this machine's LAN IPv4 addresses (no loopback)."""
-    ips: set[str] = set()
+    """
+    Best-effort list of this machine's *externally reachable* LAN IPv4 addresses.
 
-    # Primary outbound IP (the one on the active default route). No packet is
-    # actually sent for a UDP socket; this just picks the source address.
+    Enumerates every network interface (via the Linux ``ip`` command) and keeps
+    real ones only — so a machine bridging two networks (e.g. internet on Wi-Fi
+    plus a separate robot LAN on Ethernet) lists *both* addresses, not just the
+    default-route one. Loopback and virtual/container interfaces (docker, bridges,
+    VPNs…) are skipped because peers can't connect to those.
+
+    Falls back to the default-route source address if ``ip`` is unavailable
+    (e.g. non-Linux hosts).
+    """
+    ips: list[str] = []
+
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        out = subprocess.run(
+            ["ip", "-4", "-o", "addr", "show", "scope", "global"],
+            capture_output=True, text=True, timeout=2,
+        ).stdout
+        for line in out.splitlines():
+            # e.g. "2: wlp1s0    inet 10.0.0.201/24 brd ... scope global ..."
+            parts = line.split()
+            if len(parts) < 4 or parts[1].startswith(_SKIP_IFACE_PREFIXES):
+                continue
+            for i, tok in enumerate(parts):
+                if tok == "inet" and i + 1 < len(parts):
+                    ips.append(parts[i + 1].split("/")[0])
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+    if not ips:
+        # Fallback: primary outbound IP (default route only). No packet is sent
+        # for a UDP socket; this just picks the source address.
         try:
-            s.connect(("8.8.8.8", 80))
-            ips.add(s.getsockname()[0])
-        finally:
-            s.close()
-    except OSError:
-        pass
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            try:
+                s.connect(("8.8.8.8", 80))
+                ips.append(s.getsockname()[0])
+            finally:
+                s.close()
+        except OSError:
+            pass
 
-    # Anything else resolvable from the hostname.
-    try:
-        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
-            ips.add(info[4][0])
-    except OSError:
-        pass
-
-    return sorted(ip for ip in ips if not ip.startswith("127."))
+    # De-dupe (preserve order), drop loopback.
+    return list(dict.fromkeys(ip for ip in ips if not ip.startswith("127.")))
 
 
 def _print_urls(host: str, port: int) -> None:
@@ -46,11 +74,15 @@ def _print_urls(host: str, port: int) -> None:
     lines = [f"\nWalkie web interface listening on port {port}:",
              f"  Local:   http://127.0.0.1:{port}"]
     if host == "0.0.0.0":
-        lines += [
-            f"  Network: http://{ip}:{port}   ← share with others on the LAN"
-            for ip in _local_ips()
-        ]
-        lines.append("  (others must be on the same network; the API has no auth)")
+        ips = _local_ips()
+        lines += [f"  Network: http://{ip}:{port}" for ip in ips]
+        if not ips:
+            lines.append("  (could not detect a LAN IP — check `ip -4 addr`)")
+        elif len(ips) == 1:
+            lines.append("  ↳ share the Network URL with others (the API has no auth)")
+        else:
+            lines.append("  ↳ share the URL on the SAME network as the other machine "
+                         "(the API has no auth)")
     elif host not in ("127.0.0.1", "localhost"):
         lines.append(f"  Network: http://{host}:{port}")
     # flush so the banner shows immediately even when stdout is redirected/piped.
