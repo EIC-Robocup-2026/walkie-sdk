@@ -3,11 +3,11 @@ Lift - Robot lift/elevator control module.
 
 Provides set() and get() for controlling the linear lift actuator.
 
-Command topic:  lift/cmd          (std_msgs/msg/Float64MultiArray)
-                data: [target_pos_cm, vel_cm_s, accel_cm_s2]
+Command topic: lift/cmd  (std_msgs/msg/Float64MultiArray)
+               data: [target_pos_cm, vel_cm_s, accel_cm_s2]
 
-Feedback topic: lift/joint_states (sensor_msgs/msg/JointState)
-                position[0] in meters
+Position feedback is read from the shared JointStateHub via the
+``lift_joint`` entry in joint_states (position in meters).
 
 Travel range: 0.0 cm (bottom) → 74.35 cm (top)
 Normalized:   0.0              → 1.0
@@ -15,11 +15,14 @@ Normalized:   0.0              → 1.0
 
 import threading
 import time
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.namespace import apply_namespace
 from walkie_sdk.config.ros_topics import LIFT_TOPICS
+
+if TYPE_CHECKING:
+    from walkie_sdk.modules.joint_state_hub import JointStateHub
 
 LIFT_MAX_CM = 74.35
 LIFT_DEFAULT_SPEED = 2.0
@@ -41,33 +44,16 @@ class Lift:
         namespace: ROS namespace prefix for topics (default: "" = no namespace)
     """
 
-    def __init__(self, transport: ROSTransportInterface, namespace: str = ""):
+    def __init__(
+        self,
+        transport: ROSTransportInterface,
+        namespace: str = "",
+        joint_state_hub: "JointStateHub" = None,
+    ):
         self._transport = transport
         self._namespace = namespace
-        self._lock = threading.Lock()
-        self._latest_pos_m: Optional[float] = None
-        self._subscribed = False
+        self._joint_state_hub = joint_state_hub
         self._status: Optional[str] = None
-
-    def _setup_state_subscription(self) -> None:
-        """Subscribe to lift joint states. Called after transport connects."""
-        if self._subscribed:
-            return
-
-        def _cb(msg: dict) -> None:
-            positions = msg.get("position", [])
-            if positions:
-                with self._lock:
-                    self._latest_pos_m = float(positions[0])
-
-        try:
-            topic = apply_namespace(LIFT_TOPICS["states"], self._namespace)
-            print(f"[Lift] Subscribing to topic: '{topic}'")
-            self._transport.subscribe(topic, LIFT_TOPICS["states_type"], _cb)
-            self._subscribed = True
-            print(f"[Lift] Successfully subscribed to '{topic}'")
-        except Exception as e:
-            print(f"[Lift] Failed to subscribe to lift joint states: {e}")
 
     @property
     def namespace(self) -> str:
@@ -76,20 +62,12 @@ class Lift:
 
     @namespace.setter
     def namespace(self, value: str) -> None:
-        """Set ROS namespace and re-subscribe with the new prefix."""
         self._namespace = value
-        self._subscribed = False
-        self._setup_state_subscription()
 
     @property
     def cmd_topic(self) -> str:
         """Full lift command topic name with namespace."""
         return apply_namespace(LIFT_TOPICS["cmd"], self._namespace)
-
-    @property
-    def states_topic(self) -> str:
-        """Full lift joint states topic name with namespace."""
-        return apply_namespace(LIFT_TOPICS["states"], self._namespace)
 
     @property
     def status(self) -> Optional[str]:
@@ -200,9 +178,10 @@ class Lift:
             bot.lift.get(norm_pos=False) # e.g. 37.175  (cm)
             ```
         """
-        with self._lock:
-            pos_m = self._latest_pos_m
+        if self._joint_state_hub is None:
+            return None
 
+        pos_m = self._joint_state_hub.get("lift_joint")
         if pos_m is None:
             return None
 

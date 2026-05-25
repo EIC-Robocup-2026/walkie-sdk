@@ -71,12 +71,25 @@ OB_POSE_SERVICE = {
     "service_type": os.getenv("WALKIE_OB_POSE_SERVICE_TYPE", "perception/srv/GetObPose"),
 }
 
+# ── Joint State Topics (shared hub) ───────────────────────────
+JOINT_STATE_TOPICS = {
+    "states":      os.getenv("WALKIE_JOINT_STATES",      "joint_states"),
+    "states_type": os.getenv("WALKIE_JOINT_STATES_TYPE", "sensor_msgs/msg/JointState"),
+}
+
 # ── Lift Topics ────────────────────────────────────────────────
 LIFT_TOPICS = {
     "cmd":         os.getenv("WALKIE_LIFT_CMD",          "lift/cmd"),
     "cmd_type":    os.getenv("WALKIE_LIFT_CMD_TYPE",     "std_msgs/msg/Float64MultiArray"),
     "states":      os.getenv("WALKIE_LIFT_STATES",       "lift/joint_states"),
     "states_type": os.getenv("WALKIE_LIFT_STATES_TYPE",  "sensor_msgs/msg/JointState"),
+}
+
+# ── Head Topics ────────────────────────────────────────────────
+HEAD_TOPICS = {
+    "cmd":         os.getenv("WALKIE_HEAD_CMD",          "head_servo_controller/commands"),
+    "cmd_type":    os.getenv("WALKIE_HEAD_CMD_TYPE",     "std_msgs/msg/Float64MultiArray"),
+    "state_joint": os.getenv("WALKIE_HEAD_STATE_JOINT",  "head_servo_joint"),
 }
 
 ROS_DOMAIN_ID = int(os.getenv("WALKIE_ROS_DOMAIN_ID", "23"))
@@ -107,6 +120,8 @@ def load_config(yaml_path: str):
         if "VIZ_TOPICS" in config: VIZ_TOPICS.update(config["VIZ_TOPICS"])
         if "OB_POSE_SERVICE" in config: OB_POSE_SERVICE.update(config["OB_POSE_SERVICE"])
         if "LIFT_TOPICS" in config: LIFT_TOPICS.update(config["LIFT_TOPICS"])
+        if "HEAD_TOPICS" in config: HEAD_TOPICS.update(config["HEAD_TOPICS"])
+        if "JOINT_STATE_TOPICS" in config: JOINT_STATE_TOPICS.update(config["JOINT_STATE_TOPICS"])
         
         print(f"[Walkie SDK] Loaded custom topics from '{yaml_path}'")
 

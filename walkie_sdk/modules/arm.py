@@ -15,11 +15,14 @@ Direct JTC streaming (via transport.publish):
 """
 
 import threading
-from typing import Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from walkie_sdk.config.ros_topics import ARM_ACTIONS, ARM_SERVICES, ARM_TOPICS
 from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.namespace import apply_namespace
+
+if TYPE_CHECKING:
+    from walkie_sdk.modules.joint_state_hub import JointStateHub
 
 # Joint name mapping for JTC direct streaming.
 # Lengths must match the group DOF expected by set_joint_position.
@@ -108,54 +111,21 @@ class Arm:
     Args:
         transport: Transport instance implementing ROSTransportInterface
         namespace: ROS namespace prefix for topics/actions (default: "" = no namespace)
+        joint_state_hub: Shared hub that owns the joint_states subscription.
     """
-
-    DEBUG_SUBSCRIBE = False
-    DEBUG_INTERVAL = 100
 
     def __init__(
         self,
         transport: ROSTransportInterface,
         namespace: str = "",
+        joint_state_hub: "JointStateHub" = None,
     ):
         self._transport = transport
         self._namespace = namespace
-        self._states_lock = threading.Lock()
-        self._latest_states: Optional[Dict[str, Any]] = None
-        self._subscribed = False
-        self._msg_count = 0
+        self._joint_state_hub = joint_state_hub
 
         self.left = ArmGroup(self, "left_arm_lift", gripper_name="left_gripper")
         self.right = ArmGroup(self, "right_arm_lift", gripper_name="right_gripper")
-
-    # ── Subscription setup ─────────────────────────────────────────────────
-
-    def _setup_state_subscription(self) -> None:
-        """Subscribe to joint_states topic. Called after transport connects."""
-        if self._subscribed:
-            return
-
-        def _cb(msg: Dict) -> None:
-            self._msg_count += 1
-            if self.DEBUG_SUBSCRIBE and self._msg_count % self.DEBUG_INTERVAL == 0:
-                names = msg.get("name", [])
-                positions = msg.get("position", [])
-                print(
-                    f"[Arm] #{self._msg_count} | joints={len(names)} | pos[0:3]={positions[:3] if positions else 'N/A'}"
-                )
-            elif self.DEBUG_SUBSCRIBE and self._msg_count == 1:
-                print(f"[Arm] First message received! Keys: {list(msg.keys())}")
-            with self._states_lock:
-                self._latest_states = msg
-
-        try:
-            topic = apply_namespace(ARM_TOPICS["states"], self._namespace)
-            print(f"[Arm] Subscribing to topic: '{topic}'")
-            self._transport.subscribe(topic, ARM_TOPICS["states_type"], _cb)
-            self._subscribed = True
-            print(f"[Arm] Successfully subscribed to '{topic}'")
-        except Exception as e:
-            print(f"[Arm] Failed to subscribe to joint states: {e}")
 
     # ── Properties ────────────────────────────────────────────────────────
 
@@ -166,8 +136,6 @@ class Arm:
     @namespace.setter
     def namespace(self, value: str) -> None:
         self._namespace = value
-        self._subscribed = False
-        self._setup_state_subscription()
 
     # ── Internal helpers ──────────────────────────────────────────────────
 
@@ -587,84 +555,73 @@ class Arm:
 
     def get_joint_states(self) -> Optional[Dict[str, Any]]:
         """
-        Get latest joint states from the continuous topic subscription.
+        Get latest joint states from the shared JointStateHub.
 
-        Returns the most recently received joint_states message parsed into
-        left_arm, right_arm, and gripper fields. Returns None if no data
-        has been received yet.
+        Returns the most recently received data parsed into left_arm, right_arm,
+        and gripper fields. Returns None if the hub has no data yet.
 
         For a one-shot per-group query, use get_joint_states_service() instead.
 
         Returns:
             Dict with "left_arm", "right_arm", "left_gripper", "right_gripper", or None.
         """
-        with self._states_lock:
-            if self._latest_states is None:
-                return None
-            try:
-                msg = self._latest_states
-                names = msg.get("name", [])
-                positions = msg.get("position", [])
-                velocities = msg.get("velocity", [])
-                efforts = msg.get("effort", [])
+        if self._joint_state_hub is None:
+            return None
 
-                left_pos, left_vel, left_torque = [], [], []
-                right_pos, right_vel, right_torque = [], [], []
-                left_gripper = None
-                right_gripper = None
+        all_joints = self._joint_state_hub.get_all()
+        if not all_joints:
+            return None
 
-                for i, name in enumerate(names):
-                    if name.startswith("openarm_left_joint") or name.startswith(
-                        "left_joint"
-                    ):
-                        idx = int(name.split("joint")[-1]) - 1
-                        if idx < 7:
-                            while len(left_pos) <= idx:
-                                left_pos.append(0.0)
-                                left_vel.append(0.0)
-                                left_torque.append(0.0)
-                            if i < len(positions):
-                                left_pos[idx] = positions[i]
-                            if i < len(velocities):
-                                left_vel[idx] = velocities[i]
-                            if i < len(efforts):
-                                left_torque[idx] = efforts[i]
-                    elif name.startswith("openarm_right_joint") or name.startswith(
-                        "right_joint"
-                    ):
-                        idx = int(name.split("joint")[-1]) - 1
-                        if idx < 7:
-                            while len(right_pos) <= idx:
-                                right_pos.append(0.0)
-                                right_vel.append(0.0)
-                                right_torque.append(0.0)
-                            if i < len(positions):
-                                right_pos[idx] = positions[i]
-                            if i < len(velocities):
-                                right_vel[idx] = velocities[i]
-                            if i < len(efforts):
-                                right_torque[idx] = efforts[i]
-                    elif "left_gripper" in name or "left_finger" in name:
-                        if i < len(positions):
-                            left_gripper = positions[i]
-                    elif "right_gripper" in name or "right_finger" in name:
-                        if i < len(positions):
-                            right_gripper = positions[i]
+        try:
+            left_pos, left_vel, left_torque = [], [], []
+            right_pos, right_vel, right_torque = [], [], []
+            left_gripper = None
+            right_gripper = None
 
-                return {
-                    "left_arm": {
-                        "positions": left_pos[:7],
-                        "velocities": left_vel[:7],
-                        "torques": left_torque[:7],
-                    },
-                    "right_arm": {
-                        "positions": right_pos[:7],
-                        "velocities": right_vel[:7],
-                        "torques": right_torque[:7],
-                    },
-                    "left_gripper": left_gripper,
-                    "right_gripper": right_gripper,
-                }
-            except Exception as e:
-                print(f"[Arm] Error parsing joint states: {e}")
-                return None
+            for name, data in all_joints.items():
+                pos    = data["position"]
+                vel    = data["velocity"]
+                effort = data["effort"]
+
+                if name.startswith("openarm_left_joint") or name.startswith("left_joint"):
+                    idx = int(name.split("joint")[-1]) - 1
+                    if idx < 7:
+                        while len(left_pos) <= idx:
+                            left_pos.append(0.0)
+                            left_vel.append(0.0)
+                            left_torque.append(0.0)
+                        left_pos[idx]    = pos
+                        left_vel[idx]    = vel
+                        left_torque[idx] = effort
+                elif name.startswith("openarm_right_joint") or name.startswith("right_joint"):
+                    idx = int(name.split("joint")[-1]) - 1
+                    if idx < 7:
+                        while len(right_pos) <= idx:
+                            right_pos.append(0.0)
+                            right_vel.append(0.0)
+                            right_torque.append(0.0)
+                        right_pos[idx]    = pos
+                        right_vel[idx]    = vel
+                        right_torque[idx] = effort
+                elif "left_gripper" in name or "left_finger" in name:
+                    left_gripper = pos
+                elif "right_gripper" in name or "right_finger" in name:
+                    right_gripper = pos
+
+            return {
+                "left_arm": {
+                    "positions":  left_pos[:7],
+                    "velocities": left_vel[:7],
+                    "torques":    left_torque[:7],
+                },
+                "right_arm": {
+                    "positions":  right_pos[:7],
+                    "velocities": right_vel[:7],
+                    "torques":    right_torque[:7],
+                },
+                "left_gripper":  left_gripper,
+                "right_gripper": right_gripper,
+            }
+        except Exception as e:
+            print(f"[Arm] Error parsing joint states: {e}")
+            return None
