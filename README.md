@@ -126,7 +126,7 @@ with WalkieRobot(ip="192.168.1.100") as bot:
 
 Prefer clicking buttons over typing Python? Install the optional `web` extra and
 run a browser dashboard that drives the SDK — connection, telemetry, navigation,
-lift, arm/gripper, and a live camera feed.
+lift, arm/gripper, head tilt, joint states, and a live camera feed.
 
 ```bash
 uv sync --extra web                 # or: uv pip install "walkie-sdk[web]"
@@ -141,8 +141,60 @@ it over `/api/*` (Swagger docs at `/docs`); the browser is just a remote control
 See the [Web Interface guide](docs/guides/web-interface.md) for the full route
 list and flags.
 
-> **Heads up:** the API has no auth. Keep the default `--host 127.0.0.1` unless
-> you're on a trusted network.
+### Sharing it on your network (LAN / public IP)
+
+By default `walkie-web` binds to `127.0.0.1`, so only the same machine can open
+the dashboard. To let phones, tablets, or teammates on the same network reach
+it, bind to **all interfaces** with `--host 0.0.0.0`:
+
+```bash
+walkie-web --host 0.0.0.0 --port 8080
+```
+
+On startup the server prints every LAN URL it can reach, e.g.:
+
+```
+Walkie web interface listening on port 8080:
+  Local:   http://127.0.0.1:8080
+  Network: http://10.0.0.201:8080
+  Network: http://192.168.1.42:8080
+  ↳ share the URL on the SAME network as the other machine (the API has no auth)
+```
+
+Open one of the `Network` URLs from any device on the same Wi-Fi / LAN.
+
+If a remote device can't connect:
+
+- **Firewall** — allow inbound TCP on the port. On Ubuntu: `sudo ufw allow 8080/tcp`.
+- **Wi-Fi isolation** — some guest / hotel networks block peer-to-peer traffic;
+  use a wired link or a phone hotspot instead.
+- **Correct interface** — pick the URL that matches the network the *other*
+  device is on (e.g. the Ethernet IP if the robot is on Ethernet but your laptop
+  is on Wi-Fi, both URLs are printed).
+
+### Exposing it over the public internet
+
+There is **no built-in auth**, so do *not* port-forward `walkie-web` directly.
+If you really need access from outside the LAN, tunnel it through something
+that adds auth or short-lived URLs:
+
+```bash
+# Cloudflare quick tunnel — no account needed, ephemeral https URL
+cloudflared tunnel --url http://localhost:8080
+
+# ngrok — free tier prints a random *.ngrok.io URL
+ngrok http 8080
+
+# Plain SSH reverse tunnel from a server you already own
+ssh -R 8080:localhost:8080 user@your-public-host
+```
+
+Keep the tunnel running only while you're using it, and treat the URL as a key
+— anyone with it can drive the robot.
+
+> **Heads up:** the API has no auth. Keep the default `--host 127.0.0.1` for
+> local-only use, and only switch to `--host 0.0.0.0` when you intentionally
+> want to share access with the rest of your LAN.
 
 ## Server Requirements
 

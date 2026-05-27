@@ -105,7 +105,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--camera-protocol", default="zenoh")
     parser.add_argument("--camera-port", type=int, default=7447)
     parser.add_argument("--namespace", default="")
-    parser.add_argument("--arm-mode", default="custom_ik")
     return parser
 
 
@@ -123,7 +122,6 @@ def main(argv: list[str] | None = None) -> None:
                 camera_protocol=args.camera_protocol,
                 camera_port=args.camera_port,
                 namespace=args.namespace,
-                arm_mode=args.arm_mode,
             )
             print(f"✓ Auto-connected to robot at {args.ip}")
         except Exception as e:
