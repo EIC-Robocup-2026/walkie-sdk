@@ -20,8 +20,10 @@ from walkie_sdk.core.interfaces import (
     CameraTransportInterface,
     ROSTransportInterface,
 )
-from walkie_sdk.modules.arm import Arm, ArmControlMode
+from walkie_sdk.modules.arm import Arm
 from walkie_sdk.modules.camera import Camera
+from walkie_sdk.modules.head import Head
+from walkie_sdk.modules.joint_state_hub import JointStateHub
 from walkie_sdk.modules.lift import Lift
 from walkie_sdk.modules.multi_camera import MultiCamera
 from walkie_sdk.modules.navigation import Navigation
@@ -96,8 +98,6 @@ class WalkieRobot:
         camera_port: int = 7447,
         timeout: float = 10.0,
         namespace: str = "",
-        arm_mode: str = "custom_ik",
-        arm_target_pose_topic: str = "/target_pose",
         config_path: str = None,
         # Legacy parameters for backward compatibility
         ws_port: Optional[int] = None,
@@ -155,15 +155,13 @@ class WalkieRobot:
             )
         )
 
+        # Shared joint state hub — one subscription for all modules
+        self._joints = JointStateHub(self._transport, namespace=namespace)
+
         # Initialize modules with transport interface (not specific implementation)
         self._nav = Navigation(self._transport, namespace=namespace)
         self._status = Telemetry(self._transport, namespace=namespace)
-        self._arm = Arm(
-            self._transport,
-            namespace=namespace,
-            default_mode=ArmControlMode(arm_mode),
-            target_pose_topic=arm_target_pose_topic,
-        )
+        self._arm = Arm(self._transport, namespace=namespace, joint_state_hub=self._joints)
         self._camera: Optional[Camera] = (
             Camera(self._camera_transport) if self._camera_transport else None
         )
@@ -180,7 +178,10 @@ class WalkieRobot:
         self._viz = Visualization(self._transport, namespace=namespace)
 
         # Lift module
-        self._lift = Lift(self._transport, namespace=namespace)
+        self._lift = Lift(self._transport, namespace=namespace, joint_state_hub=self._joints)
+
+        # Head tilt module
+        self._head = Head(self._transport, namespace=namespace, joint_state_hub=self._joints)
 
         # Auto-connect
         self._connect()
@@ -199,11 +200,8 @@ class WalkieRobot:
         # Start telemetry subscription
         self._status.start()
 
-        # Setup arm subscription (must be done after transport is connected)
-        self._arm._setup_state_subscription()
-
-        # Setup lift subscription
-        self._lift._setup_state_subscription()
+        # Single joint_states subscription shared by Arm, Lift, and Head
+        self._joints._setup_subscription()
 
         # Connect camera if enabled
         if self._camera_transport is not None:
@@ -331,6 +329,49 @@ class WalkieRobot:
             ```
         """
         return self._lift
+
+    @property
+    def head(self) -> Head:
+        """
+        Head tilt controller.
+
+        Provides:
+        - tilt(angle_rad): Set tilt angle in radians (positive = camera down)
+        - get_angle(): Get last commanded tilt angle, or None if not yet set
+
+        Safe range: ±π/4 rad (±45°). Values outside this range raise ValueError.
+
+        Example:
+            ```python
+            bot.head.tilt(0.5)      # tilt camera 0.5 rad downward
+            bot.head.tilt(0.0)      # look forward
+            bot.head.get_angle()    # returns 0.0
+            ```
+        """
+        return self._head
+
+    @property
+    def joints(self) -> JointStateHub:
+        """
+        Shared joint state hub.
+
+        Single source of truth for all joint positions, velocities, and efforts.
+        Backed by one subscription to the joint_states topic.
+
+        Provides:
+        - get(joint_name): Current position of a joint (rad or m)
+        - get_velocity(joint_name): Current velocity
+        - get_effort(joint_name): Current effort
+        - get_all(): Full snapshot as {name: {position, velocity, effort}}
+
+        Example:
+            ```python
+            bot.joints.get("head_servo_joint")   # head tilt in rad
+            bot.joints.get("lift_joint")         # lift height in m
+            bot.joints.get_all()                 # all joints
+            ```
+        """
+        return self._joints
 
     @property
     def tools(self) -> Tools:
@@ -482,9 +523,11 @@ class WalkieRobot:
         self._namespace = value
         self._nav.namespace = value
         self._status.namespace = value
+        self._joints.namespace = value
         self._arm.namespace = value
         self._lift.namespace = value
         self._viz.namespace = value
+        self._head.namespace = value
 
     @property
     def is_connected(self) -> bool:

@@ -8,8 +8,10 @@ These modules are protocol-agnostic and work with any transport
 implementation (rosbridge, zenoh) via abstract interfaces.
 """
 
-from walkie_sdk.modules.arm import Arm, ArmControlMode
+from walkie_sdk.modules.arm import Arm
 from walkie_sdk.modules.camera import Camera
+from walkie_sdk.modules.head import Head
+from walkie_sdk.modules.joint_state_hub import JointStateHub
 from walkie_sdk.modules.lift import Lift
 from walkie_sdk.modules.navigation import Navigation
 from walkie_sdk.modules.telemetry import Telemetry
@@ -20,9 +22,10 @@ __all__ = [
     "Navigation",
     "Telemetry",
     "Camera",
+    "Head",
+    "JointStateHub",
     "Lift",
     "Tools",
     "Arm",
-    "ArmControlMode",
     "Visualization",
 ]

@@ -7,16 +7,26 @@ CAMERA_TOPICS:
   default: "walkie/camera/image"
 
 ARM_TOPICS:
-  commands: "walkie/arm/commands"
   states: "joint_states"
-  target_pose: "/target_pose"
-  commands_type: "sensor_msgs/msg/JointState"
   states_type: "sensor_msgs/msg/JointState"
-  target_pose_type: "geometry_msgs/msg/PoseStamped"
+  jtc_left: "left_joint_trajectory_controller/joint_trajectory"
+  jtc_right: "right_joint_trajectory_controller/joint_trajectory"
+  jtc_type: "trajectory_msgs/msg/JointTrajectory"
 
 ARM_ACTIONS:
   interface: "my_robot_interfaces/action"
-  move_group: "moveit_msgs/action/MoveGroup"
+  go_to_pose: "go_to_pose"
+  go_to_pose_quat: "go_to_pose_quat"
+  go_to_pose_relative: "go_to_pose_relative"
+  go_to_home: "go_to_home"
+  control_gripper: "control_gripper"
+  set_joint_position: "set_joint_position"
+
+ARM_SERVICES:
+  get_ee_pose: "get_ee_pose"
+  get_ee_pose_type: "my_robot_interfaces/srv/GetEEPose"
+  get_joint_states: "get_joint_states"
+  get_joint_states_type: "my_robot_interfaces/srv/GetJointStates"
 
 NAV_TOPICS:
   cmd_vel: "cmd_vel"
