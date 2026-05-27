@@ -68,6 +68,7 @@ nav:
     - Camera Setup: guides/cameras.md
     - Arm Control: guides/arm-control.md
     - Visualization: guides/visualization.md
+    - Web Interface: guides/web-interface.md
   - API Reference:
     - WalkieRobot: api/robot.md
     - Navigation: api/navigation.md

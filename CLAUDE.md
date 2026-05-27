@@ -2,65 +2,69 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## What this is
+
+`walkie_sdk` is a **pure-Python client SDK** for controlling Walkie robots (EIC Robocup 2026). It wraps ROS 2 communication into plain function calls so that **no ROS 2 installation is required on the client machine** — communication goes over rosbridge (WebSocket) or Zenoh. The robot side runs ROS 2 (Nav2, MoveIt, rosbridge_server, perception services).
+
 ## Commands
 
+This project uses **uv**. The first `uv run`/`uv sync` will create `.venv` and install dependencies from `uv.lock`.
+
 ```bash
-# Install dependencies
-uv sync
+uv sync                          # install all deps into .venv
+uv run pytest                    # run the unit test suite (tests/unit only, see pytest config)
+uv run pytest -q                 # quiet
+uv run pytest tests/unit/test_lift.py::TestLift::test_set   # run a single test
+uv run pytest -k namespace       # run tests matching a keyword
 
-# Run unit tests (tests/unit/ only — no robot required)
-uv run pytest
-
-# Run a single test file
-uv run pytest tests/unit/test_lift.py
-
-# Run a single test
-uv run pytest tests/unit/test_lift.py::TestLiftBlocking::test_blocking_returns_succeeded_when_position_reached
-
-# Build and preview documentation locally
-uv pip install -e ".[docs]"
-mkdocs serve
+uv pip install -e ".[docs]"      # install docs extras
+mkdocs serve                     # preview docs site locally at :8000
 ```
 
-The `tests/` root contains integration/hardware tests (`test_call_action.py`, `test_lift.py`, etc.) that require a real robot; only `tests/unit/` runs without hardware. `pyproject.toml` points pytest's `testpaths` to `tests/unit`.
+`pyproject.toml` pins `testpaths = ["tests/unit"]`, so a bare `pytest` only runs the offline unit tests. The other scripts under `tests/` (e.g. `tests/test_lift.py`, `tests/test_tools_bbox.py`, `tests/test_call_action.py`) are **live-robot integration/interactive scripts**, not pytest cases — run them directly with `python tests/<name>.py --ip <robot-ip>` against a running robot. Likewise `examples/*.py` are runnable demos that connect to real hardware.
 
 ## Architecture
 
-`WalkieRobot` (`walkie_sdk/robot.py`) is the single entry point. On construction it:
-1. Creates a **ROS transport** via `TransportFactory` (rosbridge WebSocket or Zenoh DDS)
-2. Creates a **camera transport** via `TransportFactory` (Zenoh stream, USB OpenCV, or None)
-3. Instantiates all **modules** injected with the transport interface
-4. Auto-connects (`_connect()`)
+The design is a **three-layer transport abstraction** so that high-level modules never know which wire protocol is in use:
 
-### Transport layer (`walkie_sdk/core/`)
+```
+WalkieRobot (robot.py)          ← user-facing facade; exposes .nav .status .arm .lift .camera .cameras .viz .tools
+   │  holds one ROS transport + one camera transport, injects them into modules
+   ▼
+Modules (walkie_sdk/modules/)   ← Navigation, Telemetry, Arm, Lift, Camera, MultiCamera, Visualization, Tools
+   │  each takes a ROSTransportInterface in __init__ and calls publish/subscribe/call_action/call_service
+   ▼
+TransportFactory (core/factory.py) → ROSTransportInterface / CameraTransportInterface (core/interfaces/)
+   │  lazy-imports the concrete transport based on a protocol enum
+   ▼
+Transports (core/transports/)   ← rosbridge/ (roslibpy WebSocket), zenoh/ (DDS), usb/ (cv2/V4L2 camera)
+```
 
-All modules depend only on `ROSTransportInterface` / `CameraTransportInterface` (ABCs in `core/interfaces/`), never on concrete transports. This is the key seam for unit testing — modules are tested by injecting `MagicMock` transports.
+Key consequences when editing:
 
-- `TransportFactory` lazily imports only the requested transport to avoid pulling unused deps.
-- Protocol selection: `ROSProtocol` enum (`rosbridge`, `zenoh`, `auto`) and `CameraProtocol` enum (`zenoh`, `usb`, `none`).
-- Default ports: rosbridge → 9090, zenoh → 7447.
+- **Modules are protocol-agnostic.** A module must only depend on the abstract `ROSTransportInterface` (`core/interfaces/ros_transport.py`) — its `connect/disconnect/subscribe/publish/call_action/cancel_action/call_service` methods. Never import a concrete transport (`ROSBridgeTransport`, `ZenohTransport`) inside a module. To add robot capability, add a module + register it in `WalkieRobot.__init__`.
+- **The factory does lazy imports.** `TransportFactory.create_ros_transport` / `create_camera_transport` import the concrete class only inside the matching `if protocol == ...` branch, so installing one protocol's deps doesn't force the others. Add new protocols by extending the `ROSProtocol`/`CameraProtocol` enums and adding a branch.
+- **`ros_protocol="auto"`** tries zenoh then rosbridge (`_auto_detect_ros`).
+- **Connection lifecycle:** `WalkieRobot.__init__` constructs transports + modules, then calls `_connect()`, which connects the transport and then explicitly wires up subscriptions that require a live connection — `status.start()`, `arm._setup_state_subscription()`, `lift._setup_state_subscription()`. New stateful modules that subscribe must follow this two-phase pattern (construct in `__init__`, subscribe in `_connect`).
 
-### Modules (`walkie_sdk/modules/`)
+### Topic/type configuration (important)
 
-Each module receives a transport and a `namespace` string:
+All ROS topic names, message types, action types, and service names live in **`walkie_sdk/config/ros_topics.py`** as module-level dicts (`CAMERA_TOPICS`, `ARM_TOPICS`, `NAV_TOPICS`, `TELEMETRY_TOPICS`, `VIZ_TOPICS`, `LIFT_TOPICS`, `OB_POSE_SERVICE`, etc.). Each entry defaults to an env var (e.g. `WALKIE_ARM_COMMANDS`) falling back to a literal.
 
-| Module | `bot.*` | Purpose |
-|---|---|---|
-| `Navigation` | `bot.nav` | Nav2 action (`go_to`, `cancel`, `stop`) |
-| `Telemetry` | `bot.status` | Odometry subscription (`get_position`, `get_velocity`) |
-| `Arm` | `bot.arm` | Joint commands, MoveIt actions, custom IK publishing |
-| `Lift` | `bot.lift` | Linear actuator position (normalized 0–1 or cm 0–74.35) |
-| `Camera` | `bot.camera` | Single-camera frame access |
-| `MultiCamera` | `bot.cameras` | Named multi-camera frame access |
-| `Visualization` | `bot.viz` | RViz2 marker/pose publishing |
-| `Tools` | `bot.tools` | Utility helpers (e.g., 3D pose service) |
+- **Always read these via dict lookup at call time**, e.g. `ARM_TOPICS["commands"]`, never by binding a value to a local at import time. `load_config(yaml_path)` mutates these dicts **in place** (`.update(...)`) so that every module that imported the dict sees the new values. Binding `cmd = ARM_TOPICS["commands"]` at import would freeze the default and silently ignore YAML/env overrides. (This is why historical commits "read config dicts at runtime" and "use single quotes for dict keys inside f-strings in arm.py" exist.)
+- A YAML config (top-level `ros_topics.yaml`, or a custom path) is applied by passing `config_path=` to `WalkieRobot(...)`, which calls `load_config` before modules are built.
 
-### Topic/action configuration (`walkie_sdk/config/ros_topics.py`)
+### Namespacing
 
-All ROS topic and action names are centralized here as module-level dicts (`CAMERA_TOPICS`, `ARM_TOPICS`, `NAV_TOPICS`, etc.). They read from env vars (e.g., `WALKIE_NAV_CMD_VEL`) with hardcoded defaults as fallback.
+ROS namespaces are applied at call time via `apply_namespace(name, namespace)` (`utils/namespace.py`), which prefixes `name` with `namespace/` (slashes stripped) or returns `name` unchanged when namespace is empty. Topic/action names in config are stored **without leading slashes** so namespacing produces `robot1/joint_states`, not `//...`. Each module stores `self._namespace` and exposes namespaced topic names as `@property` getters (e.g. `Navigation.cmd_vel_topic`). Setting `WalkieRobot.namespace` fans the value out to all modules; arm/lift re-subscribe immediately, telemetry keeps its old subscription until restart.
 
-At runtime, `load_config(yaml_path)` updates these dicts **in-place** from a YAML file — this propagates to all already-imported modules because they reference the same dict objects. The root `ros_topics.yaml` is the default config file.
+### Conventions
 
-### Namespace handling (`walkie_sdk/utils/namespace.py`)
+- ROS messages are passed as **plain dicts** matching the ROS message structure (see `Navigation.go_to` building a `NavigateToPose` goal). Geometry conversions (Euler↔quaternion, bbox→DetectionArray, poses→arrays) live in `utils/converters.py`.
+- Blocking vs non-blocking: action-based calls (nav `go_to`, arm/lift moves) take a `blocking` flag. Non-blocking runs the `call_action` in a daemon thread and returns `"IN_PROGRESS"`. When publishing a command and then polling for completion, **publish synchronously first, then spawn the polling thread** (see lift commit history) to avoid races.
+- Modules degrade gracefully: camera connection failure disables `.camera` rather than aborting; service/action errors are caught and surfaced as `None`/`"FAILED"` return values, not exceptions, in the user-facing methods.
 
-`apply_namespace(name, namespace)` prepends a namespace prefix: `"odom"` + `"robot1"` → `"robot1/odom"`. Each module stores `_namespace` and exposes a `namespace` setter; setting `bot.namespace = "x"` propagates to all modules. Arm and Lift re-subscribe immediately on namespace change; Telemetry keeps the previous subscription until restart.
+## Testing notes
+
+- Unit tests (`tests/unit/`) are pure and offline — they exercise converters, namespace logic, imports, and module behavior with fakes/mocks. Keep new unit tests here so `pytest` stays runnable without a robot.
+- `requires-python = ">=3.11"`; `.python-version` pins 3.11.

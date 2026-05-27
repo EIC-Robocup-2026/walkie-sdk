@@ -7,6 +7,7 @@ It does not require ROS2 to be installed on the client machine.
 
 from __future__ import annotations
 
+import socket
 import threading
 import time
 from typing import Any, Callable, Dict, Optional
@@ -87,6 +88,15 @@ class ROSBridgeTransport(ROSTransportInterface[roslibpy.Topic]):
         """
         print(f"  → Connecting to ROSBridge at {self._host}:{self._port}...")
 
+        # Fast TCP reachability pre-check BEFORE touching roslibpy. roslibpy's
+        # run() starts a process-wide Twisted reactor; if that first connection
+        # fails (wrong IP, rosbridge down) the reactor is left in a poisoned
+        # state that makes every *later* connect in the same process time out
+        # too — fatal for a long-lived server. By failing here, on a plain
+        # socket, a bad address never starts the reactor, so a subsequent
+        # connect to the right IP still works.
+        self._precheck_reachable()
+
         try:
             self._ros = roslibpy.Ros(host=self._host, port=self._port)
             self._ros.run()
@@ -95,7 +105,11 @@ class ROSBridgeTransport(ROSTransportInterface[roslibpy.Topic]):
             start_time = time.time()
             while not self._ros.is_connected:
                 if time.time() - start_time > self._timeout:
-                    self._ros.terminate()
+                    # close() (not terminate()) so the process-wide Twisted
+                    # reactor keeps running — terminate() stops it permanently
+                    # (ReactorNotRestartable), which would poison every later
+                    # connect attempt in a long-lived process (e.g. the web server).
+                    self._ros.close()
                     self._ros = None
                     raise ConnectionError(
                         f"Connection timeout after {self._timeout}s. "
@@ -113,11 +127,33 @@ class ROSBridgeTransport(ROSTransportInterface[roslibpy.Topic]):
                 f"Failed to connect to ROSBridge at {self._host}:{self._port}: {e}"
             ) from e
 
+    def _precheck_reachable(self) -> None:
+        """Raise ConnectionError if the host:port can't be TCP-connected.
+
+        Keeps unreachable addresses away from roslibpy/Twisted (see connect()).
+        """
+        timeout = min(self._timeout, 5.0) if self._timeout else 5.0
+        try:
+            with socket.create_connection((self._host, self._port), timeout=timeout):
+                pass
+        except OSError as e:
+            raise ConnectionError(
+                f"Cannot reach ROSBridge at {self._host}:{self._port} ({e}). "
+                f"Check the robot IP and that rosbridge_server is running."
+            ) from e
+
     def disconnect(self) -> None:
-        """Disconnect from the ROSBridge server."""
+        """Disconnect from the ROSBridge server.
+
+        Uses ``close()`` rather than ``terminate()`` so the process-wide Twisted
+        reactor stays alive and the client can reconnect later. ``terminate()``
+        stops the reactor for good (ReactorNotRestartable on the next connect),
+        which breaks reconnect in long-lived processes like the web server.
+        The reactor runs on a daemon thread, so it never blocks process exit.
+        """
         if self._ros is not None:
             try:
-                self._ros.terminate()
+                self._ros.close()
             except Exception:
                 pass
             self._ros = None

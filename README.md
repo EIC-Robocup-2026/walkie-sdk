@@ -122,6 +122,28 @@ with WalkieRobot(ip="192.168.1.100") as bot:
     # Auto-disconnects when exiting
 ```
 
+## Web Interface
+
+Prefer clicking buttons over typing Python? Install the optional `web` extra and
+run a browser dashboard that drives the SDK — connection, telemetry, navigation,
+lift, arm/gripper, and a live camera feed.
+
+```bash
+uv sync --extra web                 # or: uv pip install "walkie-sdk[web]"
+
+walkie-web --port 8080              # then open http://localhost:8080
+# auto-connect on startup:
+walkie-web --ip 192.168.1.100
+```
+
+A FastAPI server holds a single `WalkieRobot` connection server-side and exposes
+it over `/api/*` (Swagger docs at `/docs`); the browser is just a remote control.
+See the [Web Interface guide](docs/guides/web-interface.md) for the full route
+list and flags.
+
+> **Heads up:** the API has no auth. Keep the default `--host 127.0.0.1` unless
+> you're on a trusted network.
+
 ## Server Requirements
 
 The robot must run ROS 2 with the appropriate servers:
