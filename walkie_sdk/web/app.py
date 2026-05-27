@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Any, Callable, Dict
+from typing import Any, Dict
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
@@ -25,6 +25,8 @@ from walkie_sdk.web.state import session as default_session
 
 STATIC_DIR = Path(__file__).parent / "static"
 
+_GRIPPER_MAX_M = 0.04  # mirror walkie_sdk.modules.arm._GRIPPER_MAX_M
+
 
 def create_app(session: RobotSession | None = None) -> FastAPI:
     """
@@ -35,7 +37,7 @@ def create_app(session: RobotSession | None = None) -> FastAPI:
             tests inject a fake here.
     """
     session = session or default_session
-    app = FastAPI(title="Walkie SDK Web Interface", version="0.2.0")
+    app = FastAPI(title="Walkie SDK Web Interface", version="0.3.0")
 
     # ── Connection lifecycle ────────────────────────────────────────────
     @app.post("/api/connect")
@@ -105,7 +107,7 @@ def create_app(session: RobotSession | None = None) -> FastAPI:
             "status": robot.lift.status,
         }
 
-    # ── Arm + Gripper ───────────────────────────────────────────────────
+    # ── Arm ─────────────────────────────────────────────────────────────
     @app.post("/api/arm/pose")
     def arm_pose(req: models.ArmPoseRequest) -> Dict[str, Any]:
         robot = session.require()
@@ -117,43 +119,132 @@ def create_app(session: RobotSession | None = None) -> FastAPI:
             pitch=req.pitch,
             yaw=req.yaw,
             group_name=req.group_name,
+            frame_id=req.frame_id,
             cartesian_path=req.cartesian_path,
             blocking=req.blocking,
-            mode=req.mode,
+        )
+        return {"ok": True, "result": result}
+
+    @app.post("/api/arm/pose_quat")
+    def arm_pose_quat(req: models.ArmPoseQuatRequest) -> Dict[str, Any]:
+        robot = session.require()
+        result = robot.arm.go_to_pose_quat(
+            x=req.x,
+            y=req.y,
+            z=req.z,
+            qx=req.qx,
+            qy=req.qy,
+            qz=req.qz,
+            qw=req.qw,
+            group_name=req.group_name,
+            frame_id=req.frame_id,
+            cartesian_path=req.cartesian_path,
+            blocking=req.blocking,
+        )
+        return {"ok": True, "result": result}
+
+    @app.post("/api/arm/pose_relative")
+    def arm_pose_relative(req: models.ArmPoseRelativeRequest) -> Dict[str, Any]:
+        robot = session.require()
+        result = robot.arm.go_to_pose_relative(
+            x=req.x,
+            y=req.y,
+            z=req.z,
+            roll=req.roll,
+            pitch=req.pitch,
+            yaw=req.yaw,
+            group_name=req.group_name,
+            frame_id=req.frame_id,
+            cartesian_path=req.cartesian_path,
+            ee_frame=req.ee_frame,
+            blocking=req.blocking,
         )
         return {"ok": True, "result": result}
 
     @app.post("/api/arm/home")
     def arm_home(req: models.HomeRequest) -> Dict[str, Any]:
         robot = session.require()
-        return {"ok": True, "result": robot.arm.go_to_home(req.group_name)}
+        return {
+            "ok": True,
+            "result": robot.arm.go_to_home(
+                group_name=req.group_name, blocking=req.blocking
+            ),
+        }
 
     @app.post("/api/arm/gripper")
     def arm_gripper(req: models.GripperRequest) -> Dict[str, Any]:
         robot = session.require()
+        position_m = (
+            max(0.0, min(1.0, req.position)) * _GRIPPER_MAX_M
+            if req.norm
+            else req.position
+        )
         result = robot.arm.control_gripper(
             group_name=req.group_name,
-            position=req.position,
+            position=position_m,
+            blocking=req.blocking,
+        )
+        return {"ok": True, "result": result, "position_m": position_m}
+
+    @app.post("/api/arm/joints")
+    def arm_joints(req: models.ArmJointPositionRequest) -> Dict[str, Any]:
+        robot = session.require()
+        result = robot.arm.set_joint_position(
+            group_name=req.group_name,
+            joint_positions=req.joint_positions,
+            mode=req.mode,
+            duration=req.duration,
             blocking=req.blocking,
         )
         return {"ok": True, "result": result}
-
-    @app.post("/api/arm/joints")
-    def arm_joints(req: models.ArmJointsRequest) -> Dict[str, Any]:
-        robot = session.require()
-        ok = robot.arm.set_joint_positions(
-            left_arm=req.left_arm,
-            right_arm=req.right_arm,
-            left_gripper=req.left_gripper,
-            right_gripper=req.right_gripper,
-            blocking=req.blocking,
-        )
-        return {"ok": True, "result": ok}
 
     @app.get("/api/arm/states")
     def arm_states() -> Dict[str, Any]:
         robot = session.require()
         return {"ok": True, "states": robot.arm.get_joint_states()}
+
+    @app.post("/api/arm/ee_pose")
+    def arm_ee_pose(req: models.EePoseRequest) -> Dict[str, Any]:
+        robot = session.require()
+        pose = robot.arm.get_ee_pose(
+            group_name=req.group_name,
+            frame_id=req.frame_id,
+            timeout=req.timeout,
+        )
+        return {"ok": True, "pose": pose}
+
+    # ── Head ────────────────────────────────────────────────────────────
+    @app.post("/api/head/tilt")
+    def head_tilt(req: models.HeadTiltRequest) -> Dict[str, Any]:
+        robot = session.require()
+        try:
+            robot.head.tilt(req.angle_rad)
+        except ValueError as e:
+            return JSONResponse(
+                {"ok": False, "error": str(e)}, status_code=400
+            )
+        return {"ok": True, "angle_rad": req.angle_rad}
+
+    @app.get("/api/head")
+    def head_get() -> Dict[str, Any]:
+        robot = session.require()
+        return {"ok": True, "angle_rad": robot.head.get_angle()}
+
+    # ── Joints (shared hub) ─────────────────────────────────────────────
+    @app.get("/api/joints")
+    def joints_get() -> Dict[str, Any]:
+        robot = session.require()
+        return {"ok": True, "joints": robot.joints.get_all()}
+
+    @app.get("/api/joints/{name}")
+    def joints_get_one(name: str) -> Dict[str, Any]:
+        robot = session.require()
+        return {
+            "ok": True,
+            "position": robot.joints.get(name),
+            "velocity": robot.joints.get_velocity(name),
+            "effort": robot.joints.get_effort(name),
+        }
 
     # ── Camera ──────────────────────────────────────────────────────────
     @app.get("/api/camera/snapshot")

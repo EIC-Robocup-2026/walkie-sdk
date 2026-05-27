@@ -107,6 +107,9 @@ class RobotSession:
         out["lift"] = _safe(lambda: robot.lift.get(norm_pos=True))
         out["lift_cm"] = _safe(lambda: robot.lift.get(norm_pos=False))
         out["lift_status"] = _safe(lambda: robot.lift.status)
+        out["head_angle"] = _safe(lambda: robot.head.get_angle())
+        out["arm_states"] = _safe(lambda: robot.arm.get_joint_states())
+        out["joints_count"] = _safe(lambda: len(robot.joints.get_all()))
         out["camera_available"] = robot.camera is not None
         out["cameras"] = _safe(
             lambda: robot.cameras.camera_names if robot.cameras else []

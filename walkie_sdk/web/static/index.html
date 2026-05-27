@@ -68,6 +68,8 @@
         <div class="stat"><span>Linear</span><b id="t-lin">—</b><small>m/s</small></div>
         <div class="stat"><span>Angular</span><b id="t-ang">—</b><small>rad/s</small></div>
         <div class="stat"><span>Nav</span><b id="t-nav">—</b><small>status</small></div>
+        <div class="stat"><span>Head tilt</span><b id="t-head">—</b><small>rad</small></div>
+        <div class="stat"><span>Joints</span><b id="t-joints">—</b><small>count</small></div>
       </div>
     </section>
 
@@ -106,6 +108,31 @@
       </div>
     </section>
 
+    <!-- Head tilt -->
+    <section class="card" id="card-head">
+      <h2>Head Tilt</h2>
+      <div class="lift-readout">
+        <b id="head-angle">—</b><small> rad</small>
+        <span class="sep">/</span>
+        <b id="head-deg">—</b><small> °</small>
+      </div>
+      <input id="head_slider" class="slider" type="range" min="-0.785" max="0.785" step="0.01" value="0" />
+      <div class="row two">
+        <div><label>Angle (rad, ±π/4)</label><input id="head_rad" type="number" step="0.05" min="-0.785" max="0.785" value="0.0" /></div>
+        <div><label>Quick</label>
+          <div class="btn-row">
+            <button class="ghost" data-head="-0.5">Up</button>
+            <button class="ghost" data-head="0">Center</button>
+            <button class="ghost" data-head="0.5">Down</button>
+          </div>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="primary" id="btn-head-set">Tilt</button>
+      </div>
+      <p class="help">Positive angle tilts the camera downward. Range ±0.785 rad (±45°).</p>
+    </section>
+
     <!-- Arm + Gripper -->
     <section class="card" id="card-arm">
       <h2>Arm &amp; Gripper</h2>
@@ -115,15 +142,15 @@
           <select id="arm_group">
             <option value="left_arm">left_arm</option>
             <option value="right_arm">right_arm</option>
+            <option value="left_arm_lift" selected>left_arm_lift</option>
+            <option value="right_arm_lift">right_arm_lift</option>
+            <option value="both_arms">both_arms</option>
+            <option value="both_arms_lift">both_arms_lift</option>
           </select>
         </div>
         <div>
-          <label>Mode</label>
-          <select id="arm_mode">
-            <option value="">(default)</option>
-            <option value="custom_ik">custom_ik</option>
-            <option value="moveit">moveit</option>
-          </select>
+          <label>Frame</label>
+          <input id="arm_frame" type="text" value="base_footprint" />
         </div>
       </div>
       <div class="row three">
@@ -136,10 +163,17 @@
         <div><label>Pitch</label><input id="arm_pitch" type="number" step="0.05" value="0.0" /></div>
         <div><label>Yaw</label><input id="arm_yaw" type="number" step="0.05" value="0.0" /></div>
       </div>
+      <div class="row two">
+        <div><label><input id="arm_cartesian" type="checkbox" /> Cartesian path</label></div>
+        <div><label><input id="arm_ee_frame" type="checkbox" /> EE-frame (relative only)</label></div>
+      </div>
       <div class="btn-row">
         <button class="primary" id="btn-arm-pose">Go To Pose</button>
+        <button class="ghost" id="btn-arm-relative">Relative Move</button>
         <button class="ghost" id="btn-arm-home">Home</button>
+        <button class="ghost" id="btn-arm-ee">Read EE Pose</button>
       </div>
+      <pre id="arm-ee-readout" class="readout"></pre>
       <hr />
       <div class="row two">
         <div>
@@ -149,13 +183,23 @@
             <option value="right_gripper">right_gripper</option>
           </select>
         </div>
-        <div><label>Position</label><input id="grip_pos" type="number" step="0.1" value="0.7" /></div>
+        <div><label>Position (0–1, normalized)</label><input id="grip_pos" type="number" step="0.05" min="0" max="1" value="0.5" /></div>
       </div>
       <div class="btn-row">
         <button class="ghost" id="btn-grip-open">Open</button>
         <button class="ghost" id="btn-grip-close">Close</button>
         <button class="primary" id="btn-grip-set">Set</button>
       </div>
+    </section>
+
+    <!-- Joint state hub readout -->
+    <section class="card" id="card-joints">
+      <h2>Joint States</h2>
+      <div class="btn-row">
+        <button class="ghost" id="btn-joints-refresh">Refresh</button>
+        <span class="tag" id="joints-tag">—</span>
+      </div>
+      <pre id="joints-readout" class="readout"></pre>
     </section>
 
     <!-- Camera -->

@@ -224,9 +224,19 @@ def test_arm_pose(connected_client):
 
 def test_gripper(connected_client):
     client, session = connected_client
+    # Default norm=True maps 0.7 → 0.028 m (70% of 0.04 m).
     r = client.post("/api/arm/gripper", json={"position": 0.7})
     assert r.json()["result"] == "SUCCEEDED"
-    assert session._robot.arm.calls[-1][1]["position"] == 0.7
+    assert session._robot.arm.calls[-1][1]["position"] == pytest.approx(0.028)
+
+
+def test_gripper_raw_meters(connected_client):
+    client, session = connected_client
+    r = client.post(
+        "/api/arm/gripper", json={"position": 0.03, "norm": False}
+    )
+    assert r.json()["result"] == "SUCCEEDED"
+    assert session._robot.arm.calls[-1][1]["position"] == 0.03
 
 
 # ── Camera ──────────────────────────────────────────────────────────────

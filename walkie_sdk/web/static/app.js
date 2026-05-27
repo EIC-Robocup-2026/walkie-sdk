@@ -3,6 +3,7 @@
 // ── Tiny helpers ───────────────────────────────────────────────────────
 const $ = (id) => document.getElementById(id);
 const fmt = (v, d = 2) => (v === null || v === undefined ? "—" : Number(v).toFixed(d));
+const RAD2DEG = 180 / Math.PI;
 
 let toastTimer = null;
 function toast(msg, kind = "") {
@@ -101,34 +102,103 @@ $("btn-lift").onclick = action(
   "Lift command sent"
 );
 
-// ── Arm + Gripper ──────────────────────────────────────────────────────
-$("btn-arm-pose").onclick = action(
-  () => api("/api/arm/pose", {
+// ── Head tilt ──────────────────────────────────────────────────────────
+$("head_slider").oninput = (e) => ($("head_rad").value = e.target.value);
+$("head_rad").oninput = (e) => ($("head_slider").value = e.target.value);
+$("btn-head-set").onclick = action(
+  () => api("/api/head/tilt", {
     method: "POST",
-    body: {
-      x: +$("arm_x").value, y: +$("arm_y").value, z: +$("arm_z").value,
-      roll: +$("arm_roll").value, pitch: +$("arm_pitch").value, yaw: +$("arm_yaw").value,
-      group_name: $("arm_group").value,
-      mode: $("arm_mode").value || null,
-      blocking: false,
-    },
+    body: { angle_rad: +$("head_rad").value },
   }),
+  "Head tilt sent"
+);
+document.querySelectorAll("[data-head]").forEach((btn) => {
+  btn.onclick = action(async () => {
+    const v = +btn.dataset.head;
+    $("head_rad").value = v;
+    $("head_slider").value = v;
+    return api("/api/head/tilt", { method: "POST", body: { angle_rad: v } });
+  }, "Head tilt sent");
+});
+
+// ── Arm + Gripper ──────────────────────────────────────────────────────
+function armPoseBody() {
+  return {
+    x: +$("arm_x").value, y: +$("arm_y").value, z: +$("arm_z").value,
+    roll: +$("arm_roll").value, pitch: +$("arm_pitch").value, yaw: +$("arm_yaw").value,
+    group_name: $("arm_group").value,
+    frame_id: $("arm_frame").value.trim() || "base_footprint",
+    cartesian_path: $("arm_cartesian").checked,
+    blocking: false,
+  };
+}
+$("btn-arm-pose").onclick = action(
+  () => api("/api/arm/pose", { method: "POST", body: armPoseBody() }),
   "Arm pose sent"
 );
+$("btn-arm-relative").onclick = action(
+  () => api("/api/arm/pose_relative", {
+    method: "POST",
+    body: { ...armPoseBody(), ee_frame: $("arm_ee_frame").checked },
+  }),
+  "Relative move sent"
+);
 $("btn-arm-home").onclick = action(
-  () => api("/api/arm/home", { method: "POST", body: { group_name: $("arm_group").value } }),
+  () => api("/api/arm/home", {
+    method: "POST",
+    body: { group_name: $("arm_group").value, blocking: false },
+  }),
   "Homing arm"
 );
+$("btn-arm-ee").onclick = action(async () => {
+  const r = await api("/api/arm/ee_pose", {
+    method: "POST",
+    body: {
+      group_name: $("arm_group").value,
+      frame_id: $("arm_frame").value.trim() || "base_footprint",
+    },
+  });
+  $("arm-ee-readout").textContent = r.pose
+    ? JSON.stringify(r.pose, null, 2)
+    : "(no pose)";
+  return r;
+}, "EE pose read");
 
-function sendGripper(position) {
+function sendGripper(positionNorm) {
   return api("/api/arm/gripper", {
     method: "POST",
-    body: { group_name: $("grip_group").value, position, blocking: false },
+    body: {
+      group_name: $("grip_group").value,
+      position: positionNorm,
+      norm: true,
+      blocking: false,
+    },
   });
 }
-$("btn-grip-open").onclick = action(() => sendGripper(-15.71), "Gripper opening");
-$("btn-grip-close").onclick = action(() => sendGripper(0.7), "Gripper closing");
+$("btn-grip-open").onclick = action(() => {
+  $("grip_pos").value = 1.0;
+  return sendGripper(1.0);
+}, "Gripper opening");
+$("btn-grip-close").onclick = action(() => {
+  $("grip_pos").value = 0.0;
+  return sendGripper(0.0);
+}, "Gripper closing");
 $("btn-grip-set").onclick = action(() => sendGripper(+$("grip_pos").value), "Gripper set");
+
+// ── Joint states ───────────────────────────────────────────────────────
+$("btn-joints-refresh").onclick = action(async () => {
+  const r = await api("/api/joints");
+  const j = r.joints || {};
+  const names = Object.keys(j).sort();
+  $("joints-tag").textContent = `${names.length} joints`;
+  $("joints-readout").textContent = names
+    .map((n) => {
+      const d = j[n];
+      return `${n.padEnd(28)} pos=${fmt(d.position, 3)}  vel=${fmt(d.velocity, 3)}  eff=${fmt(d.effort, 3)}`;
+    })
+    .join("\n");
+  return r;
+}, "Joints refreshed");
 
 // ── Camera ─────────────────────────────────────────────────────────────
 function startStream() {
@@ -164,7 +234,7 @@ function applyStatus(s) {
     : "Disconnected";
 
   // Enable/disable control cards based on connection.
-  ["card-nav", "card-lift", "card-arm", "card-camera", "card-telemetry"].forEach((id) => {
+  ["card-nav", "card-lift", "card-arm", "card-camera", "card-telemetry", "card-head", "card-joints"].forEach((id) => {
     $(id).classList.toggle("disabled-area", !connected);
   });
 
@@ -176,12 +246,27 @@ function applyStatus(s) {
   $("t-lin").textContent = fmt(v.linear);
   $("t-ang").textContent = fmt(v.angular);
   $("t-nav").textContent = s.nav_status || "—";
+  $("t-head").textContent = fmt(s.head_angle);
+  $("t-joints").textContent = s.joints_count === null || s.joints_count === undefined ? "—" : s.joints_count;
 
   $("lift-norm").textContent = fmt(s.lift, 2);
   $("lift-cm").textContent = fmt(s.lift_cm, 1);
   $("lift-status").textContent = s.lift_status || "";
   if (s.lift !== null && s.lift !== undefined && document.activeElement !== $("lift_slider")) {
     $("lift_slider").value = s.lift;
+  }
+
+  // Head readout (sync slider only when user isn't dragging it).
+  $("head-angle").textContent = fmt(s.head_angle, 3);
+  $("head-deg").textContent = s.head_angle === null || s.head_angle === undefined
+    ? "—"
+    : (s.head_angle * RAD2DEG).toFixed(1);
+  if (
+    s.head_angle !== null && s.head_angle !== undefined &&
+    document.activeElement !== $("head_slider") &&
+    document.activeElement !== $("head_rad")
+  ) {
+    $("head_slider").value = s.head_angle;
   }
 
   // Refresh camera dropdown only when the set changes.
