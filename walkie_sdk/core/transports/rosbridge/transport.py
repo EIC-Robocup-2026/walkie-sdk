@@ -356,14 +356,23 @@ class ROSBridgeTransport(ROSTransportInterface[roslibpy.Topic]):
 
         result_event = threading.Event()
         result_data: Dict[str, Any] = {}
+        error_holder: Dict[str, Any] = {}
 
         def callback(response: Dict[str, Any]) -> None:
             result_data.update(response)
             result_event.set()
 
-        service.call(request_msg, callback)
+        def errback(error: Any) -> None:
+            error_holder["error"] = error
+            result_event.set()
+
+        service.call(request_msg, callback, errback=errback)
 
         if result_event.wait(timeout=timeout):
+            if "error" in error_holder:
+                raise RuntimeError(
+                    f"Service {service_name} failed: {error_holder['error']}"
+                )
             return result_data
         else:
             raise TimeoutError(f"Service {service_name} timed out after {timeout}s")

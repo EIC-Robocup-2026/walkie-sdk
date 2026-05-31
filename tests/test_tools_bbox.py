@@ -1,7 +1,7 @@
 """
 Integration test for Tools.bboxes_to_positions() against a live robot.
 
-Requires a running rosbridge server and the perception/srv/GetObPose service.
+Requires a running rosbridge server and the walkie_perception/srv/GetObPose service.
 
 With --viz, the returned 3D positions are published as RViz2 markers (a colored
 sphere + text label per detection) so you can SEE the result. Open RViz2, set

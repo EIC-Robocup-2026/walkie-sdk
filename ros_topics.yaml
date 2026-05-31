@@ -50,4 +50,4 @@ VIZ_TOPICS:
 
 OB_POSE_SERVICE:
   service_name: "get_3d_poses"
-  service_type: "perception/srv/GetObPose"
+  service_type: "walkie_perception/srv/GetObPose"

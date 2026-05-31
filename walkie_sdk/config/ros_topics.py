@@ -68,7 +68,7 @@ VIZ_TOPICS = {
 # ── Object Pose Service ────────────────────────────────────────
 OB_POSE_SERVICE = {
     "service_name": os.getenv("WALKIE_OB_POSE_SERVICE_NAME", "get_3d_poses"),
-    "service_type": os.getenv("WALKIE_OB_POSE_SERVICE_TYPE", "perception/srv/GetObPose"),
+    "service_type": os.getenv("WALKIE_OB_POSE_SERVICE_TYPE", "walkie_perception/srv/GetObPose"),
 }
 
 # ── Joint State Topics (shared hub) ───────────────────────────
@@ -127,3 +127,34 @@ def load_config(yaml_path: str):
 
     except Exception as e:
         print(f"[Walkie SDK] Failed to load config from '{yaml_path}': {e}")
+
+
+def _default_config_path():
+    """
+    Resolve the YAML config to auto-load on import, in priority order:
+      1. $WALKIE_CONFIG_PATH (explicit override)
+      2. ./ros_topics.yaml in the current working directory
+      3. ros_topics.yaml at the SDK repo root (two levels above this package)
+    Returns the first existing path, or None if no config file is found.
+    """
+    env_path = os.getenv("WALKIE_CONFIG_PATH")
+    if env_path:
+        return env_path
+
+    cwd_path = os.path.join(os.getcwd(), "ros_topics.yaml")
+    if os.path.isfile(cwd_path):
+        return cwd_path
+
+    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    repo_path = os.path.join(repo_root, "ros_topics.yaml")
+    if os.path.isfile(repo_path):
+        return repo_path
+
+    return None
+
+
+# Auto-load a default YAML config on import if one is present. An explicit
+# config_path passed to WalkieRobot(...) is applied afterwards and overrides this.
+_auto_config_path = _default_config_path()
+if _auto_config_path:
+    load_config(_auto_config_path)
