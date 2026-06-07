@@ -62,7 +62,12 @@ class JointStateHub:
                     "effort":   _safe(efforts[i]   if i < len(efforts)    else None),
                 }
             with self._lock:
-                self._data = data
+                # Merge per-joint rather than replacing the whole cache: the
+                # robot publishes joints (e.g. lift_joint, head_servo_joint)
+                # from separate publishers whose messages interleave, each
+                # carrying only its own joint. A full replacement would wipe
+                # out the other publisher's joint on every message.
+                self._data.update(data)
 
         try:
             topic = apply_namespace(JOINT_STATE_TOPICS["states"], self._namespace)

@@ -130,3 +130,45 @@ class TestHubGetAll:
         updated_msg["position"] = [0.0, 0.78, 0.5, 0.0]
         _fire_callback(hub, updated_msg)
         assert hub.get("head_servo_joint") == pytest.approx(0.78)
+
+
+class TestHubInterleavedPublishers:
+    """Separate publishers (lift, head) each emit only their own joint on the
+    shared topic. Messages interleave, and the cache must merge them rather than
+    replace — otherwise each message wipes out the other publisher's joint."""
+
+    _LIFT_ONLY = {
+        "name":     ["lift_joint"],
+        "position": [0.7435],
+        "velocity": [0.0],
+        "effort":   [0.0],
+    }
+    _HEAD_ONLY = {
+        "name":     ["head_servo_joint"],
+        "position": [0.42],
+        "velocity": [0.0],
+        "effort":   [0.0],
+    }
+
+    def test_both_joints_available_after_interleaved_messages(self):
+        hub, _ = _make_hub()
+        _fire_callback(hub, self._LIFT_ONLY)
+        _fire_callback(hub, self._HEAD_ONLY)
+        # Both must be present even though each arrived in its own message.
+        assert hub.get("lift_joint") == pytest.approx(0.7435)
+        assert hub.get("head_servo_joint") == pytest.approx(0.42)
+
+    def test_order_independent(self):
+        hub, _ = _make_hub()
+        _fire_callback(hub, self._HEAD_ONLY)
+        _fire_callback(hub, self._LIFT_ONLY)
+        assert hub.get("lift_joint") == pytest.approx(0.7435)
+        assert hub.get("head_servo_joint") == pytest.approx(0.42)
+
+    def test_repeated_single_publisher_keeps_other_joint(self):
+        hub, _ = _make_hub()
+        _fire_callback(hub, self._LIFT_ONLY)
+        _fire_callback(hub, self._HEAD_ONLY)
+        # Another lift-only message must not erase the cached head joint.
+        _fire_callback(hub, self._LIFT_ONLY)
+        assert hub.get("head_servo_joint") == pytest.approx(0.42)
