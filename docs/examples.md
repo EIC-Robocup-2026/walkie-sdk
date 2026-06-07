@@ -13,6 +13,7 @@ uv run python examples/<script_name>.py
 | Script | Description |
 |--------|-------------|
 | `example_camera.py` | Camera feed viewer with FPS overlay and snapshot saving |
+| `example_depth.py` | Depth stream (get_depth) with distance readout and colourised view |
 | `example_no_camera.py` | Navigation and telemetry without camera |
 | `example_protocols.py` | Protocol selection examples (rosbridge, zenoh, auto, mixed cameras) |
 | `example_visualization.py` | RViz2 marker, pose, and axis publishing |

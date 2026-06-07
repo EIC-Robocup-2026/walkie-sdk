@@ -6,6 +6,11 @@ CAMERA_TOPICS:
   right: "/walkie/camera/right"
   default: "walkie/camera/image"
 
+# Depth streams (sensor_msgs/msg/Image). Read via bot.camera.get_depth()
+# (zenoh camera streams these automatically). ZED head publishes 32FC1 (metres).
+DEPTH_TOPICS:
+  head: "/zed_head/zed_node/depth/depth_registered"
+
 ARM_TOPICS:
   states: "joint_states"
   states_type: "sensor_msgs/msg/JointState"

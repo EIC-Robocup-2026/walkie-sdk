@@ -83,6 +83,31 @@ class Camera:
         """
         return self._transport.get_frame()
 
+    def get_depth(self) -> Optional[np.ndarray]:
+        """
+        Get the latest depth frame.
+
+        Available with the zenoh camera transport, which streams depth
+        automatically. Returns the most recent depth image; does not block
+        waiting for a new one.
+
+        Returns:
+            Single-channel depth array in the topic's native units, or None if
+            depth is disabled/unsupported or no frame is available yet.
+            For the ZED head (``32FC1``) this is ``HxW`` float32 **metres**,
+            where invalid pixels are ``NaN``.
+
+        Example:
+            ```python
+            depth = bot.camera.get_depth()
+            if depth is not None:
+                # distance to the pixel at the image centre, in metres
+                h, w = depth.shape
+                print(depth[h // 2, w // 2])
+            ```
+        """
+        return self._transport.get_depth()
+
     def start(self) -> None:
         """
         Start the camera stream.

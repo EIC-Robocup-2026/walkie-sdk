@@ -12,6 +12,14 @@ CAMERA_TOPICS = {
     "default": os.getenv("WALKIE_CAM_DEFAULT", "walkie/camera/image"),
 }
 
+# ── Depth Camera Topics ────────────────────────────────────────
+# Raw depth streams (sensor_msgs/msg/Image). Keyed by the same camera names
+# as CAMERA_TOPICS so depth and color can be addressed alike. The ZED head
+# publishes 32FC1 (float32 metres, NaN = invalid) on depth_registered.
+DEPTH_TOPICS = {
+    "head": os.getenv("WALKIE_DEPTH_HEAD", "/zed_head/zed_node/depth/depth_registered"),
+}
+
 # ── Arm Topics ─────────────────────────────────────────────────
 ARM_TOPICS = {
     "states": os.getenv("WALKIE_ARM_STATES", "joint_states"),
@@ -111,6 +119,7 @@ def load_config(yaml_path: str):
             
         # Update dictionaries in-place so all imported references reflect the new YAML values
         if "CAMERA_TOPICS" in config: CAMERA_TOPICS.update(config["CAMERA_TOPICS"])
+        if "DEPTH_TOPICS" in config: DEPTH_TOPICS.update(config["DEPTH_TOPICS"])
         if "ARM_TOPICS" in config: ARM_TOPICS.update(config["ARM_TOPICS"])
         if "ARM_ACTIONS" in config: ARM_ACTIONS.update(config["ARM_ACTIONS"])
         if "ARM_SERVICES" in config: ARM_SERVICES.update(config["ARM_SERVICES"])

@@ -145,6 +145,41 @@ class MultiCamera:
         frame = self._transport.get_frame()
         return {"head": frame} if frame is not None else {}
 
+    def get_depth(self, camera_name: str = "head") -> Optional[np.ndarray]:
+        """
+        Get the latest depth frame from a specific camera.
+
+        Available with the zenoh camera transport, which streams depth automatically.
+
+        Args:
+            camera_name: Name of camera ("head", "left", or "right")
+
+        Returns:
+            Single-channel depth array in the topic's native units (float32
+            metres for the ZED head), or None if depth is disabled/unavailable.
+        """
+        if self._is_dict:
+            transport = self._transport.get(camera_name)
+            return transport.get_depth() if transport is not None else None
+        return self._transport.get_depth(camera_name)
+
+    def get_all_depth(self) -> Dict[str, np.ndarray]:
+        """
+        Get the latest depth frames from all cameras that have one.
+
+        Returns:
+            Dictionary mapping camera name to depth array. Empty if depth is
+            disabled/unavailable or no frames have arrived yet.
+        """
+        if self._is_dict:
+            depth = {}
+            for name, transport in self._transport.items():
+                frame = transport.get_depth()
+                if frame is not None:
+                    depth[name] = frame
+            return depth
+        return self._transport.get_all_depth()
+
     def get_frame_shape(
         self, camera_name: str = "head"
     ) -> Optional[Tuple[int, int, int]]:

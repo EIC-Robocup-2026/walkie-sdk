@@ -84,6 +84,36 @@ class CameraTransportInterface(ABC):
         """
         pass
 
+    def get_depth(self, camera_name: Optional[str] = None) -> Optional[np.ndarray]:
+        """
+        Get the latest depth frame.
+
+        Optional capability: transports without depth support (e.g. USB) keep
+        the default and return None. Depth-capable transports (e.g. ZenohCamera
+        with depth enabled) override this.
+
+        Args:
+            camera_name: Name of camera whose depth to return (default camera if None).
+
+        Returns:
+            Single-channel depth array in the topic's native units
+            (float32 metres for 32FC1, uint16 millimetres for 16UC1), or None
+            if depth is disabled or no frame is available yet.
+        """
+        return None
+
+    def get_all_depth(self) -> Dict[str, np.ndarray]:
+        """
+        Get the latest depth frames from all cameras that have one.
+
+        Optional capability mirroring get_depth(); defaults to empty.
+
+        Returns:
+            Dictionary mapping camera name to depth array. Empty if depth
+            is unsupported/disabled or no frames are available yet.
+        """
+        return {}
+
     def __enter__(self) -> "CameraTransportInterface":
         """Context manager entry - connect to camera."""
         self.connect()

@@ -34,7 +34,7 @@ except ImportError:
     cv2 = None
 
 from walkie_sdk.core.interfaces import CameraTransportInterface, ROSTransportInterface
-from walkie_sdk.config.ros_topics import CAMERA_TOPICS, ROS_DOMAIN_ID
+from walkie_sdk.config.ros_topics import CAMERA_TOPICS, DEPTH_TOPICS, ROS_DOMAIN_ID
 
 
 def _msg_to_dict(msg: Any) -> Dict[str, Any]:
@@ -296,6 +296,9 @@ class ZenohCamera(CameraTransportInterface):
         self._subscribers: Dict[str, ROS2Subscriber] = {}
 
         self._latest_frames: Dict[str, np.ndarray] = {}
+        # Depth frames are kept separate from color: they share camera-name keys
+        # but carry single-channel metric data (float32 metres / uint16 mm).
+        self._latest_depth: Dict[str, np.ndarray] = {}
         self._frame_lock = threading.Lock()
         self._streaming = False
 
@@ -347,6 +350,30 @@ class ZenohCamera(CameraTransportInterface):
                 router_port=self._port,
             )
 
+        # Depth streams. Subscribed under a "depth:" prefix so the callbacks /
+        # handles never collide with the color subscribers above.
+        depth_topics = DEPTH_TOPICS
+        if not self._multi_camera:
+            # Only the requested camera's depth, when it has a depth topic.
+            depth_topics = {
+                self._camera_name: DEPTH_TOPICS[self._camera_name]
+            } if self._camera_name in DEPTH_TOPICS else {}
+
+        for name, topic in depth_topics.items():
+            print(f"  → Subscribing to depth topic: {topic}")
+
+            def make_depth_cb(cam_id):
+                return lambda msg: self._on_depth(cam_id, msg)
+
+            self._subscribers[f"depth:{name}"] = ROS2Subscriber(
+                topic=topic,
+                msg_type="sensor_msgs/msg/Image",
+                domain_id=ROS_DOMAIN_ID,
+                callback=make_depth_cb(name),
+                router_ip=self._host,
+                router_port=self._port,
+            )
+
         self._streaming = True
         print("  ✓ Camera Stream Started")
 
@@ -358,6 +385,7 @@ class ZenohCamera(CameraTransportInterface):
 
         with self._frame_lock:
             self._latest_frames.clear()
+            self._latest_depth.clear()
 
     def _on_frame(self, name: str, msg: Any) -> None:
         """Handle raw sensor_msgs/msg/Image message."""
@@ -409,6 +437,45 @@ class ZenohCamera(CameraTransportInterface):
             # print(f"Frame decode error: {e}")
             pass
 
+    def _on_depth(self, name: str, msg: Any) -> None:
+        """Handle a raw sensor_msgs/msg/Image carrying single-channel depth.
+
+        Stores the frame in its native units (no conversion):
+          - 32FC1 / mono16-as-float -> float32, metres (NaN = invalid pixel)
+          - 16UC1  / mono16          -> uint16, millimetres
+        """
+        try:
+            height = getattr(msg, "height", None)
+            width = getattr(msg, "width", None)
+            encoding = getattr(msg, "encoding", "")
+            data = getattr(msg, "data", None)
+
+            if data is None or height is None or width is None:
+                return
+
+            # Normalize the byte representation (rosbags numpy vs list vs bytes)
+            if hasattr(data, "tobytes"):
+                data = data.tobytes()
+            elif isinstance(data, list):
+                data = bytes(data)
+            elif not isinstance(data, (bytes, bytearray)):
+                data = bytes(data)
+
+            if encoding == "32FC1":
+                depth = np.frombuffer(data, dtype=np.float32).reshape((height, width))
+            elif encoding in ("16UC1", "mono16"):
+                depth = np.frombuffer(data, dtype=np.uint16).reshape((height, width))
+            else:
+                print(f"Unsupported depth encoding '{encoding}' for camera '{name}'")
+                return
+
+            with self._frame_lock:
+                self._latest_depth[name] = depth
+
+        except Exception:
+            # Swallow decode errors -- get_depth() simply returns the last good frame.
+            pass
+
     def get_frame(self, camera_name: Optional[str] = None) -> Optional[np.ndarray]:
         target = camera_name or self._camera_name
         with self._frame_lock:
@@ -428,6 +495,19 @@ class ZenohCamera(CameraTransportInterface):
         with self._frame_lock:
             return {
                 k: v.copy() for k, v in self._latest_frames.items() if v is not None
+            }
+
+    def get_depth(self, camera_name: Optional[str] = None) -> Optional[np.ndarray]:
+        """Latest depth frame for a camera (None if depth disabled/unavailable)."""
+        target = camera_name or self._camera_name
+        with self._frame_lock:
+            depth = self._latest_depth.get(target)
+            return depth.copy() if depth is not None else None
+
+    def get_all_depth(self) -> Dict[str, np.ndarray]:
+        with self._frame_lock:
+            return {
+                k: v.copy() for k, v in self._latest_depth.items() if v is not None
             }
 
 

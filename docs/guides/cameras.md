@@ -169,3 +169,48 @@ All camera transports return frames in the same format:
 - **Returns `None`** when no frame is available yet
 
 Frames are always copies -- safe to modify without affecting the internal buffer.
+
+## Depth
+
+The ZED head camera also publishes a depth stream. It is streamed automatically
+by the **zenoh** camera transport, alongside the color frames -- just read it
+with `get_depth()`:
+
+```python
+bot = WalkieRobot(
+    ip="192.168.1.100",
+    ros_protocol="zenoh",
+    camera_protocol="zenoh",
+)
+
+depth = bot.camera.get_depth()  # or bot.cameras.get_depth("head")
+if depth is not None:
+    h, w = depth.shape
+    print(depth[h // 2, w // 2], "metres to the centre pixel")
+```
+
+### Depth Frame Format
+
+Depth is returned in the topic's **native units** (no conversion):
+
+| Source encoding | Dtype | Units | Invalid pixels |
+|-----------------|---------|-------------|----------------|
+| `32FC1` (ZED `depth_registered`, default) | `float32` | **metres** | `NaN` |
+| `16UC1` / `mono16` | `uint16` | **millimetres** | `0` |
+
+- **Shape:** `(height, width)` -- single channel, no color dimension.
+- **Returns `None`** when depth is disabled, unsupported (e.g. USB cameras),
+  or no frame has arrived yet.
+- Frames are copies -- safe to modify.
+
+!!! warning "Use NaN-aware math"
+    For the default `32FC1` stream, invalid/unmeasured pixels are `NaN`. Use
+    `np.isfinite(depth)` to mask them before reductions, e.g.
+    `depth[np.isfinite(depth)].min()`.
+
+The depth topic defaults to `/zed_head/zed_node/depth/depth_registered` and can
+be overridden via the `WALKIE_DEPTH_HEAD` env var, or the `DEPTH_TOPICS` block
+in a `ros_topics.yaml` config file.
+
+See [`examples/example_depth.py`](https://github.com/EIC-Robocup-2026/walkie-sdk/blob/main/examples/example_depth.py)
+for a runnable demo with a colourised live view.
