@@ -74,7 +74,7 @@ def main():
     print("  bot.nav.stop()")
 
     print("\n  Navigating to (1.0, 0.0)...")
-    result = bot.nav.go_to(x=1.0, y=0.0, heading=0.0, blocking=False)
+    result = bot.nav.go_to(x=1.0, y=0.0, heading=0.0, blocking=True)
     print(f"  Result: {result}")
 
     # 4. Monitor Loop

@@ -38,6 +38,12 @@ class Navigation:
         self._current_goal_id: Optional[str] = None
         self._goal_lock = threading.Lock()
         self._navigation_status: Optional[str] = None
+        self._distance_remaining: Optional[float] = None
+        self._number_of_recoveries: int = 0
+        self._current_pose: Optional[Dict[str, Any]] = None
+        self._final_distance_remaining: Optional[float] = None
+        self._nav_error_code: Optional[int] = None
+        self._nav_error_msg: Optional[str] = None
 
     @property
     def namespace(self) -> str:
@@ -67,6 +73,7 @@ class Navigation:
         blocking: bool = True,
         timeout: Optional[float] = None,
         feedback_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        goal_tolerance: Optional[float] = None,
     ) -> str:
         """
         Navigate to a target pose.
@@ -80,9 +87,11 @@ class Navigation:
             blocking: If True, wait for navigation to complete (default: True)
             timeout: Optional timeout in seconds (None = wait forever)
             feedback_callback: Optional callback for navigation feedback
+            goal_tolerance: If set (metres), a Nav2 FAILED result is promoted to
+                "CLOSE_ENOUGH" when the final distance_remaining ≤ this value.
 
         Returns:
-            Status string: "SUCCEEDED", "FAILED", "CANCELED", or "IN_PROGRESS"
+            Status string: "SUCCEEDED", "FAILED", "CANCELED", "CLOSE_ENOUGH", or "IN_PROGRESS"
 
         Raises:
             ConnectionError: If not connected to ROS
@@ -99,6 +108,14 @@ class Navigation:
         """
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
+
+        # Reset feedback state for new goal
+        self._distance_remaining = None
+        self._number_of_recoveries = 0
+        self._current_pose = None
+        self._final_distance_remaining = None
+        self._nav_error_code = None
+        self._nav_error_msg = None
 
         # Convert heading to quaternion (roll=0, pitch=0, yaw=heading)
         qx, qy, qz, qw = euler_to_quaternion(0.0, 0.0, heading)
@@ -119,19 +136,34 @@ class Navigation:
             self._navigation_status = "IN_PROGRESS"
             threading.Thread(
                 target=self._send_goal_async,
-                args=(goal_msg, feedback_callback),
+                args=(goal_msg, self._make_feedback_handler(feedback_callback), goal_tolerance),
                 daemon=True,
             ).start()
             return "IN_PROGRESS"
 
         # Blocking: send goal and wait for result
-        return self._send_goal_blocking(goal_msg, timeout, feedback_callback)
+        return self._send_goal_blocking(goal_msg, timeout, self._make_feedback_handler(feedback_callback), goal_tolerance)
+
+    def _make_feedback_handler(
+        self,
+        user_callback: Optional[Callable[[Dict[str, Any]], None]],
+    ) -> Callable[[Dict[str, Any]], None]:
+        """Wrap user callback to also update internal feedback state."""
+        def handler(feedback: Dict[str, Any]) -> None:
+            fb = feedback.get("feedback", feedback)  # unwrap rosbridge envelope
+            self._distance_remaining = fb.get("distance_remaining")
+            self._number_of_recoveries = fb.get("number_of_recoveries", 0)
+            self._current_pose = fb.get("current_pose")
+            if user_callback:
+                user_callback(feedback)
+        return handler
 
     def _send_goal_blocking(
         self,
         goal_msg: Dict[str, Any],
         timeout: Optional[float],
         feedback_callback: Optional[Callable[[Dict[str, Any]], None]],
+        goal_tolerance: Optional[float] = None,
     ) -> str:
         """Send goal and block until complete."""
         try:
@@ -143,11 +175,26 @@ class Navigation:
                 timeout=timeout,
             )
 
-            # Check result status
-            if result.get("status") == "SUCCEEDED":
+            nav_result = result.get("result") or {}
+            self._nav_error_code = nav_result.get("error_code")
+            self._nav_error_msg = nav_result.get("error_msg")
+            self._final_distance_remaining = self._distance_remaining
+
+            status = result.get("status")
+            if status == "SUCCEEDED":
                 self._navigation_status = "SUCCEEDED"
                 return "SUCCEEDED"
+            elif status == "CANCELED":
+                self._navigation_status = "CANCELED"
+                return "CANCELED"
             else:
+                if (
+                    goal_tolerance is not None
+                    and self._final_distance_remaining is not None
+                    and self._final_distance_remaining <= goal_tolerance
+                ):
+                    self._navigation_status = "CLOSE_ENOUGH"
+                    return "CLOSE_ENOUGH"
                 self._navigation_status = "FAILED"
                 return "FAILED"
 
@@ -163,6 +210,7 @@ class Navigation:
         self,
         goal_msg: Dict[str, Any],
         feedback_callback: Optional[Callable[[Dict[str, Any]], None]],
+        goal_tolerance: Optional[float] = None,
     ) -> None:
         """Send goal in background thread."""
         try:
@@ -174,10 +222,25 @@ class Navigation:
                 timeout=None,
             )
 
-            if result.get("status") == "SUCCEEDED":
+            nav_result = result.get("result") or {}
+            self._nav_error_code = nav_result.get("error_code")
+            self._nav_error_msg = nav_result.get("error_msg")
+            self._final_distance_remaining = self._distance_remaining
+
+            status = result.get("status")
+            if status == "SUCCEEDED":
                 self._navigation_status = "SUCCEEDED"
+            elif status == "CANCELED":
+                self._navigation_status = "CANCELED"
             else:
-                self._navigation_status = "FAILED"
+                if (
+                    goal_tolerance is not None
+                    and self._final_distance_remaining is not None
+                    and self._final_distance_remaining <= goal_tolerance
+                ):
+                    self._navigation_status = "CLOSE_ENOUGH"
+                else:
+                    self._navigation_status = "FAILED"
 
         except Exception:
             self._navigation_status = "FAILED"
@@ -258,3 +321,44 @@ class Navigation:
             True if navigation is in progress
         """
         return self._navigation_status == "IN_PROGRESS"
+
+    @property
+    def distance_remaining(self) -> Optional[float]:
+        """Distance remaining to the navigation goal in metres (from latest Nav2 feedback)."""
+        return self._distance_remaining
+
+    @property
+    def number_of_recoveries(self) -> int:
+        """Number of recovery behaviors triggered so far in the current navigation goal."""
+        return self._number_of_recoveries
+
+    @property
+    def current_pose(self) -> Optional[Dict[str, Any]]:
+        """Most recent robot pose reported by Nav2 feedback (PoseStamped as dict)."""
+        return self._current_pose
+
+    @property
+    def final_distance_remaining(self) -> Optional[float]:
+        """Distance to goal (metres) captured at the moment the last action ended."""
+        return self._final_distance_remaining
+
+    @property
+    def nav_error_code(self) -> Optional[int]:
+        """Nav2 error_code from the action result (None if not provided by the Nav2 version)."""
+        return self._nav_error_code
+
+    @property
+    def nav_error_msg(self) -> Optional[str]:
+        """Nav2 error_msg from the action result (None if not provided by the Nav2 version)."""
+        return self._nav_error_msg
+
+    @property
+    def last_result(self) -> Dict[str, Any]:
+        """Rich result dict from the last navigation action."""
+        return {
+            "status": self._navigation_status,
+            "final_distance": self._final_distance_remaining,
+            "error_code": self._nav_error_code,
+            "error_msg": self._nav_error_msg,
+            "recoveries": self._number_of_recoveries,
+        }

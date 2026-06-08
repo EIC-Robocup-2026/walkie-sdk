@@ -65,6 +65,17 @@ for name, frame in frames.items():
 result = bot.nav.go_to(x=2.0, y=1.0, heading=0.0)
 print(result)  # "SUCCEEDED" or "FAILED"
 
+# With goal tolerance -- treats "close enough" as acceptable
+result = bot.nav.go_to(x=3.0, y=2.0, heading=0.0, goal_tolerance=0.4)
+if result in ("SUCCEEDED", "CLOSE_ENOUGH"):
+    print("Reached goal")
+
+# Inspect why navigation failed
+if result == "FAILED":
+    print(bot.nav.nav_error_code)          # Nav2 error code (int)
+    print(bot.nav.nav_error_msg)           # Human-readable reason
+    print(bot.nav.final_distance_remaining)  # Metres from goal at abort
+
 # Non-blocking -- returns immediately
 bot.nav.go_to(x=5.0, y=3.0, heading=1.57, blocking=False)
 print(bot.nav.status)  # "IN_PROGRESS"
