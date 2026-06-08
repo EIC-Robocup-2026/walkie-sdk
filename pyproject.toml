@@ -62,3 +62,8 @@ yolo = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests/unit"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]

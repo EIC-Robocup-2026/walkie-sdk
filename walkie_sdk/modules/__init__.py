@@ -16,6 +16,7 @@ from walkie_sdk.modules.lift import Lift
 from walkie_sdk.modules.navigation import Navigation
 from walkie_sdk.modules.telemetry import Telemetry
 from walkie_sdk.modules.tools import Tools
+from walkie_sdk.modules.transform import Transform
 from walkie_sdk.modules.visualization import Visualization
 
 __all__ = [
@@ -26,6 +27,7 @@ __all__ = [
     "JointStateHub",
     "Lift",
     "Tools",
+    "Transform",
     "Arm",
     "Visualization",
 ]
