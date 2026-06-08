@@ -266,16 +266,26 @@ class ROSBridgeTransport(ROSTransportInterface[roslibpy.Topic]):
         result_data: Dict[str, Any] = {"result": None, "status": None}
 
         def on_result(result: Dict[str, Any]) -> None:
-            result_data["result"] = result
-            result_data["status"] = "SUCCEEDED"
+            goal_status = result.get("status")
+            result_data["result"] = result.get("values", result)
+            if goal_status == roslibpy.GoalStatus.SUCCEEDED:
+                result_data["status"] = "SUCCEEDED"
+            elif goal_status == roslibpy.GoalStatus.CANCELED:
+                result_data["status"] = "CANCELED"
+            else:
+                result_data["status"] = "FAILED"
             result_event.set()
 
         def on_feedback(feedback: Dict[str, Any]) -> None:
             if feedback_callback:
                 feedback_callback(feedback)
 
-        def on_error(error: Exception) -> None:
-            result_data["status"] = "FAILED"
+        def on_error(error: Any) -> None:
+            goal_status = error.get("status") if isinstance(error, dict) else None
+            if goal_status == roslibpy.GoalStatus.CANCELED:
+                result_data["status"] = "CANCELED"
+            else:
+                result_data["status"] = "FAILED"
             result_data["error"] = str(error)
             result_event.set()
 
