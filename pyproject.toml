@@ -26,6 +26,7 @@ dependencies = [
     "eclipse-zenoh>=1.7.2",
     "zenoh-ros2-sdk",
     "rosbags",
+    "matplotlib>=3.10.9",
 ]
 
 [project.urls]

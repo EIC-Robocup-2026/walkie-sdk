@@ -11,6 +11,10 @@ CAMERA_TOPICS:
 DEPTH_TOPICS:
   head: "/zed_head/zed_node/depth/depth_registered"
 
+# Point cloud streams (sensor_msgs/msg/PointCloud2). Read via bot.point_cloud.get_once().
+POINT_CLOUD_TOPICS:
+  head: "/zed_head/zed_node/point_cloud/cloud_registered/filtered_map"
+
 ARM_TOPICS:
   states: "joint_states"
   states_type: "sensor_msgs/msg/JointState"

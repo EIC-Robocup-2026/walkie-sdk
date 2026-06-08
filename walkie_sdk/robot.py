@@ -29,6 +29,7 @@ from walkie_sdk.modules.multi_camera import MultiCamera
 from walkie_sdk.modules.navigation import Navigation
 from walkie_sdk.modules.telemetry import Telemetry
 from walkie_sdk.modules.visualization import Visualization
+from walkie_sdk.modules.point_cloud import PointCloud
 from walkie_sdk.modules.tools import Tools
 from walkie_sdk.modules.transform import Transform
 
@@ -187,6 +188,9 @@ class WalkieRobot:
         # Head tilt module
         self._head = Head(self._transport, namespace=namespace, joint_state_hub=self._joints)
 
+        # Point cloud module (subscribes via the active ROS transport)
+        self._point_cloud = PointCloud(self._transport, namespace=namespace)
+
         # Auto-connect
         self._connect()
 
@@ -215,6 +219,9 @@ class WalkieRobot:
                 print(f"  ⚠ Camera connection failed: {e}")
                 print(f"    Camera will not be available.")
                 self._camera = None
+
+        # Start point cloud subscriptions
+        self._point_cloud._setup_subscription()
 
         self._connected = True
         print(f"✓ Robot connected!")
@@ -386,6 +393,26 @@ class WalkieRobot:
     def transform(self) -> Transform:
         """Transform module for coordinate frame lookups."""
         return self._transform
+
+    @property
+    def point_cloud(self) -> "PointCloud":
+        """
+        Point cloud interface.
+
+        Provides:
+        - get_cloud(source_name="head"): Latest cached PointCloud2 dict (non-blocking)
+        - get_all_clouds(): Latest clouds for all subscribed sources
+        - get_once(source_name="head", timeout=10.0): Block until first message (--once)
+
+        Example:
+            ```python
+            cloud = bot.point_cloud.get_once(timeout=10.0)
+            if cloud:
+                print(cloud["header"]["frame_id"])
+                print(cloud["width"])   # number of points
+            ```
+        """
+        return self._point_cloud
 
     def draw_marker(
         self,
