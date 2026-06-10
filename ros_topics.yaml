@@ -11,6 +11,12 @@ CAMERA_TOPICS:
 DEPTH_TOPICS:
   head: "/zed_head/zed_node/depth/depth_registered"
 
+# Intrinsics (sensor_msgs/msg/CameraInfo). Read via bot.camera.get_camera_info()
+# or bot.camera.get_intrinsics(). depth_registered is aligned to the left
+# rectified image, so the same intrinsics apply to colour and depth.
+CAMERA_INFO_TOPICS:
+  head: "/zed_head/zed_node/rgb/color/rect/camera_info"
+
 ARM_TOPICS:
   states: "joint_states"
   states_type: "sensor_msgs/msg/JointState"

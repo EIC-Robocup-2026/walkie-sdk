@@ -20,6 +20,15 @@ DEPTH_TOPICS = {
     "head": os.getenv("WALKIE_DEPTH_HEAD", "/zed_head/zed_node/depth/depth_registered"),
 }
 
+# ── Camera Info Topics ─────────────────────────────────────────
+# Intrinsics (sensor_msgs/msg/CameraInfo), published alongside each image
+# topic. Keyed by the same camera names as CAMERA_TOPICS. The ZED head's
+# depth_registered is aligned to the left rectified image, so the one set of
+# intrinsics serves both colour and depth projection.
+CAMERA_INFO_TOPICS = {
+    "head": os.getenv("WALKIE_CAMERA_INFO_HEAD", "/zed_head/zed_node/rgb/color/rect/camera_info"),
+}
+
 # ── Arm Topics ─────────────────────────────────────────────────
 ARM_TOPICS = {
     "states": os.getenv("WALKIE_ARM_STATES", "joint_states"),
@@ -126,6 +135,7 @@ def load_config(yaml_path: str):
         # Update dictionaries in-place so all imported references reflect the new YAML values
         if "CAMERA_TOPICS" in config: CAMERA_TOPICS.update(config["CAMERA_TOPICS"])
         if "DEPTH_TOPICS" in config: DEPTH_TOPICS.update(config["DEPTH_TOPICS"])
+        if "CAMERA_INFO_TOPICS" in config: CAMERA_INFO_TOPICS.update(config["CAMERA_INFO_TOPICS"])
         if "ARM_TOPICS" in config: ARM_TOPICS.update(config["ARM_TOPICS"])
         if "ARM_ACTIONS" in config: ARM_ACTIONS.update(config["ARM_ACTIONS"])
         if "ARM_SERVICES" in config: ARM_SERVICES.update(config["ARM_SERVICES"])
