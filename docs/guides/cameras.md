@@ -238,8 +238,9 @@ distortion coefficients are zero.
 
 !!! warning "Use the optical frame"
     The back-projected `(x, y, z)` point is in the camera's **optical** frame
-    (Z forward, X right, Y down) — e.g. `zed_head_left_camera_optical_frame`,
-    not `zed_head_left_camera_frame` (ROS body convention, X forward).
+    (Z forward, X right, Y down) — on Walkie that is
+    `zed_head_left_camera_frame_optical`, not `zed_head_left_camera_frame`
+    (ROS body convention, X forward).
 
 The camera_info topic defaults to `/zed_head/zed_node/rgb/color/rect/camera_info`
 and can be overridden via the `WALKIE_CAMERA_INFO_HEAD` env var, or the
@@ -261,7 +262,7 @@ intr = bot.camera.get_intrinsics()    # fx, fy, cx, cy (cached)
 
 # Camera pose in the map frame. Use the *optical* frame -- it matches the
 # axes the pinhole math produces (Z forward, X right, Y down).
-pose = bot.transform.lookup("map", "zed_head_left_camera_optical_frame")
+pose = bot.transform.lookup("map", "zed_head_left_camera_frame_optical")
 q, p = pose["quaternion"], pose["position"]
 R = quaternion_to_matrix(q["x"], q["y"], q["z"], q["w"])
 t = np.array([p["x"], p["y"], p["z"]])

@@ -11,7 +11,7 @@ from walkie_sdk.config.ros_topics import CAMERA_INFO_TOPICS
 from walkie_sdk.modules.camera import Camera
 
 CAMERA_INFO_MSG = {
-    "header": {"frame_id": "zed_head_left_camera_optical_frame"},
+    "header": {"frame_id": "zed_head_left_camera_frame_optical"},
     "width": 1280,
     "height": 720,
     "distortion_model": "plumb_bob",

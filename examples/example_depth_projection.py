@@ -33,7 +33,7 @@ NAMESPACE = ""  # Optional: "robot1" for namespaced topics
 
 # The back-projected points live in the OPTICAL frame (Z forward, X right,
 # Y down) -- not the body-convention camera frame (X forward, Z up).
-CAMERA_FRAME = "zed_head_left_camera_optical_frame"
+CAMERA_FRAME = "zed_head_left_camera_frame_optical"
 WORLD_FRAME = "map"
 
 
