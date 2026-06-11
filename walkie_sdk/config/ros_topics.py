@@ -27,6 +27,14 @@ DEPTH_TOPICS = {
 # intrinsics serves both colour and depth projection.
 CAMERA_INFO_TOPICS = {
     "head": os.getenv("WALKIE_CAMERA_INFO_HEAD", "/zed_head/zed_node/rgb/color/rect/camera_info"),
+# ── Point Cloud Topics ─────────────────────────────────────────
+# Keys are source names → topic strings. Message type is always
+# sensor_msgs/msg/PointCloud2 (hardcoded in the transport).
+POINT_CLOUD_TOPICS = {
+    "head": os.getenv(
+        "WALKIE_PC_HEAD",
+        "/zed_head/zed_node/point_cloud/cloud_registered/filtered_map",
+    ),
 }
 
 # ── Arm Topics ─────────────────────────────────────────────────
@@ -136,6 +144,7 @@ def load_config(yaml_path: str):
         if "CAMERA_TOPICS" in config: CAMERA_TOPICS.update(config["CAMERA_TOPICS"])
         if "DEPTH_TOPICS" in config: DEPTH_TOPICS.update(config["DEPTH_TOPICS"])
         if "CAMERA_INFO_TOPICS" in config: CAMERA_INFO_TOPICS.update(config["CAMERA_INFO_TOPICS"])
+        if "POINT_CLOUD_TOPICS" in config: POINT_CLOUD_TOPICS.update(config["POINT_CLOUD_TOPICS"])
         if "ARM_TOPICS" in config: ARM_TOPICS.update(config["ARM_TOPICS"])
         if "ARM_ACTIONS" in config: ARM_ACTIONS.update(config["ARM_ACTIONS"])
         if "ARM_SERVICES" in config: ARM_SERVICES.update(config["ARM_SERVICES"])

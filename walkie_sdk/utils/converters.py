@@ -5,7 +5,7 @@ Provides quaternion <-> euler angle conversions for working with ROS orientation
 """
 
 import math
-from typing import Tuple,List
+from typing import Any, Dict, List, Optional, Tuple
 import time
 
 import numpy as np
@@ -227,4 +227,101 @@ def convert_poses_to_array(data):
     Extracts [x, y, z] coordinates from a dictionary of poses.
     """
     return [[p['position']['x'], p['position']['y'], p['position']['z']] for p in data.get('poses', [])]
+
+
+def parse_point_cloud_xyz(
+    cloud: Dict[str, Any],
+    remove_nan: bool = True,
+) -> "Optional[Any]":
+    """
+    Parse a ROS PointCloud2 message dict into a numpy (N, 3) float32 XYZ array.
+
+    Handles the binary data formats produced by rosbridge (list of ints)
+    and the zenoh transport (bytes / bytearray / numpy array).
+    Field offsets are read dynamically from the message's ``fields`` list,
+    so the function works regardless of point layout.
+
+    Args:
+        cloud: PointCloud2 message dict from bot.point_cloud.get_cloud()
+               or get_once().
+        remove_nan: If True (default), discard points where any coordinate
+                    is NaN or infinite. ZED outputs NaN for unmeasured pixels.
+
+    Returns:
+        numpy float32 array of shape (N, 3) with columns [x, y, z],
+        or None if the cloud cannot be parsed (missing fields, empty data, …).
+
+    Example:
+        ```python
+        cloud = bot.point_cloud.get_once()
+        pts = parse_point_cloud_xyz(cloud)   # (N, 3) float32
+        print(pts.shape)                     # e.g. (184320, 3)
+        ```
+    """
+    try:
+        import numpy as np
+
+        # -- normalise raw bytes -----------------------------------------------
+        data = cloud.get("data")
+        if data is None:
+            return None
+
+        if isinstance(data, str):
+            # rosbridge v2 sends uint8[] fields as base64-encoded strings
+            import base64
+            raw = base64.b64decode(data)
+        elif isinstance(data, list):
+            raw = bytes(data)
+        elif isinstance(data, (bytes, bytearray)):
+            raw = bytes(data)
+        elif hasattr(data, "tobytes"):   # numpy array
+            raw = data.tobytes()
+        else:
+            return None
+
+        if not raw:
+            return None
+
+        # -- geometry metadata -------------------------------------------------
+        point_step: int = cloud.get("point_step", 0)
+        height: int = cloud.get("height", 1)
+        width: int = cloud.get("width", 0)
+        n_points: int = height * width
+
+        if point_step == 0 or n_points == 0:
+            return None
+        if len(raw) < n_points * point_step:
+            return None
+
+        # -- field offset map --------------------------------------------------
+        # ROS PointCloud2 field datatypes: 7 = FLOAT32 (4 bytes)
+        fields = cloud.get("fields", [])
+        offsets: Dict[str, int] = {}
+        for f in fields:
+            if isinstance(f, dict):
+                name = f.get("name", "")
+                if name in ("x", "y", "z"):
+                    offsets[name] = int(f.get("offset", 0))
+
+        # Fallback to standard XYZ layout (offset 0, 4, 8)
+        x_off = offsets.get("x", 0)
+        y_off = offsets.get("y", 4)
+        z_off = offsets.get("z", 8)
+
+        # -- extract float32 columns -------------------------------------------
+        arr = np.frombuffer(raw, dtype=np.uint8)[:n_points * point_step].reshape(n_points, point_step)
+
+        x = np.frombuffer(arr[:, x_off:x_off + 4].tobytes(), dtype=np.float32)
+        y = np.frombuffer(arr[:, y_off:y_off + 4].tobytes(), dtype=np.float32)
+        z = np.frombuffer(arr[:, z_off:z_off + 4].tobytes(), dtype=np.float32)
+
+        pts = np.column_stack([x, y, z])
+
+        if remove_nan:
+            pts = pts[np.isfinite(pts).all(axis=1)]
+
+        return pts
+
+    except Exception:
+        return None
 

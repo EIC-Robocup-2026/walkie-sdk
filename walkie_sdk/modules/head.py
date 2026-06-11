@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from walkie_sdk.modules.joint_state_hub import JointStateHub
 
 HEAD_TILT_MIN: float = -math.pi / 4  # -0.785 rad  (45° upward)
-HEAD_TILT_MAX: float = math.pi / 4   #  0.785 rad  (45° downward)
+HEAD_TILT_MAX: float = math.pi / 3   #  1.047 rad  (60° downward)
 
 
 class Head:
@@ -20,7 +20,7 @@ class Head:
 
     Publishes Float64MultiArray to the head servo controller topic.
     Positive angles tilt the camera downward toward the floor; negative
-    angles tilt it upward. The safe operating range is ±45° (±π/4 rad).
+    angles tilt it upward.
 
     Args:
         transport: ROS transport interface.
@@ -56,15 +56,15 @@ class Head:
         Args:
             angle_rad: Tilt angle in radians. Positive values angle the
                 camera downward; negative values angle it upward.
-                Must be within [HEAD_TILT_MIN, HEAD_TILT_MAX] (±π/4 ≈ ±0.785 rad).
+                Must be within [HEAD_TILT_MIN, HEAD_TILT_MAX].
 
         Raises:
-            ValueError: If angle_rad is outside the ±45° safe range.
+            ValueError: If angle_rad is outside the safe range.
         """
         if not (HEAD_TILT_MIN <= angle_rad <= HEAD_TILT_MAX):
             raise ValueError(
                 f"Head tilt angle {angle_rad:.3f} rad is out of range "
-                f"[{HEAD_TILT_MIN:.3f}, {HEAD_TILT_MAX:.3f}] (±45°). "
+                f"[{HEAD_TILT_MIN:.3f}, {HEAD_TILT_MAX:.3f}]. "
                 "Positive values tilt the camera downward."
             )
         self._transport.publish(

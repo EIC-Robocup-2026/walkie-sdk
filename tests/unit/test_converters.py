@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from walkie_sdk.utils.converters import (
+    parse_point_cloud_xyz,
     quaternion_to_euler,
     euler_to_quaternion,
     normalize_angle,
@@ -215,3 +216,105 @@ class TestQuaternionToMatrix:
     def test_zero_quaternion_raises(self):
         with pytest.raises(ValueError):
             quaternion_to_matrix(0.0, 0.0, 0.0, 0.0)
+class TestParsePointCloudXYZ:
+    """Tests for parse_point_cloud_xyz — offline, no robot needed."""
+
+    def _make_cloud(self, points, point_step=24, extra_nan=False):
+        """Build a minimal PointCloud2 dict from a list of (x, y, z) tuples."""
+        import struct
+        import numpy as np
+
+        fields = [
+            {"name": "x", "offset": 0,  "datatype": 7, "count": 1},
+            {"name": "y", "offset": 4,  "datatype": 7, "count": 1},
+            {"name": "z", "offset": 8,  "datatype": 7, "count": 1},
+            {"name": "rgb", "offset": 16, "datatype": 7, "count": 1},
+        ]
+        raw = bytearray()
+        for x, y, z in points:
+            point = bytearray(point_step)
+            struct.pack_into("<f", point, 0, x)
+            struct.pack_into("<f", point, 4, y)
+            struct.pack_into("<f", point, 8, z)
+            raw.extend(point)
+
+        return {
+            "header": {"frame_id": "map", "stamp": {"sec": 0, "nanosec": 0}},
+            "height": 1,
+            "width": len(points),
+            "fields": fields,
+            "point_step": point_step,
+            "row_step": point_step * len(points),
+            "data": list(raw),   # rosbridge returns list of ints
+            "is_bigendian": False,
+            "is_dense": False,
+        }
+
+    def test_parses_xyz_from_list_of_ints(self):
+        import numpy as np
+        pts_in = [(1.0, 2.0, 3.0), (4.0, 5.0, 6.0)]
+        cloud = self._make_cloud(pts_in)
+        pts = parse_point_cloud_xyz(cloud)
+        assert pts is not None
+        assert pts.shape == (2, 3)
+        np.testing.assert_allclose(pts[0], [1.0, 2.0, 3.0], atol=1e-5)
+        np.testing.assert_allclose(pts[1], [4.0, 5.0, 6.0], atol=1e-5)
+
+    def test_parses_xyz_from_bytes(self):
+        import numpy as np
+        pts_in = [(0.5, 1.5, 2.5)]
+        cloud = self._make_cloud(pts_in)
+        cloud["data"] = bytes(cloud["data"])
+        pts = parse_point_cloud_xyz(cloud)
+        assert pts is not None
+        np.testing.assert_allclose(pts[0], [0.5, 1.5, 2.5], atol=1e-5)
+
+    def test_parses_xyz_from_base64_string(self):
+        """rosbridge v2 sends uint8[] as base64-encoded strings."""
+        import base64
+        import numpy as np
+        pts_in = [(1.0, 2.0, 3.0)]
+        cloud = self._make_cloud(pts_in)
+        cloud["data"] = base64.b64encode(bytes(cloud["data"])).decode("ascii")
+        pts = parse_point_cloud_xyz(cloud)
+        assert pts is not None
+        np.testing.assert_allclose(pts[0], [1.0, 2.0, 3.0], atol=1e-5)
+
+    def test_nan_points_removed_by_default(self):
+        import math
+        import numpy as np
+        pts_in = [(1.0, 2.0, 3.0), (float("nan"), float("nan"), float("nan")), (4.0, 5.0, 6.0)]
+        cloud = self._make_cloud(pts_in)
+        pts = parse_point_cloud_xyz(cloud, remove_nan=True)
+        assert pts is not None
+        assert pts.shape == (2, 3)
+
+    def test_nan_points_kept_when_remove_nan_false(self):
+        import math
+        import numpy as np
+        pts_in = [(1.0, 2.0, 3.0), (float("nan"), float("nan"), float("nan"))]
+        cloud = self._make_cloud(pts_in)
+        pts = parse_point_cloud_xyz(cloud, remove_nan=False)
+        assert pts is not None
+        assert pts.shape == (2, 3)
+        assert np.isnan(pts[1, 0])
+
+    def test_empty_cloud_returns_none(self):
+        cloud = {"data": [], "point_step": 24, "height": 1, "width": 0, "fields": []}
+        assert parse_point_cloud_xyz(cloud) is None
+
+    def test_none_data_returns_none(self):
+        assert parse_point_cloud_xyz({"data": None}) is None
+
+    def test_missing_fields_uses_fallback_offsets(self):
+        """When fields list is absent, fall back to standard xyz layout at 0,4,8."""
+        import struct
+        import numpy as np
+        raw = bytearray(24)
+        struct.pack_into("<f", raw, 0, 7.0)
+        struct.pack_into("<f", raw, 4, 8.0)
+        struct.pack_into("<f", raw, 8, 9.0)
+        cloud = {"data": list(raw), "point_step": 24, "height": 1, "width": 1, "fields": []}
+        pts = parse_point_cloud_xyz(cloud)
+        assert pts is not None
+        np.testing.assert_allclose(pts[0], [7.0, 8.0, 9.0], atol=1e-5)
