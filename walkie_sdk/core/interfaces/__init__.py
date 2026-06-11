@@ -10,10 +10,12 @@ from walkie_sdk.core.interfaces.camera_transport import (
     CameraTransportInterface,
     MultiCameraTransportInterface,
 )
+from walkie_sdk.core.interfaces.point_cloud_transport import PointCloudTransportInterface
 from walkie_sdk.core.interfaces.ros_transport import ROSTransportInterface
 
 __all__ = [
     "ROSTransportInterface",
     "CameraTransportInterface",
     "MultiCameraTransportInterface",
+    "PointCloudTransportInterface",
 ]

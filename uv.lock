@@ -2687,6 +2687,7 @@ version = "0.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "eclipse-zenoh" },
+    { name = "matplotlib" },
     { name = "numpy" },
     { name = "opencv-python" },
     { name = "pyyaml" },
@@ -2724,6 +2725,7 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'dev'", specifier = ">=0.110" },
     { name = "fastapi", marker = "extra == 'web'", specifier = ">=0.110" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
+    { name = "matplotlib", specifier = ">=3.10.9" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.0" },
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.25" },
     { name = "numpy", specifier = ">=2.3.5" },
