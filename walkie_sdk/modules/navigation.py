@@ -61,6 +61,11 @@ class Navigation:
         return apply_namespace(NAV_ACTIONS["navigate_to_pose"], self._namespace)
 
     @property
+    def navigate_to_object_action_name(self) -> str:
+        """Get the full navigate_to_object action name with namespace."""
+        return apply_namespace(NAV_ACTIONS["navigate_to_object"], self._namespace)
+
+    @property
     def cmd_vel_topic(self) -> str:
         """Get the full cmd_vel topic name with namespace."""
         return apply_namespace(NAV_TOPICS["cmd_vel"], self._namespace)
@@ -69,26 +74,37 @@ class Navigation:
         self,
         x: float,
         y: float,
-        heading: float,
+        heading: Optional[float] = None,
         blocking: bool = True,
         timeout: Optional[float] = None,
         feedback_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
         goal_tolerance: Optional[float] = None,
+        standoff: float = 0.0,
+        align_method: str = "",
     ) -> str:
         """
-        Navigate to a target pose.
+        Navigate to a target pose or object position.
 
-        Sends a navigation goal to the Nav2 action server.
+        When ``heading`` is provided, sends a ``NavigateToPose`` goal to Nav2
+        (original behaviour). When ``heading`` is ``None``, sends a
+        ``NavigateToObject`` goal to nav_commander, which computes the
+        approach pose via PCA edge-fit alignment.
 
         Args:
             x: Target X coordinate in meters (map frame)
             y: Target Y coordinate in meters (map frame)
-            heading: Target heading in radians (0 = +X, π/2 = +Y)
+            heading: Target heading in radians (0 = +X, π/2 = +Y).
+                     ``None`` → use NavigateToObject (no heading required).
             blocking: If True, wait for navigation to complete (default: True)
             timeout: Optional timeout in seconds (None = wait forever)
             feedback_callback: Optional callback for navigation feedback
-            goal_tolerance: If set (metres), a Nav2 FAILED result is promoted to
-                "CLOSE_ENOUGH" when the final distance_remaining ≤ this value.
+            goal_tolerance: If set (metres), a FAILED result is promoted to
+                "CLOSE_ENOUGH" when final distance_remaining ≤ this value.
+            standoff: Per-goal standoff override in metres (NavigateToObject
+                      only; 0.0 = use nav_commander's configured default).
+            align_method: Alignment method for NavigateToObject (``""`` =
+                          default ``nearest_edge``, ``"face_target"`` skips
+                          edge alignment). Ignored when heading is provided.
 
         Returns:
             Status string: "SUCCEEDED", "FAILED", "CANCELED", "CLOSE_ENOUGH", or "IN_PROGRESS"
@@ -99,11 +115,12 @@ class Navigation:
 
         Example:
             ```python
+            # With heading — Nav2 navigate_to_pose
             result = bot.nav.go_to(x=2.0, y=1.0, heading=0.0)
-            # result == "SUCCEEDED"
 
-            result = bot.nav.go_to(x=5.0, y=3.0, heading=1.57, blocking=False)
-            # result == "IN_PROGRESS"
+            # Without heading — nav_commander navigate_to_object
+            result = bot.nav.go_to(x=2.0, y=1.0)
+            result = bot.nav.go_to(x=2.0, y=1.0, standoff=0.5)
             ```
         """
         if not self._transport.is_connected:
@@ -117,32 +134,41 @@ class Navigation:
         self._nav_error_code = None
         self._nav_error_msg = None
 
-        # Convert heading to quaternion (roll=0, pitch=0, yaw=heading)
-        qx, qy, qz, qw = euler_to_quaternion(0.0, 0.0, heading)
-
-        # Build NavigateToPose goal message
-        goal_msg = {
-            "pose": {
-                "header": {"frame_id": "map", "stamp": {"sec": 0, "nanosec": 0}},
-                "pose": {
-                    "position": {"x": float(x), "y": float(y), "z": 0.0},
-                    "orientation": {"x": qx, "y": qy, "z": qz, "w": qw},
-                },
+        if heading is None:
+            # navigate_to_object path — nav_commander computes the approach pose
+            goal_msg = {
+                "obj_x": float(x),
+                "obj_y": float(y),
+                "align_method": align_method,
+                "standoff": float(standoff),
             }
-        }
+            action_name = self.navigate_to_object_action_name
+            action_type = NAV_ACTIONS["navigate_to_object_type"]
+        else:
+            # navigate_to_pose path — standard Nav2
+            qx, qy, qz, qw = euler_to_quaternion(0.0, 0.0, heading)
+            goal_msg = {
+                "pose": {
+                    "header": {"frame_id": "map", "stamp": {"sec": 0, "nanosec": 0}},
+                    "pose": {
+                        "position": {"x": float(x), "y": float(y), "z": 0.0},
+                        "orientation": {"x": qx, "y": qy, "z": qz, "w": qw},
+                    },
+                }
+            }
+            action_name = self.nav2_action_name
+            action_type = NAV_ACTIONS["navigate_to_pose_type"]
 
         if not blocking:
-            # Non-blocking: send goal and return immediately
             self._navigation_status = "IN_PROGRESS"
             threading.Thread(
                 target=self._send_goal_async,
-                args=(goal_msg, self._make_feedback_handler(feedback_callback), goal_tolerance),
+                args=(action_name, action_type, goal_msg, self._make_feedback_handler(feedback_callback), goal_tolerance),
                 daemon=True,
             ).start()
             return "IN_PROGRESS"
 
-        # Blocking: send goal and wait for result
-        return self._send_goal_blocking(goal_msg, timeout, self._make_feedback_handler(feedback_callback), goal_tolerance)
+        return self._send_goal_blocking(action_name, action_type, goal_msg, timeout, self._make_feedback_handler(feedback_callback), goal_tolerance)
 
     def _make_feedback_handler(
         self,
@@ -160,6 +186,8 @@ class Navigation:
 
     def _send_goal_blocking(
         self,
+        action_name: str,
+        action_type: str,
         goal_msg: Dict[str, Any],
         timeout: Optional[float],
         feedback_callback: Optional[Callable[[Dict[str, Any]], None]],
@@ -168,8 +196,8 @@ class Navigation:
         """Send goal and block until complete."""
         try:
             result = self._transport.call_action(
-                action_name=self.nav2_action_name,
-                action_type=NAV_ACTIONS["navigate_to_pose_type"],
+                action_name=action_name,
+                action_type=action_type,
                 goal=goal_msg,
                 feedback_callback=feedback_callback,
                 timeout=timeout,
@@ -177,7 +205,7 @@ class Navigation:
 
             nav_result = result.get("result") or {}
             self._nav_error_code = nav_result.get("error_code")
-            self._nav_error_msg = nav_result.get("error_msg")
+            self._nav_error_msg = nav_result.get("error_msg") or nav_result.get("message")
             self._final_distance_remaining = self._distance_remaining
 
             status = result.get("status")
@@ -208,6 +236,8 @@ class Navigation:
 
     def _send_goal_async(
         self,
+        action_name: str,
+        action_type: str,
         goal_msg: Dict[str, Any],
         feedback_callback: Optional[Callable[[Dict[str, Any]], None]],
         goal_tolerance: Optional[float] = None,
@@ -215,8 +245,8 @@ class Navigation:
         """Send goal in background thread."""
         try:
             result = self._transport.call_action(
-                action_name=self.nav2_action_name,
-                action_type=NAV_ACTIONS["navigate_to_pose_type"],
+                action_name=action_name,
+                action_type=action_type,
                 goal=goal_msg,
                 feedback_callback=feedback_callback,
                 timeout=None,
@@ -224,7 +254,7 @@ class Navigation:
 
             nav_result = result.get("result") or {}
             self._nav_error_code = nav_result.get("error_code")
-            self._nav_error_msg = nav_result.get("error_msg")
+            self._nav_error_msg = nav_result.get("error_msg") or nav_result.get("message")
             self._final_distance_remaining = self._distance_remaining
 
             status = result.get("status")
