@@ -1,30 +1,30 @@
 """
-Hardware integration test for navigate_to_object (bot.nav.go_to without heading).
+Interactive hardware test for Navigation (navigate_to_object and navigate_to_pose).
 
-Exercises the /navigate_to_object action on nav_commander, which computes a
-PCA edge-fit approach pose so the robot faces the object directly without the
-caller needing to specify a heading.
+Lets you type goals at runtime — useful for real-life testing where you want
+to navigate to arbitrary object positions and observe the approach behaviour.
 
-⚠️  MOVES THE ROBOT BASE. Run only with a clear floor and an e-stop within reach.
-Every motion test asks for confirmation; pass --yes to skip prompts.
-
-Requires: rosbridge + Nav2 + nav_commander with the /navigate_to_object action.
+Requires: rosbridge + Nav2 + nav_commander /navigate_to_object action.
 
 Usage:
-    python tests/test_navigation_interactive.py --obj-x 1.5 --obj-y -3.0
-    python tests/test_navigation_interactive.py --obj-x 1.5 --obj-y -3.0 --standoff 0.5
-    python tests/test_navigation_interactive.py --obj-x 1.5 --obj-y -3.0 --yes
-    python tests/test_navigation_interactive.py --ip 192.168.1.100 --obj-x 1.5 --obj-y -3.0
+    python tests/test_navigation_interactive.py --ip 192.168.1.100
+    python tests/test_navigation_interactive.py --ip 192.168.1.100 --namespace robot1
+
+At the prompt type:
+    go <x> <y>                  → navigate_to_object (no heading, edge-fit approach)
+    go <x> <y> <standoff>       → navigate_to_object with standoff override (m)
+    go <x> <y> face_target      → navigate_to_object, skip edge fit
+    pose <x> <y> <heading>      → navigate_to_pose (Nav2, heading in radians)
+    cancel                      → cancel current navigation goal
+    stop                        → emergency stop (zero cmd_vel + cancel)
+    status                      → print current navigation status
+    q / quit                    → exit
 """
 
 import argparse
 import sys
-import time
 
 from walkie_sdk import WalkieRobot
-
-
-AUTO_YES = False
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -36,122 +36,189 @@ def _section(title: str) -> None:
     print("=" * 60)
 
 
-def _pass(msg: str) -> str:
+def _pass(msg: str) -> None:
     print(f"  [PASS] {msg}")
-    return "PASS"
 
 
-def _fail(msg: str) -> str:
+def _fail(msg: str) -> None:
     print(f"  [FAIL] {msg}")
-    return "FAIL"
 
 
-def _skip(msg: str) -> str:
-    print(f"  [SKIP] {msg}")
-    return "SKIP"
+def _print_status(bot: WalkieRobot) -> None:
+    print(f"  status={bot.nav.status}  navigating={bot.nav.is_navigating}")
+    if bot.nav.distance_remaining is not None:
+        print(f"  distance_remaining={bot.nav.distance_remaining:.3f} m")
+    if bot.nav.nav_error_msg:
+        print(f"  last_message={bot.nav.nav_error_msg!r}")
 
 
-def _confirm(action: str) -> bool:
-    if AUTO_YES:
-        print(f"  [auto-yes] {action}")
-        return True
-    try:
-        ans = input(f"  >> About to {action}. Proceed? [y/N] ").strip().lower()
-    except EOFError:
-        return False
-    return ans in ("y", "yes")
+def _parse_command(raw: str):
+    """
+    Parse a user input string. Returns one of:
+      ("go_obj",  x, y, standoff, align_method)
+      ("go_pose", x, y, heading)
+      ("cancel",)
+      ("stop",)
+      ("status",)
+      ("quit",)
+      ("unknown", original_text)
+    """
+    parts = raw.split()
+    if not parts:
+        return None
+
+    cmd = parts[0].lower()
+
+    if cmd in ("q", "quit", "exit"):
+        return ("quit",)
+
+    if cmd in ("cancel", "c"):
+        return ("cancel",)
+
+    if cmd in ("stop", "s"):
+        return ("stop",)
+
+    if cmd in ("status", "st"):
+        return ("status",)
+
+    if cmd == "go":
+        if len(parts) < 3:
+            print("  Usage: go <x> <y> [<standoff> | face_target]")
+            return None
+        try:
+            x = float(parts[1])
+            y = float(parts[2])
+        except ValueError:
+            print(f"  Invalid coordinates: {parts[1]!r} {parts[2]!r}")
+            return None
+
+        standoff = 0.0
+        align_method = ""
+        if len(parts) >= 4:
+            if parts[3].lower() == "face_target":
+                align_method = "face_target"
+            else:
+                try:
+                    standoff = float(parts[3])
+                except ValueError:
+                    print(f"  Invalid standoff {parts[3]!r} — use a number or 'face_target'")
+                    return None
+        return ("go_obj", x, y, standoff, align_method)
+
+    if cmd == "pose":
+        if len(parts) < 4:
+            print("  Usage: pose <x> <y> <heading_rad>")
+            return None
+        try:
+            x = float(parts[1])
+            y = float(parts[2])
+            h = float(parts[3])
+        except ValueError:
+            print(f"  Invalid pose args: {parts[1:]}")
+            return None
+        return ("go_pose", x, y, h)
+
+    return ("unknown", raw)
 
 
-# ── Test cases ─────────────────────────────────────────────────────────────
+# ── Interactive session ────────────────────────────────────────────────────
 
 
-def test_blocking_nav_to_object(bot: WalkieRobot, obj_x: float, obj_y: float, standoff: float, timeout: float) -> str:
-    _section("TEST 1: blocking go_to() without heading → navigate_to_object")
-    print(f"  Object (map frame): x={obj_x:.3f}  y={obj_y:.3f}  standoff={standoff:.2f} m")
-    if not _confirm(f"navigate to object at x={obj_x:.2f}, y={obj_y:.2f}"):
-        return _skip("user declined motion")
+def run_interactive_session(bot: WalkieRobot, timeout: float) -> tuple[int, int]:
+    """Prompt the user for navigation goals until they quit. Returns (passed, attempted)."""
+    _section("Interactive Navigation Control")
+    print()
+    print("  Commands:")
+    print("    go <x> <y>                 navigate_to_object  (no heading, edge-fit)")
+    print("    go <x> <y> <standoff>      navigate_to_object  with standoff override (m)")
+    print("    go <x> <y> face_target     navigate_to_object  skip edge alignment")
+    print("    pose <x> <y> <heading>     navigate_to_pose    (Nav2, heading in rad)")
+    print("    cancel                     cancel current goal")
+    print("    stop                       emergency stop (zero cmd_vel + cancel)")
+    print("    status                     print current nav status")
+    print("    q / quit                   exit")
+    print()
 
-    result = bot.nav.go_to(x=obj_x, y=obj_y, standoff=standoff, blocking=True, timeout=timeout)
-    print(f"  Result: {result}")
-    print(f"  Status: {bot.nav.status}")
-    print(f"  Method: {bot.nav.nav_error_msg}")
-    if result not in ("SUCCEEDED", "CLOSE_ENOUGH"):
-        return _fail(f"expected SUCCEEDED/CLOSE_ENOUGH, got {result}")
-    return _pass(f"{result} — align method used: {bot.nav.nav_error_msg}")
+    passed = 0
+    attempted = 0
 
+    while True:
+        try:
+            raw = input("  nav> ").strip()
+        except (KeyboardInterrupt, EOFError):
+            print()
+            break
 
-def test_face_target_align(bot: WalkieRobot, obj_x: float, obj_y: float, standoff: float, timeout: float) -> str:
-    _section("TEST 2: navigate_to_object with align_method='face_target' (skip edge fit)")
-    print(f"  Object (map frame): x={obj_x:.3f}  y={obj_y:.3f}")
-    if not _confirm(f"navigate to object at x={obj_x:.2f}, y={obj_y:.2f} with face_target"):
-        return _skip("user declined motion")
+        if not raw:
+            continue
 
-    result = bot.nav.go_to(x=obj_x, y=obj_y, standoff=standoff, align_method="face_target", blocking=True, timeout=timeout)
-    print(f"  Result: {result}  |  Method: {bot.nav.nav_error_msg}")
-    if result not in ("SUCCEEDED", "CLOSE_ENOUGH"):
-        return _fail(f"expected SUCCEEDED/CLOSE_ENOUGH, got {result}")
-    return _pass(f"{result}")
+        parsed = _parse_command(raw)
+        if parsed is None:
+            continue
 
+        kind = parsed[0]
 
-def test_nonblocking_then_cancel(bot: WalkieRobot, obj_x: float, obj_y: float, timeout: float) -> str:
-    _section("TEST 3: non-blocking navigate_to_object then cancel()")
-    if not _confirm(f"navigate (non-blocking) toward x={obj_x:.2f}, y={obj_y:.2f}, then cancel"):
-        return _skip("user declined motion")
+        if kind == "quit":
+            break
 
-    result = bot.nav.go_to(x=obj_x, y=obj_y, blocking=False)
-    print(f"  Immediate return: {result}")
-    if result != "IN_PROGRESS":
-        return _fail(f"expected IN_PROGRESS, got {result}")
-    if not bot.nav.is_navigating:
-        return _fail("is_navigating should be True right after non-blocking go_to")
+        if kind == "cancel":
+            ok = bot.nav.cancel()
+            print(f"  cancel() -> {ok}  |  status: {bot.nav.status}")
+            continue
 
-    time.sleep(2.0)
-    ok = bot.nav.cancel()
-    print(f"  cancel() -> {ok}  |  status: {bot.nav.status}")
-    if not ok:
-        return _fail("cancel() returned False")
-    return _pass("non-blocking goal accepted and cancelled")
+        if kind == "stop":
+            ok = bot.nav.stop()
+            print(f"  stop() -> {ok}  |  status: {bot.nav.status}")
+            continue
 
+        if kind == "status":
+            _print_status(bot)
+            continue
 
-def test_feedback_callback(bot: WalkieRobot, obj_x: float, obj_y: float, standoff: float, timeout: float) -> str:
-    _section("TEST 4: navigate_to_object with feedback_callback")
-    if not _confirm(f"navigate to object at x={obj_x:.2f}, y={obj_y:.2f} with feedback"):
-        return _skip("user declined motion")
+        if kind == "unknown":
+            print(f"  Unknown command: {parsed[1]!r}")
+            print("  Commands: go | pose | cancel | stop | status | q")
+            continue
 
-    count = {"n": 0}
+        if kind == "go_obj":
+            _, x, y, standoff, align_method = parsed
+            label = f"navigate_to_object  x={x}  y={y}  standoff={standoff}  align={align_method or 'nearest_edge'}"
+            print(f"  → {label}  (blocking, timeout={timeout}s) ...")
+            attempted += 1
 
-    def on_feedback(fb: dict) -> None:
-        count["n"] += 1
-        if count["n"] <= 3:
-            dist = fb.get("feedback", fb).get("distance_remaining", "?")
-            print(f"    [feedback #{count['n']}] distance_remaining={dist}")
+            result = bot.nav.go_to(x=x, y=y, standoff=standoff, align_method=align_method,
+                                   blocking=True, timeout=timeout)
+            print(f"  Result: {result}  |  method: {bot.nav.nav_error_msg}")
 
-    result = bot.nav.go_to(x=obj_x, y=obj_y, standoff=standoff, blocking=True,
-                           timeout=timeout, feedback_callback=on_feedback)
-    print(f"  Result: {result}  |  feedback messages: {count['n']}")
-    if result not in ("SUCCEEDED", "CLOSE_ENOUGH"):
-        return _fail(f"navigation did not succeed: {result}")
-    return _pass(f"{result} with {count['n']} feedback message(s)")
+        elif kind == "go_pose":
+            _, x, y, h = parsed
+            print(f"  → navigate_to_pose  x={x}  y={y}  heading={h:.3f} rad  (blocking, timeout={timeout}s) ...")
+            attempted += 1
+
+            result = bot.nav.go_to(x=x, y=y, heading=h, blocking=True, timeout=timeout)
+            print(f"  Result: {result}  |  status: {bot.nav.status}")
+
+        if result in ("SUCCEEDED", "CLOSE_ENOUGH"):
+            _pass(result)
+            passed += 1
+        else:
+            _fail(f"Expected SUCCEEDED/CLOSE_ENOUGH, got {result}")
+
+    return passed, attempted
 
 
 # ── Main ───────────────────────────────────────────────────────────────────
 
 
-def main() -> None:
-    global AUTO_YES
+def main():
     parser = argparse.ArgumentParser(
-        description="Hardware test for navigate_to_object (go_to without heading) — MOVES BASE"
+        description="Interactive hardware test for Navigation (navigate_to_object / navigate_to_pose)"
     )
-    parser.add_argument("--ip", default="127.0.0.1", help="Robot IP (default: 127.0.0.1)")
-    parser.add_argument("--port", type=int, default=9090, help="Rosbridge port (default: 9090)")
-    parser.add_argument("--timeout", type=float, default=60.0, help="Max seconds per blocking move (default: 60.0)")
+    parser.add_argument("--ip",        default="127.0.0.1", help="Robot IP (default: 127.0.0.1)")
+    parser.add_argument("--port",      type=int,   default=9090, help="Rosbridge port (default: 9090)")
+    parser.add_argument("--timeout",   type=float, default=60.0, help="Max seconds per blocking move (default: 60.0)")
     parser.add_argument("--namespace", default="", help="ROS namespace (default: none)")
-    parser.add_argument("--obj-x", type=float, required=True, help="Object X position in map frame")
-    parser.add_argument("--obj-y", type=float, required=True, help="Object Y position in map frame")
-    parser.add_argument("--standoff", type=float, default=0.0, help="Standoff override in metres (0=nav_commander default)")
-    parser.add_argument("--yes", "-y", action="store_true", help="Skip confirmation prompts")
     args = parser.parse_args()
-    AUTO_YES = args.yes
 
     print(f"\nConnecting to rosbridge at {args.ip}:{args.port} ...")
     bot = WalkieRobot(
@@ -161,16 +228,12 @@ def main() -> None:
         camera_protocol="none",
         namespace=args.namespace,
     )
-    print("Connected.\n")
-    print("  ⚠️  This test moves the robot base. Keep the area clear.")
-    print(f"  Object position: x={args.obj_x}  y={args.obj_y}  standoff={args.standoff} m")
+    print("Connected.")
+    print(f"  timeout = {args.timeout}s")
 
-    results = []
+    passed = attempted = 0
     try:
-        results.append(test_blocking_nav_to_object(bot, args.obj_x, args.obj_y, args.standoff, args.timeout))
-        results.append(test_face_target_align(bot, args.obj_x, args.obj_y, args.standoff, args.timeout))
-        results.append(test_nonblocking_then_cancel(bot, args.obj_x, args.obj_y, args.timeout))
-        results.append(test_feedback_callback(bot, args.obj_x, args.obj_y, args.standoff, args.timeout))
+        passed, attempted = run_interactive_session(bot, args.timeout)
     except KeyboardInterrupt:
         print("\nInterrupted by user — sending stop().")
         try:
@@ -181,14 +244,13 @@ def main() -> None:
         bot.disconnect()
         print("\nDisconnected.")
 
-    passed = results.count("PASS")
-    failed = results.count("FAIL")
-    skipped = results.count("SKIP")
-    total = len(results)
     print(f"\n{'=' * 60}")
-    print(f"  Results: {passed} passed, {failed} failed, {skipped} skipped  (of {total})")
+    if attempted == 0:
+        print("  No goals attempted.")
+    else:
+        print(f"  Goals: {passed}/{attempted} SUCCEEDED")
     print("=" * 60)
-    sys.exit(0 if failed == 0 else 1)
+    sys.exit(0 if (attempted == 0 or passed == attempted) else 1)
 
 
 if __name__ == "__main__":
