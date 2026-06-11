@@ -8,6 +8,8 @@ import math
 from typing import Any, Dict, List, Optional, Tuple
 import time
 
+import numpy as np
+
 
 def quaternion_to_euler(
     x: float, y: float, z: float, w: float
@@ -131,6 +133,37 @@ def quaternion_multiply(
     w = w1 * w2 - x1 * x2 - y1 * y2 - z1 * z2
 
     return (x, y, z, w)
+
+def quaternion_to_matrix(x: float, y: float, z: float, w: float) -> np.ndarray:
+    """
+    Convert a quaternion to a 3x3 rotation matrix.
+
+    Useful for transforming point clouds: with the camera pose in the map
+    frame as (R, t), camera-frame points map to the world via
+    ``points @ R.T + t``.
+
+    Args:
+        x: Quaternion x component
+        y: Quaternion y component
+        z: Quaternion z component
+        w: Quaternion w component
+
+    Returns:
+        3x3 rotation matrix as a numpy array (float64)
+    """
+    norm = math.sqrt(x * x + y * y + z * z + w * w)
+    if norm == 0.0:
+        raise ValueError("Cannot convert zero quaternion to rotation matrix")
+    x, y, z, w = x / norm, y / norm, z / norm, w / norm
+
+    return np.array(
+        [
+            [1 - 2 * (y * y + z * z), 2 * (x * y - z * w), 2 * (x * z + y * w)],
+            [2 * (x * y + z * w), 1 - 2 * (x * x + z * z), 2 * (y * z - x * w)],
+            [2 * (x * z - y * w), 2 * (y * z + x * w), 1 - 2 * (x * x + y * y)],
+        ]
+    )
+
 
 def convert_bboxes_to_detection_array(
     bboxes: List[List[float]], 

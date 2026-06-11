@@ -165,7 +165,9 @@ class WalkieRobot:
         self._status = Telemetry(self._transport, namespace=namespace)
         self._arm = Arm(self._transport, namespace=namespace, joint_state_hub=self._joints)
         self._camera: Optional[Camera] = (
-            Camera(self._camera_transport) if self._camera_transport else None
+            Camera(self._camera_transport, ros_transport=self._transport)
+            if self._camera_transport
+            else None
         )
 
         # Multi-camera interface (wraps camera transport for multi-cam access)

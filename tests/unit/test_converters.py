@@ -1,6 +1,8 @@
 """Unit tests for walkie_sdk.utils.converters."""
 
 import math
+
+import numpy as np
 import pytest
 
 from walkie_sdk.utils.converters import (
@@ -11,6 +13,7 @@ from walkie_sdk.utils.converters import (
     degrees_to_radians,
     radians_to_degrees,
     quaternion_multiply,
+    quaternion_to_matrix,
     convert_bboxes_to_detection_array,
     convert_poses_to_array,
 )
@@ -174,6 +177,45 @@ class TestConvertPosesToArray:
         assert result == [[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]
 
 
+# ---------------------------------------------------------------------------
+# quaternion_to_matrix
+# ---------------------------------------------------------------------------
+
+
+class TestQuaternionToMatrix:
+    def test_identity(self):
+        np.testing.assert_allclose(
+            quaternion_to_matrix(0.0, 0.0, 0.0, 1.0), np.eye(3), atol=1e-12
+        )
+
+    def test_yaw_90_rotates_x_to_y(self):
+        x, y, z, w = euler_to_quaternion(0.0, 0.0, math.pi / 2)
+        R = quaternion_to_matrix(x, y, z, w)
+        np.testing.assert_allclose(R @ [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], atol=1e-9)
+
+    def test_optical_to_body_convention(self):
+        # The ROS camera->optical rotation: optical Z (forward) maps to body X.
+        x, y, z, w = euler_to_quaternion(-math.pi / 2, 0.0, -math.pi / 2)
+        R = quaternion_to_matrix(x, y, z, w)
+        np.testing.assert_allclose(R @ [0.0, 0.0, 1.0], [1.0, 0.0, 0.0], atol=1e-9)
+
+    @pytest.mark.parametrize(
+        "roll, pitch, yaw",
+        [(0.3, -0.2, 1.1), (math.pi / 4, math.pi / 6, -math.pi / 3)],
+    )
+    def test_orthonormal(self, roll, pitch, yaw):
+        R = quaternion_to_matrix(*euler_to_quaternion(roll, pitch, yaw))
+        np.testing.assert_allclose(R @ R.T, np.eye(3), atol=1e-9)
+        assert abs(np.linalg.det(R) - 1.0) < 1e-9
+
+    def test_unnormalized_quaternion_is_normalized(self):
+        R1 = quaternion_to_matrix(0.0, 0.0, 1.0, 1.0)
+        R2 = quaternion_to_matrix(0.0, 0.0, 2.0, 2.0)
+        np.testing.assert_allclose(R1, R2, atol=1e-12)
+
+    def test_zero_quaternion_raises(self):
+        with pytest.raises(ValueError):
+            quaternion_to_matrix(0.0, 0.0, 0.0, 0.0)
 class TestParsePointCloudXYZ:
     """Tests for parse_point_cloud_xyz — offline, no robot needed."""
 

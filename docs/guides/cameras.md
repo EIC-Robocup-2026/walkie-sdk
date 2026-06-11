@@ -214,3 +214,86 @@ in a `ros_topics.yaml` config file.
 
 See [`examples/example_depth.py`](https://github.com/EIC-Robocup-2026/walkie-sdk/blob/main/examples/example_depth.py)
 for a runnable demo with a colourised live view.
+
+### Intrinsics (projecting depth to 3D)
+
+To back-project depth pixels into 3D you need the camera intrinsics. They are
+fetched once from the camera's `camera_info` topic and cached:
+
+```python
+intr = bot.camera.get_intrinsics()
+# {'fx': ..., 'fy': ..., 'cx': ..., 'cy': ..., 'width': ..., 'height': ...}
+
+depth = bot.camera.get_depth()
+z = depth[v, u]
+x = (u - intr["cx"]) * z / intr["fx"]
+y = (v - intr["cy"]) * z / intr["fy"]
+```
+
+`get_camera_info()` returns the full `sensor_msgs/msg/CameraInfo` dict instead
+(`k`, `p`, `d`, `width`, `height`, ...) if you need more than the pinhole
+parameters. The ZED's `depth_registered` stream is aligned to the left
+rectified image, so the same intrinsics apply to colour and depth, and the
+distortion coefficients are zero.
+
+!!! warning "Use the optical frame"
+    The back-projected `(x, y, z)` point is in the camera's **optical** frame
+    (Z forward, X right, Y down) — on Walkie that is
+    `zed_head_left_camera_frame_optical`, not `zed_head_left_camera_frame`
+    (ROS body convention, X forward).
+
+The camera_info topic defaults to `/zed_head/zed_node/rgb/color/rect/camera_info`
+and can be overridden via the `WALKIE_CAMERA_INFO_HEAD` env var, or the
+`CAMERA_INFO_TOPICS` block in a `ros_topics.yaml` config file.
+
+### Projecting depth into the map frame
+
+Combining the intrinsics with the camera pose from `bot.transform.lookup()`
+turns a depth image into a point cloud in the world frame. The math is two
+steps: back-project each pixel into the camera **optical** frame, then apply
+the camera pose as a rigid transform.
+
+```python
+import numpy as np
+from walkie_sdk.utils.converters import quaternion_to_matrix
+
+depth = bot.camera.get_depth()        # HxW float32, metres (NaN = invalid)
+intr = bot.camera.get_intrinsics()    # fx, fy, cx, cy (cached)
+
+# Camera pose in the map frame. Use the *optical* frame -- it matches the
+# axes the pinhole math produces (Z forward, X right, Y down).
+pose = bot.transform.lookup("map", "zed_head_left_camera_frame_optical")
+q, p = pose["quaternion"], pose["position"]
+R = quaternion_to_matrix(q["x"], q["y"], q["z"], q["w"])
+t = np.array([p["x"], p["y"], p["z"]])
+
+# Back-project every valid pixel at once (vectorised)
+h, w = depth.shape
+us, vs = np.meshgrid(np.arange(w), np.arange(h))
+valid = np.isfinite(depth) & (depth > 0)
+
+z = depth[valid]
+x = (us[valid] - intr["cx"]) * z / intr["fx"]
+y = (vs[valid] - intr["cy"]) * z / intr["fy"]
+points_optical = np.column_stack([x, y, z])   # Nx3, optical frame
+
+points_map = points_optical @ R.T + t         # Nx3, map frame
+```
+
+For a single pixel `(u, v)` the same transform is
+`R @ [x, y, z] + t`.
+
+!!! tip "Sanity checks"
+    - The depth image and `CameraInfo` must be the same resolution. If the
+      depth stream is scaled, scale `fx`/`cx` by `w_depth / intr["width"]`
+      and `fy`/`cy` by `h_depth / intr["height"]` first.
+    - The lookup must return the **camera pose in the map frame** (the
+      transform that maps camera-frame points *into* map). If your cloud
+      comes out behind/inside the robot, the transform is inverted — swap
+      the lookup direction or invert it (`R.T`, `-R.T @ t`).
+    - Depth and pose are sampled at different instants; if the robot or head
+      is moving, grab the pose as close to the frame as possible.
+
+See [`examples/example_depth_projection.py`](https://github.com/EIC-Robocup-2026/walkie-sdk/blob/main/examples/example_depth_projection.py)
+for a runnable demo that projects the full cloud and drops an RViz2 marker at
+the projected centre pixel for verification.

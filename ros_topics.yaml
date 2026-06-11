@@ -11,6 +11,11 @@ CAMERA_TOPICS:
 DEPTH_TOPICS:
   head: "/zed_head/zed_node/depth/depth_registered"
 
+# Intrinsics (sensor_msgs/msg/CameraInfo). Read via bot.camera.get_camera_info()
+# or bot.camera.get_intrinsics(). depth_registered is aligned to the left
+# rectified image, so the same intrinsics apply to colour and depth.
+CAMERA_INFO_TOPICS:
+  head: "/zed_head/zed_node/rgb/color/rect/camera_info"
 # Point cloud streams (sensor_msgs/msg/PointCloud2). Read via bot.point_cloud.get_once().
 POINT_CLOUD_TOPICS:
   head: "/zed_head/zed_node/point_cloud/cloud_registered/filtered_map"
