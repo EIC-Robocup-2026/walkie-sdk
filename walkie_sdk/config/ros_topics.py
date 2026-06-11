@@ -70,8 +70,10 @@ NAV_TOPICS = {
 }
 
 NAV_ACTIONS = {
-    "navigate_to_pose": os.getenv("WALKIE_NAV_ACTION_NAV2", "navigate_to_pose"),
-    "navigate_to_pose_type": os.getenv("WALKIE_NAV_ACTION_NAV2_TYPE", "nav2_msgs/action/NavigateToPose"),
+    "navigate_to_pose":        os.getenv("WALKIE_NAV_ACTION_NAV2",         "navigate_to_pose"),
+    "navigate_to_pose_type":   os.getenv("WALKIE_NAV_ACTION_NAV2_TYPE",    "nav2_msgs/action/NavigateToPose"),
+    "navigate_to_object":      os.getenv("WALKIE_NAV_ACTION_NAV_OBJ",      "navigate_to_object"),
+    "navigate_to_object_type": os.getenv("WALKIE_NAV_ACTION_NAV_OBJ_TYPE", "robot_navigation/action/NavigateToObject"),
 }
 
 # ── Telemetry Topics ───────────────────────────────────────────

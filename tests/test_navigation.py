@@ -19,9 +19,10 @@ Requires: rosbridge server + Nav2 'navigate_to_pose' action. Telemetry
 
 Usage:
     python tests/test_navigation.py --ip 192.168.1.100
-    python tests/test_navigation.py --ip 192.168.1.100 --dx 0.3            # nudge 30cm
+    python tests/test_navigation.py --ip 192.168.1.100 --dx 0.3                 # nudge 30cm
     python tests/test_navigation.py --goal-x 2.0 --goal-y 1.0 --goal-heading 0.0
-    python tests/test_navigation.py --ip 192.168.1.100 --yes               # no prompts
+    python tests/test_navigation.py --goal-obj-x 1.5 --goal-obj-y -3.0          # navigate_to_object
+    python tests/test_navigation.py --ip 192.168.1.100 --yes                    # no prompts
 """
 
 import argparse
@@ -72,12 +73,15 @@ def _confirm(action: str) -> bool:
 
 
 def _wait_for_pose(bot: WalkieRobot, timeout: float):
+    print(f"  Waiting up to {timeout:.0f}s for telemetry...", end="", flush=True)
     deadline = time.time() + timeout
     while time.time() < deadline:
         pose = bot.status.get_position()
         if pose is not None:
+            print(" got it.")
             return pose
         time.sleep(0.1)
+    print(" timed out.")
     return None
 
 
@@ -153,6 +157,18 @@ def test_emergency_stop(bot: WalkieRobot, goal) -> str:
     return _pass("emergency stop sent (zero cmd_vel + cancel)")
 
 
+def test_navigate_to_object(bot: WalkieRobot, obj_x: float, obj_y: float, standoff: float, timeout: float) -> str:
+    _section("TEST 6: navigate_to_object (no heading)")
+    print(f"  Object position (map frame): x={obj_x:.3f}  y={obj_y:.3f}  standoff={standoff:.2f} m")
+    if not _confirm(f"navigate to object at x={obj_x:.2f}, y={obj_y:.2f} via nav_commander"):
+        return _skip("user declined motion")
+    result = bot.nav.go_to(x=obj_x, y=obj_y, standoff=standoff, blocking=True, timeout=timeout)
+    print(f"  Result: {result}  |  final status: {bot.nav.status}  |  message: {bot.nav.nav_error_msg}")
+    if result not in ("SUCCEEDED", "CLOSE_ENOUGH"):
+        return _fail(f"expected SUCCEEDED/CLOSE_ENOUGH, got {result}")
+    return _pass(f"{result} — method: {bot.nav.nav_error_msg}")
+
+
 def test_feedback_callback(bot: WalkieRobot, goal, timeout: float) -> str:
     _section("TEST 5: blocking go_to() with feedback_callback")
     x, y, h = goal
@@ -190,6 +206,9 @@ def main() -> None:
     parser.add_argument("--goal-x", type=float, default=None, help="Absolute map-frame goal X (overrides --dx)")
     parser.add_argument("--goal-y", type=float, default=None, help="Absolute map-frame goal Y (overrides --dy)")
     parser.add_argument("--goal-heading", type=float, default=None, help="Goal heading in radians")
+    parser.add_argument("--goal-obj-x", type=float, default=None, help="Object X for navigate_to_object test (no heading)")
+    parser.add_argument("--goal-obj-y", type=float, default=None, help="Object Y for navigate_to_object test (no heading)")
+    parser.add_argument("--standoff", type=float, default=0.0, help="Standoff override for navigate_to_object (m, 0=default)")
     parser.add_argument("--yes", "-y", action="store_true", help="Skip confirmation prompts")
     args = parser.parse_args()
     AUTO_YES = args.yes
@@ -209,10 +228,16 @@ def main() -> None:
     try:
         results.append(test_initial_status(bot))
 
+        # navigate_to_object test (no heading required)
+        if args.goal_obj_x is not None and args.goal_obj_y is not None:
+            results.append(test_navigate_to_object(bot, args.goal_obj_x, args.goal_obj_y, args.standoff, args.timeout))
+
+        # navigate_to_pose tests (heading required; derive goal from telemetry or explicit coords)
         goal = _resolve_goal(bot, args)
         if goal is None:
-            print("\n  Could not determine a goal: no telemetry and no --goal-x/--goal-y given.")
-            results.append(_fail("goal resolution failed — motion tests skipped"))
+            print("\n  Could not determine a nav2 goal: no telemetry and no --goal-x/--goal-y given.")
+            print("  Tip: pass --goal-obj-x/--goal-obj-y to test navigate_to_object without telemetry.")
+            results.append(_fail("goal resolution failed — navigate_to_pose tests skipped"))
         else:
             results.append(test_blocking_go_to(bot, goal, args.timeout))
             results.append(test_nonblocking_then_cancel(bot, goal, args.timeout))
