@@ -9,12 +9,15 @@ to work with any transport implementation (rosbridge, zenoh).
 """
 
 import threading
-from typing import Any, Callable, Dict, Optional
+import time
+from typing import Any, Callable, Dict, Optional, Tuple
+
+import numpy as np
 
 from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.converters import euler_to_quaternion
 from walkie_sdk.utils.namespace import apply_namespace
-from walkie_sdk.config.ros_topics import NAV_TOPICS, NAV_ACTIONS
+from walkie_sdk.config.ros_topics import NAV_TOPICS, NAV_ACTIONS, MAP_TOPICS, MAP_SERVICES
 
 
 class Navigation:
@@ -44,6 +47,7 @@ class Navigation:
         self._final_distance_remaining: Optional[float] = None
         self._nav_error_code: Optional[int] = None
         self._nav_error_msg: Optional[str] = None
+        self._map_metadata: Optional[dict] = None
 
     @property
     def namespace(self) -> str:
@@ -69,6 +73,16 @@ class Navigation:
     def cmd_vel_topic(self) -> str:
         """Get the full cmd_vel topic name with namespace."""
         return apply_namespace(NAV_TOPICS["cmd_vel"], self._namespace)
+
+    @property
+    def map_topic(self) -> str:
+        """Get the full map topic name with namespace."""
+        return apply_namespace(MAP_TOPICS["map"], self._namespace)
+
+    @property
+    def map_metadata(self) -> Optional[dict]:
+        """Metadata (resolution, size, origin) of the last fetched map, or None."""
+        return self._map_metadata
 
     def go_to(
         self,
@@ -392,3 +406,131 @@ class Navigation:
             "error_msg": self._nav_error_msg,
             "recoveries": self._number_of_recoveries,
         }
+
+    # ------------------------------------------------------------------
+    # Occupancy grid map
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _occupancy_grid_to_image(grid: dict) -> np.ndarray:
+        """
+        Convert a nav_msgs/OccupancyGrid (as a dict) into a grayscale image.
+
+        Cell values map to: -1 (unknown) → 127, 0 (free) → 255, occupied → 0.
+        The grid is stored row-major starting at the bottom-left in ROS, so the
+        result is flipped vertically to match image (top-left origin) convention.
+        """
+        info = grid["info"]
+        w, h = info["width"], info["height"]
+        data = np.array(grid["data"], dtype=np.int16).reshape(h, w)
+        img = np.where(data == -1, 127, np.where(data == 0, 255, 0)).astype(np.uint8)
+        return np.flipud(img)  # ROS bottom-left → image top-left
+
+    def get_map_image(self, timeout: float = 5.0) -> Optional[np.ndarray]:
+        """
+        Fetch the robot's occupancy grid map and return it as a grayscale image.
+
+        Tries the map service first (nav_msgs/srv/GetMap), then falls back to
+        subscribing to the map topic. On success, ``map_metadata`` is populated
+        with the map's resolution, size, and origin for pixel conversions.
+
+        Args:
+            timeout: Per-source timeout in seconds (applies to both the service
+                     call and the topic subscription wait).
+
+        Returns:
+            A ``(height, width)`` uint8 numpy array, or None if the map could
+            not be retrieved.
+
+        Raises:
+            ConnectionError: If not connected to the robot.
+        """
+        if not self._transport.is_connected:
+            raise ConnectionError("Not connected to robot")
+
+        grid = self._fetch_grid_via_service(timeout)
+        if grid is None:
+            grid = self._fetch_grid_via_topic(timeout)
+        if grid is None:
+            return None
+
+        info = grid["info"]
+        origin = info["origin"]["position"]
+        self._map_metadata = {
+            "resolution": info["resolution"],
+            "width":      info["width"],
+            "height":     info["height"],
+            "origin_x":   origin["x"],
+            "origin_y":   origin["y"],
+        }
+        return self._occupancy_grid_to_image(grid)
+
+    def _fetch_grid_via_service(self, timeout: float) -> Optional[dict]:
+        """Try to fetch the occupancy grid via the GetMap service."""
+        try:
+            response = self._transport.call_service(
+                service_name=apply_namespace(MAP_SERVICES["get_map"], self._namespace),
+                service_type=MAP_SERVICES["get_map_type"],
+                request={},
+                timeout=timeout,
+            )
+            return response.get("map")
+        except Exception:
+            return None
+
+    def _fetch_grid_via_topic(self, timeout: float) -> Optional[dict]:
+        """Fall back to fetching the occupancy grid by subscribing to the map topic."""
+        received: list = [None]
+        lock = threading.Lock()
+
+        def _cb(msg: dict) -> None:
+            with lock:
+                received[0] = msg
+
+        handle = None
+        try:
+            handle = self._transport.subscribe(
+                topic=self.map_topic,
+                message_type=MAP_TOPICS["map_type"],
+                callback=_cb,
+                queue_size=1,
+            )
+            deadline = time.monotonic() + timeout
+            while time.monotonic() < deadline:
+                with lock:
+                    if received[0] is not None:
+                        return received[0]
+                time.sleep(0.05)
+            return None
+        except Exception:
+            return None
+        finally:
+            if handle is not None:
+                try:
+                    self._transport.unsubscribe(handle)
+                except Exception:
+                    pass
+
+    def map_to_pixel(self, x: float, y: float) -> Tuple[int, int]:
+        """
+        Convert a map-frame coordinate (metres) to a pixel coordinate.
+
+        The pixel coordinate matches the image returned by ``get_map_image()``
+        (top-left origin, y increasing downward).
+
+        Args:
+            x: Map-frame X coordinate in metres.
+            y: Map-frame Y coordinate in metres.
+
+        Returns:
+            (px, py) pixel coordinates.
+
+        Raises:
+            RuntimeError: If no map has been fetched yet (call get_map_image()).
+        """
+        if self._map_metadata is None:
+            raise RuntimeError("No map metadata — call get_map_image() first")
+        m = self._map_metadata
+        px = int((x - m["origin_x"]) / m["resolution"])
+        py = int(m["height"] - 1 - (y - m["origin_y"]) / m["resolution"])
+        return px, py

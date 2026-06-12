@@ -171,6 +171,61 @@ def create_app(session: RobotSession | None = None) -> FastAPI:
             ),
         }
 
+    @app.post("/api/arm/clear_objects")
+    def arm_clear_objects() -> Dict[str, Any]:
+        robot = session.require()
+        ok = robot.arm.clear_collision_objects()
+        out: Dict[str, Any] = {"ok": ok}
+        if not ok:
+            out["error"] = "Failed to clear collision objects (is move_group up?)"
+        return out
+
+    @app.post("/api/arm/clear_octomap")
+    def arm_clear_octomap() -> Dict[str, Any]:
+        robot = session.require()
+        ok = robot.arm.clear_octomap()
+        out: Dict[str, Any] = {"ok": ok}
+        if not ok:
+            out["error"] = "Failed to clear octomap (is move_group up?)"
+        return out
+
+    @app.post("/api/arm/toggle_collision")
+    def arm_toggle_collision(req: models.ToggleCollisionRequest) -> Dict[str, Any]:
+        robot = session.require()
+        ok = robot.arm.toggle_gripper_collision(req.group_name, req.enable)
+        out: Dict[str, Any] = {"ok": ok, "group_name": req.group_name, "enable": req.enable}
+        if not ok:
+            out["error"] = (
+                f"Failed to {'enable' if req.enable else 'disable'} collision "
+                f"for {req.group_name} (is move_group up?)"
+            )
+        return out
+
+    @app.post("/api/arm/param/set")
+    def arm_param_set(req: models.ParamSetRequest) -> Dict[str, Any]:
+        robot = session.require()
+        res = robot.arm.set_param_result(req.name, req.value)
+        out: Dict[str, Any] = {"ok": res["ok"], "name": req.name, "value": req.value}
+        if not res["ok"]:
+            out["error"] = (
+                f"Commander rejected '{req.name}' = {req.value!r}: "
+                f"{res['reason'] or 'unknown reason'}"
+            )
+        return out
+
+    @app.post("/api/arm/param/get")
+    def arm_param_get(req: models.ParamGetRequest) -> Dict[str, Any]:
+        robot = session.require()
+        value = robot.arm.get_param(req.name)
+        if value is None:
+            return {
+                "ok": False,
+                "name": req.name,
+                "value": None,
+                "error": f"Param '{req.name}' not found or not set on commander",
+            }
+        return {"ok": True, "name": req.name, "value": value}
+
     @app.post("/api/arm/gripper")
     def arm_gripper(req: models.GripperRequest) -> Dict[str, Any]:
         robot = session.require()

@@ -27,6 +27,7 @@ DEPTH_TOPICS = {
 # intrinsics serves both colour and depth projection.
 CAMERA_INFO_TOPICS = {
     "head": os.getenv("WALKIE_CAMERA_INFO_HEAD", "/zed_head/zed_node/rgb/color/rect/camera_info"),
+}
 # ── Point Cloud Topics ─────────────────────────────────────────
 # Keys are source names → topic strings. Message type is always
 # sensor_msgs/msg/PointCloud2 (hardcoded in the transport).
@@ -61,6 +62,25 @@ ARM_SERVICES = {
     "get_ee_pose_type":      os.getenv("WALKIE_ARM_SVC_GET_EE_POSE_TYPE", "my_robot_interfaces/srv/GetEEPose"),
     "get_joint_states":      os.getenv("WALKIE_ARM_SVC_GET_JOINT_STATES", "get_joint_states"),
     "get_joint_states_type": os.getenv("WALKIE_ARM_SVC_GET_JOINT_STATES_TYPE", "my_robot_interfaces/srv/GetJointStates"),
+    "clear_objects":         os.getenv("WALKIE_ARM_SVC_CLEAR_OBJECTS", "clear_collision_objects"),
+    "clear_objects_type":    os.getenv("WALKIE_ARM_SVC_CLEAR_OBJECTS_TYPE", "std_srvs/srv/Trigger"),
+    "toggle_collision":      os.getenv("WALKIE_ARM_SVC_TOGGLE_COLLISION", "toggle_gripper_collision"),
+    "toggle_collision_type": os.getenv("WALKIE_ARM_SVC_TOGGLE_COLLISION_TYPE", "my_robot_interfaces/srv/ToggleGripperCollision"),
+    "clear_octomap":         os.getenv("WALKIE_ARM_SVC_CLEAR_OCTOMAP", "clear_octomap"),
+    "clear_octomap_type":    os.getenv("WALKIE_ARM_SVC_CLEAR_OCTOMAP_TYPE", "std_srvs/srv/Empty"),
+}
+
+# Standard ROS 2 parameter services exposed by the commander node, used to
+# read/write its tuning params live (gripper_speed, planner_id, grasp_*, ...).
+# "node" is the commander node name; the param services live under it.
+ARM_PARAMS = {
+    "node":                 os.getenv("WALKIE_ARM_PARAM_NODE", "bimanual_commander"),
+    "set":                  os.getenv("WALKIE_ARM_PARAM_SET", "set_parameters"),
+    "set_type":             os.getenv("WALKIE_ARM_PARAM_SET_TYPE", "rcl_interfaces/srv/SetParameters"),
+    "get":                  os.getenv("WALKIE_ARM_PARAM_GET", "get_parameters"),
+    "get_type":             os.getenv("WALKIE_ARM_PARAM_GET_TYPE", "rcl_interfaces/srv/GetParameters"),
+    "list":                 os.getenv("WALKIE_ARM_PARAM_LIST", "list_parameters"),
+    "list_type":            os.getenv("WALKIE_ARM_PARAM_LIST_TYPE", "rcl_interfaces/srv/ListParameters"),
 }
 
 # ── Navigation Topics & Actions ────────────────────────────────
@@ -74,6 +94,17 @@ NAV_ACTIONS = {
     "navigate_to_pose_type":   os.getenv("WALKIE_NAV_ACTION_NAV2_TYPE",    "nav2_msgs/action/NavigateToPose"),
     "navigate_to_object":      os.getenv("WALKIE_NAV_ACTION_NAV_OBJ",      "navigate_to_object"),
     "navigate_to_object_type": os.getenv("WALKIE_NAV_ACTION_NAV_OBJ_TYPE", "robot_navigation/action/NavigateToObject"),
+}
+
+# ── Map Topics & Services ──────────────────────────────────────
+MAP_TOPICS = {
+    "map":      os.getenv("WALKIE_MAP_TOPIC", "map"),
+    "map_type": os.getenv("WALKIE_MAP_TYPE",  "nav_msgs/msg/OccupancyGrid"),
+}
+
+MAP_SERVICES = {
+    "get_map":      os.getenv("WALKIE_MAP_SERVICE",      "map_server/map"),
+    "get_map_type": os.getenv("WALKIE_MAP_SERVICE_TYPE", "nav_msgs/srv/GetMap"),
 }
 
 # ── Telemetry Topics ───────────────────────────────────────────
@@ -150,8 +181,11 @@ def load_config(yaml_path: str):
         if "ARM_TOPICS" in config: ARM_TOPICS.update(config["ARM_TOPICS"])
         if "ARM_ACTIONS" in config: ARM_ACTIONS.update(config["ARM_ACTIONS"])
         if "ARM_SERVICES" in config: ARM_SERVICES.update(config["ARM_SERVICES"])
+        if "ARM_PARAMS" in config: ARM_PARAMS.update(config["ARM_PARAMS"])
         if "NAV_TOPICS" in config: NAV_TOPICS.update(config["NAV_TOPICS"])
         if "NAV_ACTIONS" in config: NAV_ACTIONS.update(config["NAV_ACTIONS"])
+        if "MAP_TOPICS" in config: MAP_TOPICS.update(config["MAP_TOPICS"])
+        if "MAP_SERVICES" in config: MAP_SERVICES.update(config["MAP_SERVICES"])
         if "TELEMETRY_TOPICS" in config: TELEMETRY_TOPICS.update(config["TELEMETRY_TOPICS"])
         if "VIZ_TOPICS" in config: VIZ_TOPICS.update(config["VIZ_TOPICS"])
         if "OB_POSE_SERVICE" in config: OB_POSE_SERVICE.update(config["OB_POSE_SERVICE"])

@@ -17,7 +17,12 @@ Direct JTC streaming (via transport.publish):
 import threading
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
-from walkie_sdk.config.ros_topics import ARM_ACTIONS, ARM_SERVICES, ARM_TOPICS
+from walkie_sdk.config.ros_topics import (
+    ARM_ACTIONS,
+    ARM_PARAMS,
+    ARM_SERVICES,
+    ARM_TOPICS,
+)
 from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.namespace import apply_namespace
 
@@ -42,6 +47,124 @@ _RIGHT_GROUPS = {"right_arm", "right_arm_lift"}
 _BOTH_GROUPS = {"both_arms", "both_arms_lift"}
 
 _GRIPPER_MAX_M = 0.04  # fully open, metres
+
+
+# rcl_interfaces/msg/ParameterType enum values.
+_PT_NOT_SET = 0
+_PT_BOOL = 1
+_PT_INTEGER = 2
+_PT_DOUBLE = 3
+_PT_STRING = 4
+_PT_BOOL_ARRAY = 6
+_PT_INTEGER_ARRAY = 7
+_PT_DOUBLE_ARRAY = 8
+_PT_STRING_ARRAY = 9
+
+
+def _empty_param_value() -> Dict[str, Any]:
+    """A fully-populated rcl_interfaces/msg/ParameterValue with all fields at
+    their defaults — rosbridge/zenoh expect every field present."""
+    return {
+        "type": _PT_NOT_SET,
+        "bool_value": False,
+        "integer_value": 0,
+        "double_value": 0.0,
+        "string_value": "",
+        "byte_array_value": [],
+        "bool_array_value": [],
+        "integer_array_value": [],
+        "double_array_value": [],
+        "string_array_value": [],
+    }
+
+
+def _to_param_value(value: Any) -> Dict[str, Any]:
+    """Build a rcl_interfaces/msg/ParameterValue dict from a Python value,
+    inferring the ROS parameter type. bool is checked before int (bool is an
+    int subclass in Python)."""
+    pv = _empty_param_value()
+    if isinstance(value, bool):
+        pv["type"] = _PT_BOOL
+        pv["bool_value"] = value
+    elif isinstance(value, int):
+        pv["type"] = _PT_INTEGER
+        pv["integer_value"] = value
+    elif isinstance(value, float):
+        pv["type"] = _PT_DOUBLE
+        pv["double_value"] = value
+    elif isinstance(value, str):
+        pv["type"] = _PT_STRING
+        pv["string_value"] = value
+    elif isinstance(value, (list, tuple)):
+        seq = list(value)
+        if all(isinstance(v, bool) for v in seq):
+            pv["type"] = _PT_BOOL_ARRAY
+            pv["bool_array_value"] = seq
+        elif all(isinstance(v, int) and not isinstance(v, bool) for v in seq):
+            pv["type"] = _PT_INTEGER_ARRAY
+            pv["integer_array_value"] = seq
+        elif all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in seq):
+            pv["type"] = _PT_DOUBLE_ARRAY
+            pv["double_array_value"] = [float(v) for v in seq]
+        else:
+            pv["type"] = _PT_STRING_ARRAY
+            pv["string_array_value"] = [str(v) for v in seq]
+    else:
+        raise TypeError(f"Unsupported parameter value type: {type(value)}")
+    return pv
+
+
+def _to_param_value_typed(value: Any, declared_type: int) -> Dict[str, Any]:
+    """Build a ParameterValue coerced to the param's already-declared ROS type.
+
+    ROS 2 rejects a set when the value's type doesn't match the declared type
+    (e.g. an int literal for a double param), so when we know the declared type
+    we coerce instead of inferring. declared_type == PARAMETER_NOT_SET (the param
+    doesn't exist yet) falls back to inference."""
+    if declared_type == _PT_NOT_SET:
+        return _to_param_value(value)
+    pv = _empty_param_value()
+    pv["type"] = declared_type
+    try:
+        if declared_type == _PT_BOOL:
+            pv["bool_value"] = bool(value)
+        elif declared_type == _PT_INTEGER:
+            pv["integer_value"] = int(value)
+        elif declared_type == _PT_DOUBLE:
+            pv["double_value"] = float(value)
+        elif declared_type == _PT_STRING:
+            pv["string_value"] = str(value)
+        elif declared_type == _PT_BOOL_ARRAY:
+            pv["bool_array_value"] = [bool(v) for v in value]
+        elif declared_type == _PT_INTEGER_ARRAY:
+            pv["integer_array_value"] = [int(v) for v in value]
+        elif declared_type == _PT_DOUBLE_ARRAY:
+            pv["double_array_value"] = [float(v) for v in value]
+        elif declared_type == _PT_STRING_ARRAY:
+            pv["string_array_value"] = [str(v) for v in value]
+        else:
+            return _to_param_value(value)
+    except (TypeError, ValueError):
+        # Value can't be coerced to the declared type — let the inferred type go
+        # through so the commander returns a clear type-mismatch reason.
+        return _to_param_value(value)
+    return pv
+
+
+def _from_param_value(pv: Dict[str, Any]) -> Any:
+    """Extract the Python value from a rcl_interfaces/msg/ParameterValue dict.
+    Returns None if the parameter is not set (i.e. doesn't exist)."""
+    t = pv.get("type", _PT_NOT_SET)
+    return {
+        _PT_BOOL: pv.get("bool_value"),
+        _PT_INTEGER: pv.get("integer_value"),
+        _PT_DOUBLE: pv.get("double_value"),
+        _PT_STRING: pv.get("string_value"),
+        _PT_BOOL_ARRAY: pv.get("bool_array_value"),
+        _PT_INTEGER_ARRAY: pv.get("integer_array_value"),
+        _PT_DOUBLE_ARRAY: pv.get("double_array_value"),
+        _PT_STRING_ARRAY: pv.get("string_array_value"),
+    }.get(t, None)
 
 
 class ArmGroup:
@@ -461,6 +584,87 @@ class Arm:
 
     # ── Service methods ───────────────────────────────────────────────────
 
+    def clear_collision_objects(self, timeout: float = 5.0) -> bool:
+        """
+        Detach anything held by the grippers and remove all world collision
+        objects from the MoveIt planning scene (the octomap is left untouched).
+
+        Returns True if the commander reported success.
+        """
+        try:
+            response = self._transport.call_service(
+                service_name=apply_namespace(
+                    ARM_SERVICES["clear_objects"], self._namespace
+                ),
+                service_type=ARM_SERVICES["clear_objects_type"],
+                request={},
+                timeout=timeout,
+            )
+            ok = bool(response.get("success", False))
+            msg = response.get("message", "")
+            if ok:
+                print(f"[Arm] clear_collision_objects: {msg}")
+            else:
+                print(f"[Arm] clear_collision_objects failed: {msg}")
+            return ok
+        except Exception as e:
+            print(f"[Arm] clear_collision_objects error: {e}")
+            return False
+
+    def clear_octomap(self, timeout: float = 5.0) -> bool:
+        """
+        Clear the MoveIt octomap (the sensed point-cloud/depth-camera obstacles
+        that block planning) via move_group's /clear_octomap service. Leaves
+        collision objects and robot state untouched.
+
+        Returns True if the call succeeded.
+        """
+        try:
+            self._transport.call_service(
+                service_name=apply_namespace(
+                    ARM_SERVICES["clear_octomap"], self._namespace
+                ),
+                service_type=ARM_SERVICES["clear_octomap_type"],
+                request={},
+                timeout=timeout,
+            )
+            print("[Arm] clear_octomap: cleared")
+            return True
+        except Exception as e:
+            print(f"[Arm] clear_octomap error: {e}")
+            return False
+
+    def toggle_gripper_collision(
+        self, group_name: str, enable: bool, timeout: float = 5.0
+    ) -> bool:
+        """
+        Enable or disable collision checking for a gripper's links against the
+        rest of the world (octomap, scene objects, other robot links).
+
+        Args:
+            group_name: "left_gripper" or "right_gripper".
+            enable: True  = collision checked (normal);
+                    False = gripper links ignored vs the world.
+            timeout: Service call timeout in seconds.
+
+        Returns True if the commander accepted the change.
+        """
+        try:
+            response = self._transport.call_service(
+                service_name=apply_namespace(
+                    ARM_SERVICES["toggle_collision"], self._namespace
+                ),
+                service_type=ARM_SERVICES["toggle_collision_type"],
+                request={"group_name": group_name, "enable": bool(enable)},
+                timeout=timeout,
+            )
+            ok = bool(response.get("success", False))
+            print(f"[Arm] toggle_gripper_collision: {response.get('status', '')}")
+            return ok
+        except Exception as e:
+            print(f"[Arm] toggle_gripper_collision error: {e}")
+            return False
+
     def get_ee_pose(
         self,
         group_name: str,
@@ -549,6 +753,181 @@ class Arm:
             return None
         except Exception as e:
             print(f"[Arm] get_joint_states_service error: {e}")
+            return None
+
+    # ── Commander parameters (live tuning via ROS 2 param services) ───────
+
+    def _param_service(self, key: str) -> str:
+        """Absolute name of one of the commander node's parameter services,
+        e.g. '/bimanual_commander/get_parameters'.
+
+        ROS 2 advertises the per-node parameter services under the node's
+        FULLY-QUALIFIED name, so this is built with a leading slash — unlike the
+        commander's custom services (get_ee_pose, ...) which live at the root.
+        A namespace, if set, is inserted ahead of the node name."""
+        node = str(ARM_PARAMS["node"]).strip("/")
+        ns = self._namespace.strip("/")
+        parts = [p for p in (ns, node, ARM_PARAMS[key]) if p]
+        return "/" + "/".join(parts)
+
+    def _declared_types(
+        self, names: List[str], timeout: float = 5.0
+    ) -> Dict[str, int]:
+        """Map each name to its already-declared ROS ParameterType (0 =
+        PARAMETER_NOT_SET / unknown). Used to coerce set values to the right
+        type so the commander doesn't reject e.g. an int for a double param."""
+        try:
+            resp = self._transport.call_service(
+                service_name=self._param_service("get"),
+                service_type=ARM_PARAMS["get_type"],
+                request={"names": list(names)},
+                timeout=timeout,
+            )
+            values = resp.get("values", [])
+            return {n: int(v.get("type", 0)) for n, v in zip(names, values)}
+        except Exception:
+            return {n: 0 for n in names}
+
+    def set_param_result(
+        self, name: str, value: Any, timeout: float = 5.0
+    ) -> Dict[str, Any]:
+        """Set one commander param and return {"ok": bool, "reason": str}.
+
+        The value is coerced to the param's already-declared type, so passing a
+        bare int (e.g. 1) for a double param like gripper_speed works instead of
+        being rejected for a type mismatch."""
+        declared = self._declared_types([name], timeout).get(name, 0)
+        pv = _to_param_value_typed(value, declared)
+        try:
+            response = self._transport.call_service(
+                service_name=self._param_service("set"),
+                service_type=ARM_PARAMS["set_type"],
+                request={"parameters": [{"name": name, "value": pv}]},
+                timeout=timeout,
+            )
+            results = response.get("results", [])
+            if not results:
+                return {"ok": False, "reason": "no result from set_parameters"}
+            ok = bool(results[0].get("successful", False))
+            reason = results[0].get("reason", "") or ("" if ok else "rejected")
+            if not ok:
+                print(f"[Arm] set_param('{name}') rejected: {reason}")
+            return {"ok": ok, "reason": reason}
+        except Exception as e:
+            print(f"[Arm] set_param('{name}') error: {e}")
+            return {"ok": False, "reason": str(e)}
+
+    def set_param(self, name: str, value: Any, timeout: float = 5.0) -> bool:
+        """
+        Set a commander ROS parameter live (e.g. gripper_speed, planner_id,
+        arm_planning_time, grasp_object_size, finger_padding, ...).
+
+        The value is coerced to the param's already-declared type, so a bare int
+        works for a double param. Returns True if the commander accepted it; use
+        set_param_result() to also get the rejection reason.
+
+        Args:
+            name: Parameter name as declared by the commander.
+            value: New value.
+            timeout: Service call timeout in seconds.
+
+        Returns:
+            True if the commander accepted the change.
+        """
+        return self.set_param_result(name, value, timeout)["ok"]
+
+    def set_params(self, params: Dict[str, Any], timeout: float = 5.0) -> bool:
+        """Set several commander parameters in one atomic call. Returns True
+        only if every parameter was accepted. Each value is coerced to the
+        param's already-declared type."""
+        declared = self._declared_types(list(params.keys()), timeout)
+        try:
+            response = self._transport.call_service(
+                service_name=self._param_service("set"),
+                service_type=ARM_PARAMS["set_type"],
+                request={
+                    "parameters": [
+                        {"name": n,
+                         "value": _to_param_value_typed(v, declared.get(n, 0))}
+                        for n, v in params.items()
+                    ]
+                },
+                timeout=timeout,
+            )
+            results = response.get("results", [])
+            ok = bool(results) and all(r.get("successful", False) for r in results)
+            if not ok:
+                print(f"[Arm] set_params partial/failed: {results}")
+            return ok
+        except Exception as e:
+            print(f"[Arm] set_params error: {e}")
+            return False
+
+    # Valid values for the commander's grasp_scene_action param. See the
+    # commander: grasp = attach the box, place = detach + remove after the next
+    # motion, none = leave scene alone.
+    GRASP_SCENE_ACTIONS = ("grasp", "place", "none")
+
+    def set_grasp_scene_action(self, action: str, timeout: float = 5.0) -> bool:
+        """
+        Set the commander's ``grasp_scene_action`` param, read fresh on the next
+        gripper command. Use before sending an open/close to control what the
+        planning-scene grasp box does:
+
+            grasp - attach the box (picking up)
+            place - detach + remove after the next motion (placing/releasing)
+            none  - leave the planning scene untouched
+
+        Returns True if the commander accepted the change.
+        """
+        if action not in self.GRASP_SCENE_ACTIONS:
+            raise ValueError(
+                f"grasp_scene_action must be one of {self.GRASP_SCENE_ACTIONS}, "
+                f"got {action!r}"
+            )
+        return self.set_param("grasp_scene_action", action, timeout=timeout)
+
+    def get_param(self, name: str, timeout: float = 5.0) -> Optional[Any]:
+        """Read a single commander parameter. Returns None if it doesn't exist
+        or the call fails."""
+        values = self.get_params([name], timeout=timeout)
+        if values is None:
+            return None
+        return values.get(name)
+
+    def get_params(
+        self, names: List[str], timeout: float = 5.0
+    ) -> Optional[Dict[str, Any]]:
+        """Read several commander parameters at once. Returns a name→value dict
+        (value None for params that aren't set), or None on call failure."""
+        try:
+            response = self._transport.call_service(
+                service_name=self._param_service("get"),
+                service_type=ARM_PARAMS["get_type"],
+                request={"names": list(names)},
+                timeout=timeout,
+            )
+            values = response.get("values", [])
+            return {n: _from_param_value(v) for n, v in zip(names, values)}
+        except Exception as e:
+            print(f"[Arm] get_params error: {e}")
+            return None
+
+    def list_params(
+        self, prefixes: Optional[List[str]] = None, timeout: float = 5.0
+    ) -> Optional[List[str]]:
+        """List the commander's parameter names. Optionally filter by prefix.
+        Returns None on call failure."""
+        try:
+            response = self._transport.call_service(
+                service_name=self._param_service("list"),
+                service_type=ARM_PARAMS["list_type"],
+                request={"prefixes": list(prefixes or []), "depth": 0},
+                timeout=timeout,
+            )
+            return response.get("result", {}).get("names", [])
+        except Exception as e:
+            print(f"[Arm] list_params error: {e}")
             return None
 
     # ── Topic-based state read (continuous subscription) ──────────────────

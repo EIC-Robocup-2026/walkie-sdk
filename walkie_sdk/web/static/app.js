@@ -150,6 +150,15 @@ $("btn-arm-home").onclick = action(
   }),
   "Homing arm"
 );
+$("btn-arm-clear").onclick = action(
+  () => api("/api/arm/clear_objects", { method: "POST", body: {} }),
+  "Cleared collision objects"
+);
+$("btn-arm-clear-octomap").onclick = action(
+  () => api("/api/arm/clear_octomap", { method: "POST", body: {} }),
+  "Cleared octomap"
+);
+let lastEePose = null;
 $("btn-arm-ee").onclick = action(async () => {
   const r = await api("/api/arm/ee_pose", {
     method: "POST",
@@ -158,11 +167,40 @@ $("btn-arm-ee").onclick = action(async () => {
       frame_id: $("arm_frame").value.trim() || "base_footprint",
     },
   });
+  lastEePose = r.pose || null;
   $("arm-ee-readout").textContent = r.pose
     ? JSON.stringify(r.pose, null, 2)
     : "(no pose)";
   return r;
 }, "EE pose read");
+
+// Quaternion -> roll/pitch/yaw (ZYX), matching the commander's tf2 q.setRPY().
+function quatToRpy(qx, qy, qz, qw) {
+  const sinr = 2 * (qw * qx + qy * qz);
+  const cosr = 1 - 2 * (qx * qx + qy * qy);
+  const roll = Math.atan2(sinr, cosr);
+  let sinp = 2 * (qw * qy - qz * qx);
+  sinp = Math.max(-1, Math.min(1, sinp));
+  const pitch = Math.asin(sinp);
+  const siny = 2 * (qw * qz + qx * qy);
+  const cosy = 1 - 2 * (qy * qy + qz * qz);
+  const yaw = Math.atan2(siny, cosy);
+  return { roll, pitch, yaw };
+}
+
+// Fill the X/Y/Z/R/P/Y pose inputs from the last read EE pose.
+$("btn-arm-fill-pose").onclick = action(() => {
+  if (!lastEePose) throw new Error("Read EE pose first");
+  const p = lastEePose;
+  $("arm_x").value = (+p.x).toFixed(4);
+  $("arm_y").value = (+p.y).toFixed(4);
+  $("arm_z").value = (+p.z).toFixed(4);
+  const { roll, pitch, yaw } = quatToRpy(p.qx, p.qy, p.qz, p.qw);
+  $("arm_roll").value = roll.toFixed(4);
+  $("arm_pitch").value = pitch.toFixed(4);
+  $("arm_yaw").value = yaw.toFixed(4);
+  if ($("arm_frame") && p.frame_id) $("arm_frame").value = p.frame_id;
+}, "Pose fields filled");
 
 function sendGripper(positionNorm) {
   return api("/api/arm/gripper", {
@@ -184,6 +222,64 @@ $("btn-grip-close").onclick = action(() => {
   return sendGripper(0.0);
 }, "Gripper closing");
 $("btn-grip-set").onclick = action(() => sendGripper(+$("grip_pos").value), "Gripper set");
+$("btn-grasp-scene-set").onclick = action(() => api("/api/arm/param/set", {
+  method: "POST",
+  body: { name: "grasp_scene_action", value: $("grasp_scene_action").value },
+}), "grasp_scene_action set");
+function toggleCollision(enable) {
+  return api("/api/arm/toggle_collision", {
+    method: "POST",
+    body: { group_name: $("collision_group").value, enable },
+  });
+}
+$("btn-collision-enable").onclick = action(() => toggleCollision(true), "Collision enabled");
+$("btn-collision-disable").onclick = action(() => toggleCollision(false), "Collision disabled");
+
+// ── Commander params ───────────────────────────────────────────────────
+// Coerce the free-text input into a JSON-typed value the way set_param
+// expects: true/false → bool, a bare number → number, a comma list → numbers
+// (or strings if any element isn't numeric), otherwise a plain string.
+function parseParamValue(raw) {
+  const s = raw.trim();
+  if (s === "true") return true;
+  if (s === "false") return false;
+  if (s.includes(",")) {
+    const parts = s.split(",").map((p) => p.trim());
+    const nums = parts.map(Number);
+    return nums.every((n) => !Number.isNaN(n)) ? nums : parts;
+  }
+  const n = Number(s);
+  return s !== "" && !Number.isNaN(n) ? n : s;
+}
+$("btn-planner-set").onclick = action(() => api("/api/arm/param/set", {
+  method: "POST",
+  body: { name: "planner_id", value: $("planner_id").value },
+}), "planner set");
+$("btn-param-set").onclick = action(async () => {
+  const name = $("param_name").value;
+  const value = parseParamValue($("param_value").value);
+  const r = await api("/api/arm/param/set", {
+    method: "POST",
+    body: { name, value },
+  });
+  $("param-readout").textContent =
+    `${name} = ${JSON.stringify(value)}  →  ${r.ok ? "OK" : "REJECTED"}`;
+  return r;
+}, "Param set");
+$("btn-param-get").onclick = action(async () => {
+  const name = $("param_name").value;
+  const r = await api("/api/arm/param/get", {
+    method: "POST",
+    body: { name },
+  });
+  $("param-readout").textContent = `${name} = ${JSON.stringify(r.value)}`;
+  if (r.value !== null && r.value !== undefined) {
+    $("param_value").value = Array.isArray(r.value)
+      ? r.value.join(", ")
+      : String(r.value);
+  }
+  return r;
+}, "Param get");
 
 // ── Joint states ───────────────────────────────────────────────────────
 $("btn-joints-refresh").onclick = action(async () => {

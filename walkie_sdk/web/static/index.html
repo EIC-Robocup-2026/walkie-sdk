@@ -172,6 +172,9 @@
         <button class="ghost" id="btn-arm-relative">Relative Move</button>
         <button class="ghost" id="btn-arm-home">Home</button>
         <button class="ghost" id="btn-arm-ee">Read EE Pose</button>
+        <button class="ghost" id="btn-arm-fill-pose">Fill Pose ↑</button>
+        <button class="ghost" id="btn-arm-clear">Clear Objects</button>
+        <button class="ghost" id="btn-arm-clear-octomap">Clear Octomap</button>
       </div>
       <pre id="arm-ee-readout" class="readout"></pre>
       <hr />
@@ -190,6 +193,77 @@
         <button class="ghost" id="btn-grip-close">Close</button>
         <button class="primary" id="btn-grip-set">Set</button>
       </div>
+      <div class="row two">
+        <div>
+          <label>Grasp scene action (next gripper cmd)</label>
+          <select id="grasp_scene_action">
+            <option value="none">none</option>
+            <option value="grasp">grasp</option>
+            <option value="place">place</option>
+          </select>
+        </div>
+        <div style="align-self:end">
+          <button class="ghost" id="btn-grasp-scene-set">Apply</button>
+        </div>
+      </div>
+      <div class="row two">
+        <div>
+          <label>Gripper collision</label>
+          <select id="collision_group">
+            <option value="left_gripper">left_gripper</option>
+            <option value="right_gripper">right_gripper</option>
+          </select>
+        </div>
+        <div class="btn-row" style="align-self:end">
+          <button class="ghost" id="btn-collision-enable">Enable</button>
+          <button class="ghost" id="btn-collision-disable">Disable</button>
+        </div>
+      </div>
+      <hr />
+      <!-- Motion planner -->
+      <div class="row two">
+        <div>
+          <label>Planner</label>
+          <select id="planner_id">
+            <option value="RRTConnect">RRTConnect</option>
+            <option value="RRT">RRT</option>
+            <option value="RRTstar">RRTstar</option>
+          </select>
+        </div>
+        <div class="btn-row" style="align-self:end">
+          <button class="ghost" id="btn-planner-set">Apply</button>
+        </div>
+      </div>
+      <!-- Live commander parameters -->
+      <div class="row two">
+        <div>
+          <label>Commander param</label>
+          <select id="param_name">
+            <option value="gripper_speed">gripper_speed</option>
+            <option value="planner_id">planner_id</option>
+            <option value="arm_planning_time">arm_planning_time</option>
+            <option value="grasp_attach_enable">grasp_attach_enable</option>
+            <option value="grasp_close_threshold">grasp_close_threshold</option>
+            <option value="grasp_scene_action">grasp_scene_action</option>
+            <option value="grasp_object_size">grasp_object_size</option>
+            <option value="grasp_object_offset">grasp_object_offset</option>
+            <option value="grasp_object_rpy">grasp_object_rpy</option>
+            <option value="grasp_object_height_above">grasp_object_height_above</option>
+            <option value="grasp_object_height_below">grasp_object_height_below</option>
+            <option value="finger_padding_enable">finger_padding_enable</option>
+            <option value="finger_padding">finger_padding</option>
+          </select>
+        </div>
+        <div>
+          <label>Value (number, true/false, or comma list)</label>
+          <input id="param_value" type="text" value="" />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="ghost" id="btn-param-get">Get</button>
+        <button class="primary" id="btn-param-set">Set</button>
+      </div>
+      <pre id="param-readout" class="readout"></pre>
     </section>
 
     <!-- Joint state hub readout -->

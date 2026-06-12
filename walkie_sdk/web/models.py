@@ -7,7 +7,7 @@ route handlers can forward them with ``model.dict()`` and minimal glue.
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -109,6 +109,27 @@ class HomeRequest(BaseModel):
 
     group_name: str = "left_arm_lift"
     blocking: bool = False
+
+
+class ParamSetRequest(BaseModel):
+    """Arguments for ``arm.set_param(...)``. ``value`` is JSON-typed (number,
+    bool, string, or list) — the client sends it already coerced."""
+
+    name: str
+    value: Any
+
+
+class ParamGetRequest(BaseModel):
+    """Arguments for ``arm.get_param(...)``."""
+
+    name: str
+
+
+class ToggleCollisionRequest(BaseModel):
+    """Arguments for ``arm.toggle_gripper_collision(...)``."""
+
+    group_name: str = "left_gripper"
+    enable: bool
 
 
 class ArmJointPositionRequest(BaseModel):
