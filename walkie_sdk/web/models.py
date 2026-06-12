@@ -108,6 +108,7 @@ class HomeRequest(BaseModel):
     """Arguments for ``arm.go_to_home(...)``."""
 
     group_name: str = "left_arm_lift"
+    pose_name: str = ""
     blocking: bool = False
 
 

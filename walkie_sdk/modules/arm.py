@@ -487,21 +487,24 @@ class Arm:
     def go_to_home(
         self,
         group_name: str,
+        pose_name: str = "",
         blocking: bool = True,
         feedback_callback: Optional[Callable] = None,
     ) -> str:
         """
-        Move arm to its named home position.
+        Move arm to a named SRDF preset pose.
 
         Args:
             group_name: MoveIt group (arm groups only, not gripper).
+            pose_name: SRDF named state, e.g. "home", "standby", "hands_up".
+                Empty defaults to "home" on the commander side.
             blocking: Wait for action to complete.
             feedback_callback: Optional callback for action feedback.
 
         Returns:
             "SUCCEEDED" | "FAILED" | "IN_PROGRESS"
         """
-        goal = {"group_name": group_name}
+        goal = {"group_name": group_name, "pose_name": pose_name}
         return self._send_action_goal(
             ARM_ACTIONS["go_to_home"],
             f"{ARM_ACTIONS['interface']}/GoToHome",

@@ -143,13 +143,16 @@ $("btn-arm-relative").onclick = action(
   }),
   "Relative move sent"
 );
-$("btn-arm-home").onclick = action(
-  () => api("/api/arm/home", {
-    method: "POST",
-    body: { group_name: $("arm_group").value, blocking: false },
-  }),
-  "Homing arm"
-);
+document.querySelectorAll(".arm-preset").forEach((btn) => {
+  const pose = btn.dataset.pose;
+  btn.onclick = action(
+    () => api("/api/arm/home", {
+      method: "POST",
+      body: { group_name: $("arm_group").value, pose_name: pose, blocking: false },
+    }),
+    `Arm preset "${pose}" sent`
+  );
+});
 $("btn-arm-clear").onclick = action(
   () => api("/api/arm/clear_objects", { method: "POST", body: {} }),
   "Cleared collision objects"

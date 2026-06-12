@@ -167,7 +167,9 @@ def create_app(session: RobotSession | None = None) -> FastAPI:
         return {
             "ok": True,
             "result": robot.arm.go_to_home(
-                group_name=req.group_name, blocking=req.blocking
+                group_name=req.group_name,
+                pose_name=req.pose_name,
+                blocking=req.blocking,
             ),
         }
 
