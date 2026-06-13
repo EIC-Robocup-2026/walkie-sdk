@@ -171,6 +171,7 @@ $("btn-arm-ee").onclick = action(async () => {
     },
   });
   lastEePose = r.pose || null;
+  $("btn-arm-fill-pose").disabled = !lastEePose;
   $("arm-ee-readout").textContent = r.pose
     ? JSON.stringify(r.pose, null, 2)
     : "(no pose)";

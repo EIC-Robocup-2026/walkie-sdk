@@ -89,6 +89,13 @@ input, select {
 input:focus, select:focus { outline: none; border-color: var(--accent); }
 
 .btn-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.btn-group-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--muted);
+  min-width: 56px;
+}
 
 button {
   padding: 9px 16px;

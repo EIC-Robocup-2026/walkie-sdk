@@ -226,6 +226,14 @@ class ArmGroup:
         meters = float(value) * _GRIPPER_MAX_M if norm else float(value)
         return self._arm.control_gripper(self._gripper_name, meters, **kwargs)
 
+    def grasp(self, position: float = 0.0, **kwargs) -> Dict[str, Any]:
+        """Close this group's gripper and report grasp success. See ``Arm.grasp``.
+        Returns a dict with ``grasped`` (the answer), ``gripper_gap``, ``success``,
+        ``status``."""
+        if self._gripper_name is None:
+            raise ValueError(f"Group '{self._group_name}' has no associated gripper")
+        return self._arm.grasp(self._gripper_name, position, **kwargs)
+
 
 class Arm:
     """
@@ -540,6 +548,58 @@ class Arm:
             blocking,
             feedback_callback,
         )
+
+    def grasp(
+        self,
+        group_name: str,
+        position: float = 0.0,
+        feedback_callback: Optional[Callable] = None,
+        timeout: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """
+        Close a gripper to grasp an object and report whether something is held.
+
+        Unlike :meth:`control_gripper` (which returns only the action status), this
+        waits for the result and returns the grasp verdict:
+
+            {
+              "status":      "SUCCEEDED" | "FAILED" | "CANCELED",  # action goal status
+              "success":     bool,    # controller reached the setpoint
+              "grasped":     bool,    # an object is held (settled gap in the detect band)
+              "gripper_gap": float,   # settled finger gap (m)
+            }
+
+        IMPORTANT: judge grasp success by ``grasped``, NOT ``success``. A real grasp
+        stalls the fingers on the object before the closed setpoint, so the
+        controller reports FAILED/ABORTED while the object IS held. Calibrate the
+        band with ``grasp_detect_min`` / ``grasp_detect_max`` on the robot.
+
+        Args:
+            group_name: "left_gripper" or "right_gripper".
+            position: Close target in meters (default 0.0 = fully closed).
+            feedback_callback: Optional action feedback callback.
+            timeout: Result timeout (seconds); None waits indefinitely.
+        """
+        goal = {"group_name": group_name, "position": float(position)}
+        try:
+            res = self._transport.call_action(
+                action_name=apply_namespace(ARM_ACTIONS["control_gripper"], self._namespace),
+                action_type=f"{ARM_ACTIONS['interface']}/ControlGripper",
+                goal=goal,
+                feedback_callback=feedback_callback,
+                timeout=timeout,
+            )
+        except Exception as e:  # noqa: BLE001
+            print(f"[Arm] grasp action failed: {e}")
+            return {"status": "FAILED", "success": False, "grasped": False, "gripper_gap": 0.0}
+
+        values = res.get("result") or {}
+        return {
+            "status": res.get("status"),
+            "success": bool(values.get("success", False)),
+            "grasped": bool(values.get("grasped", False)),
+            "gripper_gap": float(values.get("gripper_gap", 0.0) or 0.0),
+        }
 
     def set_joint_position(
         self,
@@ -870,6 +930,7 @@ class Arm:
     # commander: grasp = attach the box, place = detach + remove after the next
     # motion, none = leave scene alone.
     GRASP_SCENE_ACTIONS = ("grasp", "place", "none")
+    PLANNER_IDS = ("RRTConnect", "RRT", "RRTstar")
 
     def set_grasp_scene_action(self, action: str, timeout: float = 5.0) -> bool:
         """
@@ -889,6 +950,85 @@ class Arm:
                 f"got {action!r}"
             )
         return self.set_param("grasp_scene_action", action, timeout=timeout)
+
+    # --- Convenience setters for the live commander params ---
+
+    def set_planner_id(self, planner: str, timeout: float = 5.0) -> bool:
+        """Set the OMPL planner for the arm groups (live, applied to the next
+        plan). One of RRTConnect (default, fast first solution), RRT, or RRTstar
+        (shorter paths, needs a larger ``arm_planning_time``)."""
+        if planner not in self.PLANNER_IDS:
+            raise ValueError(
+                f"planner_id must be one of {self.PLANNER_IDS}, got {planner!r}"
+            )
+        return self.set_param("planner_id", planner, timeout=timeout)
+
+    def set_arm_planning_time(self, seconds: float, timeout: float = 5.0) -> bool:
+        """Set the per-plan time budget (seconds) for the arm groups (live)."""
+        return self.set_param("arm_planning_time", float(seconds), timeout=timeout)
+
+    def set_gripper_speed(self, speed: float, timeout: float = 5.0) -> bool:
+        """Set the software gripper open/close speed cap (command units/s, read
+        live each gripper command). <= 0 disables the ramp."""
+        return self.set_param("gripper_speed", float(speed), timeout=timeout)
+
+    def set_finger_padding(
+        self, meters: float, enable: bool = True, timeout: float = 5.0
+    ) -> bool:
+        """Set the finger collision padding (m) inflating the finger geometry so
+        planning keeps that clearance from sensed voxels (live). ``enable=False``
+        clears it. Lower it if the gripper reports collisions with a visible gap."""
+        return self.set_params(
+            {"finger_padding": float(meters), "finger_padding_enable": bool(enable)},
+            timeout=timeout,
+        )
+
+    def set_attach_object_margin(self, meters: float, timeout: float = 5.0) -> bool:
+        """Set the per-side clearance (m) added to the grasp box while it is
+        ATTACHED to the gripper. The released world copy is deflated back to the
+        real grasp size, so the carried box is bigger than the placed one (live)."""
+        return self.set_param("attach_object_margin", float(meters), timeout=timeout)
+
+    def set_allow_gripper_vs_octomap(self, allow: bool, timeout: float = 5.0) -> bool:
+        """Allow (``True``) the gripper links to ignore the octomap, so grasping
+        inside sensed voxels can still plan — while the fingers keep avoiding
+        explicit collision objects and other links (unlike disabling all gripper
+        collision). Set ``False`` after the grasp to re-enforce (live)."""
+        return self.set_param("allow_gripper_vs_octomap", bool(allow), timeout=timeout)
+
+    def set_table(
+        self,
+        enable: Optional[bool] = None,
+        pose: Optional[List[float]] = None,
+        size: Optional[List[float]] = None,
+        frame: Optional[str] = None,
+        timeout: float = 5.0,
+    ) -> bool:
+        """Configure the explicit table collision box (live). Provide any of:
+
+            enable - turn the box on/off (bool)
+            pose   - [x, y, top_z, yaw]; top_z is the table height, box spans
+                     floor -> top_z
+            size   - [depth_x, width_y] footprint
+            frame  - reference frame (default base_footprint; use a fixed frame
+                     like map/odom for a world-static table)
+
+        Returns True only if every supplied param was accepted.
+        """
+        params: Dict[str, Any] = {}
+        if enable is not None:
+            params["table_enable"] = bool(enable)
+        if pose is not None:
+            params["table_pose"] = [float(v) for v in pose]
+        if size is not None:
+            params["table_size"] = [float(v) for v in size]
+        if frame is not None:
+            params["table_frame"] = str(frame)
+        if not params:
+            raise ValueError(
+                "set_table: provide at least one of enable / pose / size / frame"
+            )
+        return self.set_params(params, timeout=timeout)
 
     def get_param(self, name: str, timeout: float = 5.0) -> Optional[Any]:
         """Read a single commander parameter. Returns None if it doesn't exist

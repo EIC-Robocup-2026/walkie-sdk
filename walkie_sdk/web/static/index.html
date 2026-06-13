@@ -168,13 +168,23 @@
         <div><label><input id="arm_ee_frame" type="checkbox" /> EE-frame (relative only)</label></div>
       </div>
       <div class="btn-row">
+        <span class="btn-group-label">Move</span>
         <button class="primary" id="btn-arm-pose">Go To Pose</button>
         <button class="ghost" id="btn-arm-relative">Relative Move</button>
+      </div>
+      <div class="btn-row">
+        <span class="btn-group-label">Presets</span>
         <button class="ghost arm-preset" data-pose="home">Home</button>
         <button class="ghost arm-preset" data-pose="standby">Standby</button>
         <button class="ghost arm-preset" data-pose="hands_up">Hands Up</button>
+      </div>
+      <div class="btn-row">
+        <span class="btn-group-label">Pose</span>
         <button class="ghost" id="btn-arm-ee">Read EE Pose</button>
-        <button class="ghost" id="btn-arm-fill-pose">Fill Pose ↑</button>
+        <button class="ghost" id="btn-arm-fill-pose" disabled title="Read EE pose first">Fill Pose ↑</button>
+      </div>
+      <div class="btn-row">
+        <span class="btn-group-label">Scene</span>
         <button class="ghost" id="btn-arm-clear">Clear Objects</button>
         <button class="ghost" id="btn-arm-clear-octomap">Clear Octomap</button>
       </div>
@@ -254,6 +264,12 @@
             <option value="grasp_object_height_below">grasp_object_height_below</option>
             <option value="finger_padding_enable">finger_padding_enable</option>
             <option value="finger_padding">finger_padding</option>
+            <option value="attach_object_margin">attach_object_margin</option>
+            <option value="allow_gripper_vs_octomap">allow_gripper_vs_octomap</option>
+            <option value="table_enable">table_enable</option>
+            <option value="table_pose">table_pose</option>
+            <option value="table_size">table_size</option>
+            <option value="table_frame">table_frame</option>
           </select>
         </div>
         <div>

@@ -243,6 +243,14 @@ def create_app(session: RobotSession | None = None) -> FastAPI:
         )
         return {"ok": True, "result": result, "position_m": position_m}
 
+    @app.post("/api/arm/grasp")
+    def arm_grasp(req: models.GraspRequest) -> Dict[str, Any]:
+        robot = session.require()
+        # Returns {"status", "success", "grasped", "gripper_gap"}.
+        # Judge success by "grasped" (a real grasp stalls, so "success" is often False).
+        result = robot.arm.grasp(group_name=req.group_name, position=req.position)
+        return {"ok": True, **result}
+
     @app.post("/api/arm/joints")
     def arm_joints(req: models.ArmJointPositionRequest) -> Dict[str, Any]:
         robot = session.require()

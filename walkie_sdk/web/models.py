@@ -104,6 +104,14 @@ class GripperRequest(BaseModel):
     blocking: bool = False
 
 
+class GraspRequest(BaseModel):
+    """Arguments for ``arm.grasp(...)`` — close the gripper and report whether an
+    object is actually held (the ``grasped`` field of the response)."""
+
+    group_name: str = "left_gripper"
+    position: float = 0.0   # meters, close target (0 = fully closed)
+
+
 class HomeRequest(BaseModel):
     """Arguments for ``arm.go_to_home(...)``."""
 
