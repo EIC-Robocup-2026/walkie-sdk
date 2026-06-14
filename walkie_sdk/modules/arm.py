@@ -212,6 +212,63 @@ class ArmGroup:
     def get_joint_states_service(self, **kwargs):
         return self._arm.get_joint_states_service(self._group_name, **kwargs)
 
+    def get_joint_states(self):
+        """
+        Get latest joint states for this arm group from the topic subscription.
+
+        Returns a 3-tuple (positions, velocities, efforts) where each list has
+        8 elements: 7 arm joints followed by the gripper joint.
+        Returns None if the hub has no data yet.
+
+        Example:
+            pos, vel, effort = robot.arm.left.get_joint_states()
+        """
+        all_states = self._arm.get_joint_states()
+        if all_states is None:
+            return None
+        if self._group_name in ("left_arm", "left_arm_lift"):
+            arm_data = all_states.get("left_arm")
+            gripper_key = "left_gripper"
+        elif self._group_name in ("right_arm", "right_arm_lift"):
+            arm_data = all_states.get("right_arm")
+            gripper_key = "right_gripper"
+        else:
+            return None
+        if arm_data is None:
+            return None
+        gripper = all_states.get(gripper_key) or {}
+        positions  = arm_data["positions"]  + [gripper.get("position")  or 0.0]
+        velocities = arm_data["velocities"] + [gripper.get("velocity")  or 0.0]
+        efforts    = arm_data["torques"]    + [gripper.get("effort")    or 0.0]
+        return positions, velocities, efforts
+
+    def get_gripper_states(self):
+        """
+        Get latest gripper joint state from the topic subscription.
+
+        Returns a 3-tuple (position, velocity, effort) as scalar floats.
+        Returns None if the hub has no data yet or this group has no gripper.
+
+        Example:
+            pos, vel, effort = robot.arm.left.get_gripper_states()
+        """
+        if self._gripper_name is None:
+            return None
+        all_states = self._arm.get_joint_states()
+        if all_states is None:
+            return None
+        if self._group_name in ("left_arm", "left_arm_lift"):
+            gripper = all_states.get("left_gripper") or {}
+        elif self._group_name in ("right_arm", "right_arm_lift"):
+            gripper = all_states.get("right_gripper") or {}
+        else:
+            return None
+        return (
+            float(gripper.get("position") or 0.0),
+            float(gripper.get("velocity") or 0.0),
+            float(gripper.get("effort")   or 0.0),
+        )
+
     def gripper(self, value: float, norm: bool = True, **kwargs) -> str:
         """
         Control the gripper.
@@ -1097,8 +1154,8 @@ class Arm:
         try:
             left_pos, left_vel, left_torque = [], [], []
             right_pos, right_vel, right_torque = [], [], []
-            left_gripper = None
-            right_gripper = None
+            left_gripper: Dict[str, Any] = {"position": None, "velocity": None, "effort": None}
+            right_gripper: Dict[str, Any] = {"position": None, "velocity": None, "effort": None}
 
             for name, data in all_joints.items():
                 pos    = data["position"]
@@ -1126,9 +1183,9 @@ class Arm:
                         right_vel[idx]    = vel
                         right_torque[idx] = effort
                 elif "left_gripper" in name or "left_finger" in name:
-                    left_gripper = pos
+                    left_gripper = {"position": pos, "velocity": vel, "effort": effort}
                 elif "right_gripper" in name or "right_finger" in name:
-                    right_gripper = pos
+                    right_gripper = {"position": pos, "velocity": vel, "effort": effort}
 
             return {
                 "left_arm": {
