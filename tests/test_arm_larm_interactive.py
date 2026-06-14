@@ -12,7 +12,8 @@ Controls (main menu):
   6  set_joint_position  — direct joint angles (commander or JTC)
   7  get_ee_pose         — query current EEF pose (service)
   8  get_joint_states    — query joint positions (service)
-  9  get_joint_states    — read from topic subscription (all joints)
+  9  get_joint_states    — read from topic subscription (active arm + gripper)
+  a  get_gripper_states  — read from topic subscription (active gripper)
   q  quit
 
 Usage:
@@ -263,24 +264,32 @@ def do_get_joint_states_service(arm: ArmGroup):
         print(f"  {name:<30} {pos:>10.4f}  {math.degrees(pos):>10.2f}")
 
 
-def do_get_joint_states_topic(robot: WalkieRobot):
-    print("\n=== get_joint_states (topic subscription, all joints) ===")
-    result = robot.arm.get_joint_states()
+def do_get_joint_states_topic(arm: ArmGroup):
+    print(f"\n=== get_joint_states (topic subscription) → {arm.group_name} ===")
+    result = arm.get_joint_states()
     if result is None:
         print("  No data received yet — wait a moment and try again.")
         return
 
-    for side in ("left_arm", "right_arm"):
-        positions = result.get(side, {}).get("positions", [])
-        print(f"\n  {side}:")
-        print(f"    {'Joint':<6} {'rad':>10}  {'deg':>10}")
-        for i, pos in enumerate(positions, 1):
-            print(f"    {i:<6} {pos:>10.4f}  {math.degrees(pos):>10.2f}")
+    positions, velocities, efforts = result
+    labels = [str(i) for i in range(1, 8)] + ["gripper"]
+    print(f"  {'Joint':<8} {'pos (rad)':>12}  {'vel (rad/s)':>12}  {'effort':>10}")
+    print(f"  {'-' * 50}")
+    for label, pos, vel, eff in zip(labels, positions, velocities, efforts):
+        print(f"  {label:<8} {pos:>12.4f}  {vel:>12.4f}  {eff:>10.4f}")
 
-    lg = result.get("left_gripper")
-    rg = result.get("right_gripper")
-    print(f"\n  left_gripper:  {lg}")
-    print(f"  right_gripper: {rg}")
+
+def do_get_gripper_states_topic(arm: ArmGroup):
+    print(f"\n=== get_gripper_states (topic subscription) → {arm.group_name} ===")
+    result = arm.get_gripper_states()
+    if result is None:
+        print("  No data received yet or group has no gripper.")
+        return
+
+    pos, vel, eff = result
+    print(f"  position : {pos:.6f} m")
+    print(f"  velocity : {vel:.6f} m/s")
+    print(f"  effort   : {eff:.6f}")
 
 
 # ── main menu ──────────────────────────────────────────────────────────────
@@ -301,7 +310,8 @@ _MENU_TEMPLATE = """
 │  6   │ set_joint_position (commander or JTC)        │
 │  7   │ get_ee_pose        (service)                 │
 │  8   │ get_joint_states   (service)                 │
-│  9   │ get_joint_states   (topic, all joints)       │
+│  9   │ get_joint_states   (topic, active arm)        │
+│  a   │ get_gripper_states (topic, active gripper)   │
 │  q   │ quit                                         │
 └──────┴──────────────────────────────────────────────┘"""
 
@@ -379,7 +389,9 @@ def main():
                 elif choice == "8":
                     do_get_joint_states_service(active)
                 elif choice == "9":
-                    do_get_joint_states_topic(robot)
+                    do_get_joint_states_topic(active)
+                elif choice == "a":
+                    do_get_gripper_states_topic(active)
                 else:
                     print(f"  Unknown choice '{choice}'")
             except KeyboardInterrupt:
