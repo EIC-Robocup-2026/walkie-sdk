@@ -134,6 +134,7 @@ uv sync --extra web                 # or: uv pip install "walkie-sdk[web]"
 walkie-web --port 8080              # then open http://localhost:8080
 # auto-connect on startup:
 walkie-web --ip 192.168.1.100
+uv run walkie-web --host 0.0.0.0 --port 8080 # Open to local network
 ```
 
 A FastAPI server holds a single `WalkieRobot` connection server-side and exposes

@@ -123,7 +123,7 @@ def main(argv: list[str] | None = None) -> None:
                 camera_protocol=args.camera_protocol,
                 camera_port=args.camera_port,
                 namespace=args.namespace,
-                arm_mode=args.arm_mode,
+                # arm_mode=args.arm_mode,
             )
             print(f"✓ Auto-connected to robot at {args.ip}")
         except Exception as e:
