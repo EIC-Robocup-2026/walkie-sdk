@@ -65,6 +65,7 @@ def _print_stats(
     source: str,
     target: str,
     mode: str,
+    value_updates: int = 0,
 ) -> None:
     call_count = len(latencies) + failures
     successes = len(latencies)
@@ -83,6 +84,7 @@ def _print_stats(
     if wall_elapsed > 0:
         print(f"  Overall Hz        : {call_count / wall_elapsed:.2f}  calls/s (total)")
         print(f"  Successful Hz     : {successes / wall_elapsed:.2f}  calls/s (successful)")
+        print(f"  Value update Hz   : {value_updates / wall_elapsed:.2f}  (distinct position changes/s)")
     print()
 
     if latencies:
@@ -112,7 +114,7 @@ class SyncBenchmarkNode(Node):
     def wait_for_service(self, timeout: float = 10.0) -> bool:
         return self._client.wait_for_service(timeout_sec=timeout)
 
-    def call_once(self, source: str, target: str, call_timeout: float) -> tuple[bool, float]:
+    def call_once(self, source: str, target: str, call_timeout: float) -> tuple[bool, float, tuple | None]:
         req = GetTransform.Request()
         req.source_frame = source
         req.target_frame = target
@@ -128,15 +130,17 @@ class SyncBenchmarkNode(Node):
         while not future.done():
             executor.spin_once(timeout_sec=0.001)
             if time.perf_counter() > deadline:
-                return False, time.perf_counter() - t0
+                return False, time.perf_counter() - t0, None
         elapsed = time.perf_counter() - t0
 
         try:
             result = future.result()
         except Exception:
-            return False, elapsed
+            return False, elapsed, None
 
-        return result.success, elapsed
+        if not result.success:
+            return False, elapsed, None
+        return True, elapsed, (result.x, result.y, result.z)
 
 
 def run_sync_benchmark(
@@ -159,6 +163,8 @@ def run_sync_benchmark(
     latencies: list[float] = []
     failures = 0
     call_count = 0
+    value_updates = 0
+    prev_pos: tuple | None = None
 
     print(f"  Benchmarking '{source}' → '{target}'  for {duration:.0f}s  (Ctrl+C to stop early)\n")
     wall_start = time.perf_counter()
@@ -166,18 +172,23 @@ def run_sync_benchmark(
 
     try:
         while time.perf_counter() < deadline:
-            ok, elapsed = node.call_once(source, target, call_timeout)
+            ok, elapsed, pos = node.call_once(source, target, call_timeout)
             call_count += 1
-            if ok:
+            if ok and pos is not None:
                 latencies.append(elapsed)
+                if prev_pos is not None and pos != prev_pos:
+                    value_updates += 1
+                prev_pos = pos
             else:
                 failures += 1
 
             if call_count % 50 == 0:
                 wall_now = time.perf_counter() - wall_start
                 hz = call_count / wall_now if wall_now > 0 else 0.0
+                update_hz = value_updates / wall_now if wall_now > 0 else 0.0
                 print(f"  {call_count:5d} calls  {wall_now:5.1f}s  {hz:.1f} Hz  "
-                      f"failures={failures}", flush=True)
+                      f"value_updates={value_updates} ({update_hz:.1f} Hz)  failures={failures}",
+                      flush=True)
 
     except KeyboardInterrupt:
         print("\n  Interrupted early.")
@@ -186,7 +197,8 @@ def run_sync_benchmark(
         rclpy.shutdown()
 
     wall_elapsed = time.perf_counter() - wall_start
-    _print_stats(latencies, failures, wall_elapsed, source, target, mode="sync via call_async+spin")
+    _print_stats(latencies, failures, wall_elapsed, source, target,
+                 mode="sync via call_async+spin", value_updates=value_updates)
 
 
 # ── Async benchmark (concurrent calls via executor) ───────────────────────────
@@ -197,6 +209,8 @@ class AsyncBenchmarkNode(Node):
         self._client = self.create_client(GetTransform, service_name)
         self._latencies: list[float] = []
         self._failures = 0
+        self._value_updates = 0
+        self._prev_pos: tuple | None = None
         self._in_flight = 0
         self._max_in_flight: int = 4  # pipeline depth — tune if needed
         self._source = ""
@@ -223,6 +237,10 @@ class AsyncBenchmarkNode(Node):
                 res = fut.result()
                 if res.success:
                     self._latencies.append(elapsed)
+                    pos = (res.x, res.y, res.z)
+                    if self._prev_pos is not None and pos != self._prev_pos:
+                        self._value_updates += 1
+                    self._prev_pos = pos
                 else:
                     self._failures += 1
             except Exception:
@@ -265,7 +283,9 @@ class AsyncBenchmarkNode(Node):
                     elapsed = now - wall_start
                     total = len(self._latencies) + self._failures
                     hz = total / elapsed if elapsed > 0 else 0.0
+                    update_hz = self._value_updates / elapsed if elapsed > 0 else 0.0
                     print(f"  {total:5d} calls  {elapsed:5.1f}s  {hz:.1f} Hz  "
+                          f"value_updates={self._value_updates} ({update_hz:.1f} Hz)  "
                           f"failures={self._failures}  in_flight={self._in_flight}",
                           flush=True)
                     progress_t = now
@@ -298,11 +318,12 @@ def run_async_benchmark(
 
     latencies = node._latencies
     failures = node._failures
+    value_updates = node._value_updates
     node.destroy_node()
     rclpy.shutdown()
 
     _print_stats(latencies, failures, wall_elapsed, source, target,
-                 mode=f"async pipeline={pipeline}")
+                 mode=f"async pipeline={pipeline}", value_updates=value_updates)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────

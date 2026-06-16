@@ -40,6 +40,8 @@ def run_benchmark(
 ) -> None:
     latencies: list[float] = []
     failures = 0
+    value_updates = 0   # how many times the position changed between consecutive calls
+    prev_pos: tuple | None = None
 
     print(f"\nBenchmarking  '{source}' → '{target}'  for {duration:.0f}s  (Ctrl+C to stop early)\n")
     wall_start = time.perf_counter()
@@ -61,13 +63,23 @@ def run_benchmark(
                 failures += 1
             else:
                 latencies.append(elapsed)
+                pos = (
+                    result["position"]["x"],
+                    result["position"]["y"],
+                    result["position"]["z"],
+                )
+                if prev_pos is not None and pos != prev_pos:
+                    value_updates += 1
+                prev_pos = pos
 
-            # Progress dot every 50 calls
+            # Progress line every 50 calls
             if call_count % 50 == 0:
                 elapsed_wall = time.perf_counter() - wall_start
                 hz = call_count / elapsed_wall if elapsed_wall > 0 else 0
+                update_hz = value_updates / elapsed_wall if elapsed_wall > 0 else 0
                 print(f"  {call_count:5d} calls  {elapsed_wall:5.1f}s  {hz:.1f} Hz  "
-                      f"failures={failures}", flush=True)
+                      f"value_updates={value_updates} ({update_hz:.1f} Hz)  failures={failures}",
+                      flush=True)
 
     except KeyboardInterrupt:
         print("\n  Interrupted early.")
@@ -88,6 +100,7 @@ def run_benchmark(
     if wall_elapsed > 0:
         print(f"  Overall Hz        : {call_count / wall_elapsed:.2f}  (calls/s total)")
         print(f"  Successful Hz     : {successes / wall_elapsed:.2f}  (successful calls/s)")
+        print(f"  Value update Hz   : {value_updates / wall_elapsed:.2f}  (distinct position changes/s)")
     print()
 
     if latencies:
