@@ -241,7 +241,6 @@ def main():
     parser.add_argument("--ip",        default="127.0.0.1", help="Robot IP (default: 127.0.0.1)")
     parser.add_argument("--port",      type=int,   default=9090,        help="Rosbridge port (default: 9090)")
     parser.add_argument("--cam-port",  type=int,   default=7447,        help="Zenoh camera port (default: 7447)")
-    parser.add_argument("--protocol",  default="rosbridge", choices=["rosbridge", "zenoh"], help="ROS protocol")
     parser.add_argument("--namespace", default="",          help="ROS namespace (default: none)")
     parser.add_argument("--step",      type=float, default=_STEP_DEFAULT, help=f"Tilt step in radians (default: {_STEP_DEFAULT})")
     parser.add_argument("--no-camera", action="store_true",  help="Disable camera — terminal-only HUD")
@@ -249,11 +248,9 @@ def main():
 
     camera_protocol = "none" if args.no_camera else "zenoh"
 
-    print(f"\nConnecting to {args.ip}:{args.port}  (ROS={args.protocol}, camera={camera_protocol}) ...")
+    print(f"\nConnecting to {args.ip}:{args.port}  (camera={camera_protocol}) ...")
     bot = WalkieRobot(
         ip=args.ip,
-        ros_protocol=args.protocol,
-        ros_port=args.port,
         camera_protocol=camera_protocol,
         camera_port=args.cam_port,
         namespace=args.namespace,

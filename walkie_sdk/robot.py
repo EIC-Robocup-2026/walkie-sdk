@@ -5,8 +5,9 @@ Provides a unified interface to control the robot through
 .nav, .status, and .camera submodules.
 
 Supports multiple communication protocols via the transport abstraction layer:
-- rosbridge: WebSocket via roslibpy (default, no ROS2 required on client)
-- zenoh: Zenoh DDS bridge (good performance, no ROS2 required)
+- hybrid: Zenoh for topics/services + rosbridge for actions (default, fast)
+- rosbridge: WebSocket via roslibpy (no ROS2 required on client)
+- zenoh: Zenoh DDS bridge (good performance, topics/services only, no actions)
 """
 
 from typing import Optional
@@ -49,10 +50,14 @@ class WalkieRobot:
     Args:
         ip: Robot IP address or hostname
         ros_protocol: ROS communication protocol to use:
-            - "rosbridge": WebSocket via roslibpy (default, no ROS2 required)
-            - "zenoh": Zenoh DDS bridge (no ROS2 required)
+            - "hybrid": zenoh for topics/services + rosbridge for actions
+              (default; needs both a zenoh router and rosbridge_server on the robot)
+            - "rosbridge": WebSocket via roslibpy (no ROS2 required)
+            - "zenoh": Zenoh DDS bridge (topics/services only, no action support)
             - "auto": Auto-detect best available protocol
-        ros_port: Port for ROS transport (default: 9090 for rosbridge)
+        ros_port: rosbridge WebSocket port (default: 9090); used for actions
+            under "hybrid" and for everything under "rosbridge"
+        zenoh_port: Zenoh router port (default: 7447); used by "hybrid"/"zenoh"
         camera_protocol: Camera stream protocol to use:
             - "zenoh": Zenoh video stream (default)
             - "usb": Local USB camera via OpenCV
@@ -94,8 +99,9 @@ class WalkieRobot:
     def __init__(
         self,
         ip: str,
-        ros_protocol: str = "rosbridge",
+        ros_protocol: str = "hybrid",
         ros_port: int = 9090,
+        zenoh_port: int = 7447,
         camera_protocol: str = "zenoh",
         camera_port: int = 7447,
         timeout: float = 10.0,
@@ -117,6 +123,7 @@ class WalkieRobot:
 
         self._ip = ip
         self._ros_port = ros_port
+        self._zenoh_port = zenoh_port
         self._camera_port = camera_port
         self._timeout = timeout
         self._namespace = namespace
@@ -145,6 +152,7 @@ class WalkieRobot:
             host=ip,
             port=ros_port,
             timeout=timeout,
+            zenoh_port=zenoh_port,
         )
 
         # Create camera transport via factory (may be None)

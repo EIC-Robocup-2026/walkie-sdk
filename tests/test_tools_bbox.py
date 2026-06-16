@@ -201,9 +201,7 @@ def main():
 
     print(f"\nConnecting to rosbridge at {args.ip}:{args.port} ...")
     robot = WalkieRobot(
-        ros_protocol="rosbridge",
         ip=args.ip,
-        ros_port=args.port,
         camera_protocol="none",  # service + marker test; no camera needed
         namespace=args.namespace,
     )

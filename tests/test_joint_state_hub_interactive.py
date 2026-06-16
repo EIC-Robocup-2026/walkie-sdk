@@ -303,16 +303,13 @@ def main():
     )
     parser.add_argument("--ip",        default="127.0.0.1", help="Robot IP (default: 127.0.0.1)")
     parser.add_argument("--port",      type=int, default=9090,      help="Rosbridge port (default: 9090)")
-    parser.add_argument("--protocol",  default="rosbridge",         help="ROS protocol (default: rosbridge)")
     parser.add_argument("--namespace", default="",                  help="ROS namespace (default: none)")
     parser.add_argument("--no-camera", action="store_true",         help="Disable camera (faster connect)")
     args = parser.parse_args()
 
-    print(f"\nConnecting to {args.ip}:{args.port} (protocol={args.protocol}) ...")
+    print(f"\nConnecting to {args.ip}:{args.port} ...")
     bot = WalkieRobot(
         ip=args.ip,
-        ros_protocol=args.protocol,
-        ros_port=args.port,
         camera_protocol="none" if args.no_camera else "zenoh",
         namespace=args.namespace,
     )

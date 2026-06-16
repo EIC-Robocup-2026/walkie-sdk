@@ -22,11 +22,15 @@ class ROSProtocol(Enum):
     Each protocol has different requirements and trade-offs:
     - ROSBRIDGE: WebSocket via roslibpy. No ROS2 needed on client. Higher latency.
     - ZENOH: Zenoh DDS bridge. Good performance. No ROS2 needed on client.
+      Topics/services only — no action support.
+    - HYBRID: Zenoh for topics/services, rosbridge for actions. Best of both;
+      needs both a zenoh router and rosbridge_server running on the robot.
     - AUTO: Auto-detect best available protocol.
     """
 
     ROSBRIDGE = "rosbridge"
     ZENOH = "zenoh"
+    HYBRID = "hybrid"
     AUTO = "auto"
 
 
@@ -104,6 +108,20 @@ class TransportFactory:
             from walkie_sdk.core.transports.zenoh import ZenohTransport
 
             return ZenohTransport(host=host, port=port, timeout=timeout, **kwargs)
+
+        elif protocol == ROSProtocol.HYBRID:
+            from walkie_sdk.core.transports.hybrid import HybridTransport
+
+            # `port` is the rosbridge (action) port; zenoh router port is
+            # supplied separately and defaults to 7447.
+            zenoh_port = kwargs.pop("zenoh_port", 7447)
+            return HybridTransport(
+                host=host,
+                zenoh_port=zenoh_port,
+                rosbridge_port=port,
+                timeout=timeout,
+                **kwargs,
+            )
 
         elif protocol == ROSProtocol.AUTO:
             return TransportFactory._auto_detect_ros(host, port, timeout, **kwargs)
@@ -243,6 +261,7 @@ class TransportFactory:
         protocol_map = {
             ROSProtocol.ROSBRIDGE: CameraProtocol.ZENOH,
             ROSProtocol.ZENOH: CameraProtocol.ZENOH,
+            ROSProtocol.HYBRID: CameraProtocol.ZENOH,
             ROSProtocol.AUTO: CameraProtocol.ZENOH,
         }
         return protocol_map.get(ros_protocol, CameraProtocol.NONE)

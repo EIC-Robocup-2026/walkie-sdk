@@ -16,9 +16,7 @@ def main():
     try:
         bot = WalkieRobot(
             ip=ROBOT_IP,
-            ros_protocol="rosbridge",
             camera_protocol="zenoh",
-            ros_port=9090,  # For Zenoh, ros_port and camera_port
             camera_port=ZENOH_PORT,  # usually point to the same router port
         )
     except Exception as e:
