@@ -35,6 +35,7 @@ except ImportError:
 
 from walkie_sdk.core.interfaces import CameraTransportInterface, ROSTransportInterface
 from walkie_sdk.config.ros_topics import CAMERA_TOPICS, DEPTH_TOPICS, ROS_DOMAIN_ID
+from walkie_sdk.config.interface_defs import msg_definition, srv_definitions
 
 
 def _msg_to_dict(msg: Any) -> Dict[str, Any]:
@@ -159,11 +160,14 @@ class ZenohTransport(ROSTransportInterface[Any]):
                 except Exception as e:
                     print(f"[ZenohTransport] Error in callback for {topic}: {e}")
 
-            # Create Subscriber using standard ROS 2 types
+            # Create Subscriber. Standard ROS 2 types resolve automatically;
+            # custom (project-specific) types need their .msg text supplied.
             sub = ROS2Subscriber(
                 topic=topic,
                 msg_type=message_type,
                 callback=callback_wrapper,
+                msg_definition=msg_definition(message_type),
+                domain_id=ROS_DOMAIN_ID,
                 router_ip=self._host,
                 router_port=self._port,
             )
@@ -192,10 +196,12 @@ class ZenohTransport(ROSTransportInterface[Any]):
 
         with self._lock:
             if topic not in self._publishers:
-                # Create Publisher
+                # Create Publisher. Custom types need their .msg text supplied.
                 self._publishers[topic] = ROS2Publisher(
                     topic=topic,
                     msg_type=message_type,
+                    msg_definition=msg_definition(message_type),
+                    domain_id=ROS_DOMAIN_ID,
                     router_ip=self._host,
                     router_port=self._port,
                 )
@@ -222,9 +228,15 @@ class ZenohTransport(ROSTransportInterface[Any]):
 
         with self._lock:
             if service_name not in self._service_clients:
+                # Standard service types resolve automatically; custom
+                # (project-specific) types need their .srv text supplied.
+                request_def, response_def = srv_definitions(service_type)
                 self._service_clients[service_name] = ROS2ServiceClient(
                     service_name=service_name,
                     srv_type=service_type,
+                    request_definition=request_def,
+                    response_definition=response_def,
+                    domain_id=ROS_DOMAIN_ID,
                     timeout=timeout,
                     router_ip=self._host,
                     router_port=self._port,
