@@ -9,6 +9,10 @@ from walkie_sdk.utils.converters import (
     quaternion_to_euler,
     euler_to_quaternion,
     quaternion_multiply,
+    rotate_vector_by_quaternion,
+    compose_transforms,
+    invert_transform,
+    resolve_tf_chain,
 )
 
 # Global robot instance
@@ -26,49 +30,9 @@ EE_LINKS = {
 
 
 # ---------------------------------------------------------------------------
-# Quaternion / TF helpers
+# Quaternion / TF helpers (rotate_vector_by_quaternion, compose_transforms,
+# invert_transform, resolve_tf_chain) are imported from walkie_sdk.utils.converters
 # ---------------------------------------------------------------------------
-
-
-def rotate_vector_by_quaternion(v, q):
-    """
-    Rotate a 3D vector *v* = (vx, vy, vz) by quaternion *q* = (x, y, z, w).
-
-    Uses the formula: v' = q * (0, v) * q_conj
-    Returns (vx', vy', vz').
-    """
-    qx, qy, qz, qw = q
-    # quaternion conjugate
-    q_conj = (-qx, -qy, -qz, qw)
-    # treat vector as pure quaternion (x, y, z, w=0)
-    v_quat = (v[0], v[1], v[2], 0.0)
-    # q * v_quat
-    tmp = quaternion_multiply(q, v_quat)
-    # (q * v_quat) * q_conj
-    result = quaternion_multiply(tmp, q_conj)
-    return (result[0], result[1], result[2])
-
-
-def compose_transforms(parent_tf, child_tf):
-    """
-    Compose two transforms:  T_parent * T_child.
-
-    Each transform is (tx, ty, tz, qx, qy, qz, qw).
-    Returns the composed transform as (tx, ty, tz, qx, qy, qz, qw).
-    """
-    pt, pq = parent_tf[:3], parent_tf[3:]
-    ct, cq = child_tf[:3], child_tf[3:]
-
-    # Rotate child translation by parent rotation, then add parent translation
-    rotated = rotate_vector_by_quaternion(ct, pq)
-    tx = pt[0] + rotated[0]
-    ty = pt[1] + rotated[1]
-    tz = pt[2] + rotated[2]
-
-    # Combine rotations
-    combined_q = quaternion_multiply(pq, cq)
-
-    return (tx, ty, tz, combined_q[0], combined_q[1], combined_q[2], combined_q[3])
 
 
 def lookup_ee_pose(
@@ -103,7 +67,7 @@ def lookup_ee_pose(
                 ro["w"],
             )
         # Try to resolve the chain after every batch
-        chain = _resolve_chain(tf_data, reference_frame, target_link)
+        chain = resolve_tf_chain(tf_data, reference_frame, target_link)
         if chain is not None:
             print(chain)
             result[0] = chain
@@ -121,62 +85,6 @@ def lookup_ee_pose(
     robot_instance._transport.unsubscribe(handle)
 
     return result[0]
-
-
-def _resolve_chain(tf_data, source, target):
-    """
-    Walk the TF tree (BFS) from *source* to *target* using collected edges.
-    Returns composed transform (x, y, z, qx, qy, qz, qw) or None if the
-    path is not yet available.
-    """
-    # Build adjacency: parent -> [(child, forward?)]
-    adjacency = {}
-    for parent, child in tf_data:
-        adjacency.setdefault(parent, []).append((child, True))
-        adjacency.setdefault(child, []).append((parent, False))
-
-    # BFS
-    visited = {source}
-    queue = [(source, [])]  # (current_node, path_of_edges)
-    while queue:
-        node, path = queue.pop(0)
-        if node == target:
-            # Compose along the path
-            composed = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0)  # identity
-            for parent, child, forward in path:
-                tf = tf_data[(parent, child)]
-                if forward:
-                    composed = compose_transforms(composed, tf)
-                else:
-                    composed = compose_transforms(composed, _invert_transform(tf))
-            return composed
-
-        for neighbour, forward in adjacency.get(node, []):
-            if neighbour not in visited:
-                visited.add(neighbour)
-                if forward:
-                    edge = (node, neighbour, True)
-                else:
-                    edge = (neighbour, node, False)
-                queue.append((neighbour, path + [edge]))
-
-    return None
-
-
-def _invert_transform(tf):
-    """
-    Invert a rigid transform (tx, ty, tz, qx, qy, qz, qw).
-
-    T_inv.rotation = q_conj
-    T_inv.translation = -(q_conj * t * q)
-    """
-    tx, ty, tz, qx, qy, qz, qw = tf
-    # conjugate
-    q_inv = (-qx, -qy, -qz, qw)
-    # rotate the negated translation by the inverse rotation
-    neg_t = (-tx, -ty, -tz)
-    t_inv = rotate_vector_by_quaternion(neg_t, q_inv)
-    return (t_inv[0], t_inv[1], t_inv[2], q_inv[0], q_inv[1], q_inv[2], q_inv[3])
 
 
 # ---------------------------------------------------------------------------

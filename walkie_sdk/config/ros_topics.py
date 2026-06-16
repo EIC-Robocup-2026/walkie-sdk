@@ -135,6 +135,14 @@ TF_SERVICE = {
     "service_type": os.getenv("WALKIE_TF_SERVICE_TYPE", "walkie_tf_interfaces/srv/GetTransform"),
 }
 
+# ── Transform Topics (for local TF buffer) ─────────────────────
+TF_TOPICS = {
+    "tf":             os.getenv("WALKIE_TF_TOPIC",       "/tf"),
+    "tf_type":        os.getenv("WALKIE_TF_TYPE",        "tf2_msgs/msg/TFMessage"),
+    "tf_static":      os.getenv("WALKIE_TF_STATIC_TOPIC", "/tf_static"),
+    "tf_static_type": os.getenv("WALKIE_TF_STATIC_TYPE", "tf2_msgs/msg/TFMessage"),
+}
+
 # ── Joint State Topics (shared hub) ───────────────────────────
 JOINT_STATE_TOPICS = {
     "states":      os.getenv("WALKIE_JOINT_STATES",      "joint_states"),
@@ -190,6 +198,7 @@ def load_config(yaml_path: str):
         if "VIZ_TOPICS" in config: VIZ_TOPICS.update(config["VIZ_TOPICS"])
         if "OB_POSE_SERVICE" in config: OB_POSE_SERVICE.update(config["OB_POSE_SERVICE"])
         if "TF_SERVICE" in config: TF_SERVICE.update(config["TF_SERVICE"])
+        if "TF_TOPICS" in config: TF_TOPICS.update(config["TF_TOPICS"])
         if "LIFT_TOPICS" in config: LIFT_TOPICS.update(config["LIFT_TOPICS"])
         if "HEAD_TOPICS" in config: HEAD_TOPICS.update(config["HEAD_TOPICS"])
         if "JOINT_STATE_TOPICS" in config: JOINT_STATE_TOPICS.update(config["JOINT_STATE_TOPICS"])

@@ -225,6 +225,9 @@ class WalkieRobot:
         # Start point cloud subscriptions
         self._point_cloud._setup_subscription()
 
+        # Start local TF buffer (subscribes to /tf + /tf_static)
+        self._transform.start_buffering()
+
         self._connected = True
         print(f"✓ Robot connected!")
 

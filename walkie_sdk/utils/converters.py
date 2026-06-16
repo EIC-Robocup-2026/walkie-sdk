@@ -165,6 +165,82 @@ def quaternion_to_matrix(x: float, y: float, z: float, w: float) -> np.ndarray:
     )
 
 
+def rotate_vector_by_quaternion(
+    v: Tuple[float, float, float],
+    q: Tuple[float, float, float, float],
+) -> Tuple[float, float, float]:
+    """Rotate vector *v* = (vx, vy, vz) by quaternion *q* = (x, y, z, w)."""
+    q_conj = (-q[0], -q[1], -q[2], q[3])
+    v_quat = (v[0], v[1], v[2], 0.0)
+    tmp = quaternion_multiply(q, v_quat)
+    r = quaternion_multiply(tmp, q_conj)
+    return (r[0], r[1], r[2])
+
+
+def compose_transforms(
+    parent_tf: Tuple,
+    child_tf: Tuple,
+) -> Tuple:
+    """Compose two rigid transforms, each a 7-tuple (tx, ty, tz, qx, qy, qz, qw).
+
+    Returns the composed transform T_parent * T_child as a 7-tuple.
+    """
+    pt, pq = parent_tf[:3], parent_tf[3:]
+    ct, cq = child_tf[:3], child_tf[3:]
+    rotated = rotate_vector_by_quaternion(ct, pq)
+    tx, ty, tz = pt[0] + rotated[0], pt[1] + rotated[1], pt[2] + rotated[2]
+    cq_out = quaternion_multiply(pq, cq)
+    return (tx, ty, tz, cq_out[0], cq_out[1], cq_out[2], cq_out[3])
+
+
+def invert_transform(tf: Tuple) -> Tuple:
+    """Invert a rigid transform 7-tuple (tx, ty, tz, qx, qy, qz, qw)."""
+    tx, ty, tz, qx, qy, qz, qw = tf
+    q_inv = (-qx, -qy, -qz, qw)
+    t_inv = rotate_vector_by_quaternion((-tx, -ty, -tz), q_inv)
+    return (t_inv[0], t_inv[1], t_inv[2], q_inv[0], q_inv[1], q_inv[2], q_inv[3])
+
+
+def resolve_tf_chain(
+    tf_data: Dict[Tuple[str, str], Tuple],
+    source: str,
+    target: str,
+) -> Optional[Tuple]:
+    """Walk the TF tree (BFS) from *source* to *target*.
+
+    *tf_data* maps (parent_frame, child_frame) → 7-tuple (tx,ty,tz,qx,qy,qz,qw).
+    Edges are traversed in both directions; going child→parent inverts the transform.
+
+    Returns the composed 7-tuple or None if no path exists.
+    """
+    if source == target:
+        return (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
+
+    adjacency: Dict[str, list] = {}
+    for parent, child in tf_data:
+        adjacency.setdefault(parent, []).append((child, True))
+        adjacency.setdefault(child, []).append((parent, False))
+
+    visited = {source}
+    queue = [(source, [])]
+    while queue:
+        node, path = queue.pop(0)
+        if node == target:
+            composed: Tuple = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0)
+            for parent, child, forward in path:
+                edge_tf = tf_data[(parent, child)]
+                composed = compose_transforms(
+                    composed, edge_tf if forward else invert_transform(edge_tf)
+                )
+            return composed
+        for neighbour, forward in adjacency.get(node, []):
+            if neighbour not in visited:
+                visited.add(neighbour)
+                edge = (node, neighbour, True) if forward else (neighbour, node, False)
+                queue.append((neighbour, path + [edge]))
+    return None
+
+
 def convert_bboxes_to_detection_array(
     bboxes: List[List[float]], 
     frame_id: str = "camera_frame"
