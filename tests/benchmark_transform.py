@@ -1,6 +1,6 @@
 """
 Benchmark for Transform.lookup() — finds the max sustainable Hz of the
-walkie_tf/get_transform service over rosbridge.
+walkie_tf/get_transform service over the selected transport (rosbridge or zenoh).
 
 Runs N calls as fast as possible (no sleep) for a configurable duration, then
 reports:
@@ -13,14 +13,21 @@ Usage:
     python tests/benchmark_transform.py --ip 192.168.1.100 --source map --target base_link
     python tests/benchmark_transform.py --ip 192.168.1.100 --duration 30 --timeout 2.0
     python tests/benchmark_transform.py --ip 192.168.1.100 --namespace robot1
+    python tests/benchmark_transform.py --ip 192.168.1.100 --protocol zenoh --domain 23
+
+Zenoh note: the zenoh path requires `zenoh` + `zenoh_ros2_sdk` installed on this
+client and a reachable zenoh router/robot on the chosen ROS domain. The ROS
+domain is read from $WALKIE_ROS_DOMAIN_ID at import time, so --domain is applied
+before the SDK is imported.
 """
 
+from __future__ import annotations
+
 import argparse
+import os
 import statistics
 import sys
 import time
-
-from walkie_sdk import WalkieRobot
 
 
 def _percentile(sorted_data: list[float], pct: float) -> float:
@@ -125,7 +132,12 @@ def main() -> None:
         description="Benchmark Transform.lookup() Hz — requires walkie_tf service"
     )
     parser.add_argument("--ip",        default="127.0.0.1", help="Robot IP (default: 127.0.0.1)")
-    parser.add_argument("--port",      type=int, default=9090, help="Rosbridge port (default: 9090)")
+    parser.add_argument("--protocol",  default="rosbridge", choices=["rosbridge", "zenoh", "auto"],
+                        help="ROS transport (default: rosbridge)")
+    parser.add_argument("--port",      type=int, default=None,
+                        help="Transport port (default: 9090 rosbridge/auto, 7447 zenoh)")
+    parser.add_argument("--domain",    type=int, default=23,
+                        help="Zenoh ROS domain id (default: 23, ignored for rosbridge)")
     parser.add_argument("--source",    default="map",       help="Source TF frame (default: map)")
     parser.add_argument("--target",    default="base_link", help="Target TF frame (default: base_link)")
     parser.add_argument("--duration",  type=float, default=15.0, help="Benchmark duration in s (default: 15)")
@@ -133,11 +145,18 @@ def main() -> None:
     parser.add_argument("--namespace", default="",           help="ROS namespace (default: none)")
     args = parser.parse_args()
 
-    print(f"\nConnecting to rosbridge at {args.ip}:{args.port} ...")
+    # Resolve the port per protocol when not explicitly provided.
+    port = args.port if args.port is not None else (7447 if args.protocol == "zenoh" else 9090)
+
+    # ROS_DOMAIN_ID is read at import time, so set it before importing the SDK.
+    os.environ["WALKIE_ROS_DOMAIN_ID"] = str(args.domain)
+    from walkie_sdk import WalkieRobot
+
+    print(f"\nConnecting via {args.protocol} to {args.ip}:{port} ...")
     robot = WalkieRobot(
-        ros_protocol="rosbridge",
+        ros_protocol=args.protocol,
         ip=args.ip,
-        ros_port=args.port,
+        ros_port=port,
         camera_protocol="none",
         namespace=args.namespace,
     )
