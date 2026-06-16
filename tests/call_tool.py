@@ -10,7 +10,6 @@ args = parser.parse_args()
 # Initialize Robot (Zenoh Protocol)
 bot = WalkieRobot(
     ip=args.ip,
-    ros_protocol="rosbridge",
     camera_protocol="zenoh",
 )
 

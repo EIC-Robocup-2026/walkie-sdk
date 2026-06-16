@@ -27,9 +27,7 @@ The hardware scripts are **not** collected by `pytest` (`pyproject.toml` pins `t
   - [`test_visualization.py`](#test_visualizationpy) — `bot.viz`
   - [`test_lift.py`](#test_liftpy) — `bot.lift` ⚠️
   - [`test_navigation.py`](#test_navigationpy) — `bot.nav` ⚠️
-  - [`test_arm.py`](#test_armpy) — `bot.arm` ⚠️
   - [`test_tools_bbox.py`](#test_tools_bboxpy) — `bot.tools`
-  - [`test_yolo_viz.py`](#test_yolo_vizpy) — YOLO → 3D positions
 - [Safety](#safety)
 - [Troubleshooting quick-reference](#troubleshooting-quick-reference)
 
@@ -51,7 +49,6 @@ tests/run_tests.sh --ip "$IP" --safe --stop-on-fail
 # 3. Motion tests, one module at a time (prompts before each move)
 uv run python tests/test_lift.py --ip "$IP"
 uv run python tests/test_navigation.py --ip "$IP"
-uv run python tests/test_arm.py --ip "$IP" --mode moveit
 ```
 
 ---
@@ -388,60 +385,6 @@ uv run python tests/test_navigation.py --ip "$IP" --dx 0.3 --yes
 
 ---
 
-## `test_arm.py`
-
-**Module:** `bot.arm` (consolidated; supersedes the ad-hoc `test_call_action.py` / `test_call_pose_quaternion.py`). ⚠️ **MOVES THE ARMS.**
-Read-only checks first (`get_joint_states`, the unimplemented velocity/torque stubs), then per-mode motion tests, each gated by a prompt.
-
-**Mode routing:**
-- `set_joint_positions` — publishes `JointState` (mode-independent)
-- `control_gripper`, `go_to_home`, `go_to_pose_relative` — **action only** → auto-skipped in `custom_ik`
-- `go_to_pose`, `go_to_pose_quaternion`, `go_to_pose_quaternion_move_action` — route by mode (MoveIt action vs publishing a `PoseStamped`)
-
-**Server needs:** MoveIt/robot action servers (`my_robot_interfaces`) for `moveit`; an IK node subscribed to the target-pose topic for `custom_ik`; plus the `joint_states` publisher.
-
-| Param | Default | Notes |
-|-------|---------|-------|
-| `--ip` | `127.0.0.1` | |
-| `--port` | `9090` | |
-| `--namespace` | `""` | |
-| `--mode` | `moveit` | `moveit` / `custom_ik` / `both` |
-| `--group` | `left_arm` | MoveIt planning group |
-| `--gripper-group` | `left_gripper` | gripper group |
-| `--target-pose-topic` | `/target_pose` | custom_ik publish topic |
-| `--timeout` | `10.0` | seconds to wait for joint states |
-| `--x` `--y` `--z` | `0.38` `0.19` `0.58` | target position (m) — tuned for **left** arm |
-| `--roll` `--pitch` `--yaw` | `-1.57` `0.0` `0.0` | target orientation (rad) |
-| `--yes` / `-y` | off | skip confirmation prompts |
-
-**Commands**
-
-```bash
-# MoveIt (planned, collision-aware) — start here
-uv run python tests/test_arm.py --ip "$IP" --mode moveit
-
-# Right arm — mirror the Y target to negative
-uv run python tests/test_arm.py --ip "$IP" --group right_arm --gripper-group right_gripper --y -0.19
-
-# Custom-IK teleop publishing to a specific topic
-uv run python tests/test_arm.py --ip "$IP" --mode custom_ik --target-pose-topic /left_arm/target_pose
-
-# Both modes back to back
-uv run python tests/test_arm.py --ip "$IP" --mode both
-
-# Custom safe target pose
-uv run python tests/test_arm.py --ip "$IP" --x 0.30 --y 0.15 --z 0.50 --roll -1.57 --pitch 0 --yaw 0
-
-# Namespaced, no prompts (trusted only)
-uv run python tests/test_arm.py --ip "$IP" --namespace robot1 --mode moveit --yes
-```
-
-**Recommended first pass:** let the read-only checks confirm joint states look sane, then answer `y` only to the small/safe moves (joint nudge, gripper, home) and `n` to the larger pose moves until you trust the targets.
-
-**If pose moves report FAILED:** the action server name/type doesn't match (`WALKIE_ARM_ACTION_INTERFACE`), the group name is wrong, or (custom_ik) no IK node is listening on the target-pose topic.
-
----
-
 ## `test_tools_bbox.py`
 
 **Module:** `bot.tools.bboxes_to_positions()`. **Motion:** none.
@@ -485,56 +428,9 @@ uv run python tests/test_tools_bbox_interactive.py --ip "$IP" --cam-port 7447
 
 ---
 
-## `test_yolo_viz.py`
-
-**Module:** `bot.camera` + `bot.tools.bboxes_to_positions()` + `bot.viz`. **Motion:** none.
-Runs a **YOLO model locally** (ultralytics) on the robot's camera feed, draws detected boxes + class labels on the feed, feeds the boxes into the perception service, and publishes RViz2 markers **labeled with each object's class name and 3D position**.
-
-**Extra dependency (YOLO is not installed by default):**
-```bash
-uv sync --extra yolo                                   # installs ultralytics (+ torch)
-# or one-off, no install:
-uv run --with ultralytics python tests/test_yolo_viz.py --ip "$IP"
-```
-The weights (default `yolov8n.pt`) auto-download on first run.
-
-**Server needs:** rosbridge + zenoh camera + `get_3d_poses` service. Open RViz2 (Fixed Frame = `--viz-frame`, Marker display on `walkie/viz_markers`) to see the 3D markers.
-
-**Controls (in the OpenCV window):** `Space/Enter` query · `A` toggle auto-query · `C` clear markers · `Q/Esc` quit.
-
-| Param | Default | Notes |
-|-------|---------|-------|
-| `--ip` | `127.0.0.1` | |
-| `--port` | `9090` | rosbridge port |
-| `--cam-port` | `7447` | zenoh camera port |
-| `--timeout` | `5.0` | service-call timeout |
-| `--namespace` | `""` | |
-| `--model` | `yolov8n.pt` | YOLO weights (any ultralytics model) |
-| `--conf` | `0.25` | detection confidence threshold |
-| `--device` | auto | `cpu` / `0` (GPU index) |
-| `--viz-frame` | `map` | TF frame for the 3D markers |
-| `--auto` | off | auto-query every `--interval` seconds |
-| `--interval` | `2.0` | auto-query period (s) |
-
-**Commands**
-
-```bash
-uv run --with ultralytics python tests/test_yolo_viz.py --ip "$IP"
-uv run --with ultralytics python tests/test_yolo_viz.py --ip "$IP" --model yolov8s.pt --conf 0.4
-uv run --with ultralytics python tests/test_yolo_viz.py --ip "$IP" --auto --interval 2.0
-uv run --with ultralytics python tests/test_yolo_viz.py --ip "$IP" --viz-frame camera_link --device cpu
-```
-
-**Notes / gotchas:**
-- The OpenCV window shows live boxes (`class conf`) plus a HUD list of the last query's `class: (x, y, z)`; RViz2 shows a sphere + `class (x,y,z)` label per object.
-- 3D positions are matched to detections **by order** (the service returns poses in input order). If the service returns a different count, only the first *n* are labeled (a warning is printed).
-- Same frame caveat as `--viz` above: if markers land wrong, set `--viz-frame` to the service's actual output frame.
-
----
-
 ## Safety
 
-- **Clear the workspace** and keep a hardware **e-stop within reach** for `test_lift.py`, `test_navigation.py`, `test_arm.py`.
+- **Clear the workspace** and keep a hardware **e-stop within reach** for `test_lift.py`, `test_navigation.py`.
 - **Never pass `--yes`** to a motion script you haven't already watched succeed at least once.
 - **Start small:** nav defaults to a near-no-op; arm targets should be known-reachable points; decline (`n`) large moves on the first pass.
 - **Prefer `moveit` over `custom_ik`** for first arm runs — MoveIt plans around collisions; custom_ik publishes a raw target with no planning.

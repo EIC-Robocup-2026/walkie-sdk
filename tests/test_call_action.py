@@ -9,9 +9,7 @@ def on_arm_feedback(feedback: dict):
 
 def main():
     robot = WalkieRobot(
-        ros_protocol="rosbridge",
         ip="127.0.0.1",
-        ros_port=9090,
     )
 
     try:

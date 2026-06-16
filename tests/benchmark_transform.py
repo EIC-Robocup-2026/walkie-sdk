@@ -132,7 +132,7 @@ def main() -> None:
         description="Benchmark Transform.lookup() Hz — requires walkie_tf service"
     )
     parser.add_argument("--ip",        default="127.0.0.1", help="Robot IP (default: 127.0.0.1)")
-    parser.add_argument("--protocol",  default="rosbridge", choices=["rosbridge", "zenoh", "auto"],
+    parser.add_argument("--protocol",  default="hybrid", choices=["rosbridge", "zenoh", "hybrid", "auto"],
                         help="ROS transport (default: rosbridge)")
     parser.add_argument("--port",      type=int, default=None,
                         help="Transport port (default: 9090 rosbridge/auto, 7447 zenoh)")

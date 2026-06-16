@@ -353,16 +353,13 @@ def main():
     parser = argparse.ArgumentParser(description="Interactive arm tester")
     parser.add_argument("--ip",        default="127.0.0.1", help="Robot IP (default: 127.0.0.1)")
     parser.add_argument("--port",      type=int, default=9090, help="Rosbridge port (default: 9090)")
-    parser.add_argument("--protocol",  default="rosbridge", choices=["rosbridge", "zenoh"], help="ROS protocol")
     parser.add_argument("--namespace", default="", help="ROS namespace (default: none)")
     parser.add_argument("--no-camera", action="store_true", help="Disable camera (speeds up connection)")
     args = parser.parse_args()
 
-    print(f"Connecting to {args.ip}:{args.port} (protocol={args.protocol}) ...")
+    print(f"Connecting to {args.ip}:{args.port} ...")
     robot = WalkieRobot(
         ip=args.ip,
-        ros_protocol=args.protocol,
-        ros_port=args.port,
         camera_protocol="none" if args.no_camera else "zenoh",
         namespace=args.namespace,
     )

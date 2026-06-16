@@ -224,9 +224,7 @@ def main():
     print(f"Connecting to {args.ip}:{args.port} ...")
     robot = WalkieRobot(
         ip=args.ip,
-        ros_protocol="rosbridge",
         camera_protocol="zenoh",
-        ros_port=args.port,
         camera_port=args.cam_port,
         namespace=args.namespace,
     )

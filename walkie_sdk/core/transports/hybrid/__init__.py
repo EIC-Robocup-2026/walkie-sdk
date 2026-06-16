@@ -121,7 +121,28 @@ class HybridTransport(ROSTransportInterface[Any]):
         request: Dict[str, Any],
         timeout: float = 5.0,
     ) -> Dict[str, Any]:
-        return self._zenoh.call_service(service_name, service_type, request, timeout=timeout)
+        """Call a service over zenoh, falling back to rosbridge on failure.
+
+        zenoh is the fast path and handles most services (e.g. get_transform).
+        But some fail over ``zenoh_ros2_sdk``: responses containing nested
+        messages mis-resolve their type (e.g. ``nav_msgs/srv/GetMap`` ->
+        ``KeyError 'nav_msgs/srv/msg/OccupancyGrid'``), and the SDK's computed
+        type hash can mismatch the robot's, causing a timeout. rosbridge handles
+        these — it's the same path that worked before the zenoh migration — so we
+        fall back to it rather than failing the call.
+        """
+        try:
+            return self._zenoh.call_service(service_name, service_type, request, timeout=timeout)
+        except Exception as e:
+            if self._rosbridge.is_connected:
+                print(
+                    f"[Hybrid] zenoh service '{service_name}' failed ({e}); "
+                    f"falling back to rosbridge."
+                )
+                return self._rosbridge.call_service(
+                    service_name, service_type, request, timeout=timeout
+                )
+            raise
 
     # ── Actions → rosbridge ─────────────────────────────────────────────────
 
