@@ -168,8 +168,11 @@ class WalkieRobot:
         # Shared joint state hub — one subscription for all modules
         self._joints = JointStateHub(self._transport, namespace=namespace)
 
+        # Head tilt module (created early so Navigation can reference it)
+        self._head = Head(self._transport, namespace=namespace, joint_state_hub=self._joints)
+
         # Initialize modules with transport interface (not specific implementation)
-        self._nav = Navigation(self._transport, namespace=namespace)
+        self._nav = Navigation(self._transport, namespace=namespace, head=self._head)
         self._status = Telemetry(self._transport, namespace=namespace)
         self._arm = Arm(self._transport, namespace=namespace, joint_state_hub=self._joints)
         self._camera: Optional[Camera] = (
@@ -194,9 +197,6 @@ class WalkieRobot:
 
         # Lift module
         self._lift = Lift(self._transport, namespace=namespace, joint_state_hub=self._joints)
-
-        # Head tilt module
-        self._head = Head(self._transport, namespace=namespace, joint_state_hub=self._joints)
 
         # Point cloud module (subscribes via the active ROS transport)
         self._point_cloud = PointCloud(self._transport, namespace=namespace)
