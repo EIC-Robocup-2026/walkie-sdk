@@ -35,7 +35,6 @@ def main() -> int:
     print(f"Connecting to {args.ip}:{args.port} (namespace={args.namespace!r}) ...")
     bot = WalkieRobot(
         ip=args.ip,
-        ros_port=args.port,
         camera_protocol="none",
         namespace=args.namespace,
     )

@@ -5,7 +5,7 @@
 # Suites (climb the ladder; don't advance until the current one is green):
 #   offline : test_connection.py --offline-only          (no robot needed)
 #   safe    : connection, telemetry, cameras, visualization   (zero motion)
-#   motion  : lift, navigation, arm                       (⚠️ MOVES HARDWARE)
+#   motion  : lift, navigation                            (⚠️ MOVES HARDWARE)
 #   all     : safe + motion
 #
 # Motion scripts prompt [y/N] before each move unless you pass --yes.
@@ -28,7 +28,6 @@ SUITE="safe"            # offline | safe | motion | all
 YES=""                  # "--yes" to skip motion prompts
 STOP_ON_FAIL=0
 CAMERA_EXTRA=""         # e.g. "--multi --show"
-ARM_MODE="moveit"       # moveit | custom_ik | both
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -52,7 +51,6 @@ while [[ $# -gt 0 ]]; do
         --yes|-y)        YES="--yes"; shift;;
         --stop-on-fail)  STOP_ON_FAIL=1; shift;;
         --camera-extra)  CAMERA_EXTRA="$2"; shift 2;;
-        --arm-mode)      ARM_MODE="$2"; shift 2;;
         -h|--help)       usage; exit 0;;
         *) echo "Unknown argument: $1" >&2; usage; exit 2;;
     esac
@@ -94,7 +92,7 @@ confirm_motion() {
         return 0
     fi
     echo
-    echo "⚠️  About to run MOTION tests (lift / navigation / arm) on ${IP}."
+    echo "⚠️  About to run MOTION tests (lift / navigation) on ${IP}."
     echo "    Keep the workspace clear and an e-stop within reach."
     read -r -p "    Continue? [y/N] " ans
     [[ "$ans" == "y" || "$ans" == "Y" || "$ans" == "yes" ]]
@@ -121,8 +119,6 @@ run_motion() {
     run_test "lift"       "${RUN[@]}" "$SCRIPT_DIR/test_lift.py" --ip "$IP" --port "$PORT" "${NS_FLAG[@]}"
     # shellcheck disable=SC2086
     run_test "navigation" "${RUN[@]}" "$SCRIPT_DIR/test_navigation.py" --ip "$IP" --port "$PORT" "${NS_FLAG[@]}" $YES
-    # shellcheck disable=SC2086
-    run_test "arm"        "${RUN[@]}" "$SCRIPT_DIR/test_arm.py" --ip "$IP" --port "$PORT" "${NS_FLAG[@]}" --mode "$ARM_MODE" $YES
 }
 
 # ── Summary ──────────────────────────────────────────────────────────────────

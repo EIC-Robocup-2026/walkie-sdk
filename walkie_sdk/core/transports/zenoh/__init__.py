@@ -7,6 +7,8 @@ This handles CDR serialization, discovery, and type support automatically.
 
 from __future__ import annotations
 
+import dataclasses
+import re
 import threading
 import time
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -35,6 +37,7 @@ except ImportError:
 
 from walkie_sdk.core.interfaces import CameraTransportInterface, ROSTransportInterface
 from walkie_sdk.config.ros_topics import CAMERA_TOPICS, DEPTH_TOPICS, ROS_DOMAIN_ID
+from walkie_sdk.config.interface_defs import msg_definition, srv_definitions, seed_registry
 
 
 def _msg_to_dict(msg: Any) -> Dict[str, Any]:
@@ -57,6 +60,90 @@ def _msg_to_dict(msg: Any) -> Dict[str, Any]:
         return msg.tolist()
     else:
         return msg
+
+
+# ── Message completion ─────────────────────────────────────────────────────
+# The rosbags message classes used by zenoh_ros2_sdk are dataclasses whose
+# fields have NO defaults — constructing one requires every field, and the CDR
+# serializer needs real nested instances (not dicts) and numpy arrays (not
+# lists). Modules, however, publish *partial* dicts (rosbridge silently filled
+# the rest). These helpers complete a partial dict into full constructor kwargs
+# so any module's message publishes correctly over Zenoh.
+
+_PRIMITIVE_DEFAULTS: Dict[str, Any] = {
+    "str": "",
+    "bool": False,
+    "int": 0,
+    "float": 0.0,
+    "bytes": b"",
+}
+
+
+def _np_dtype(type_str: str):
+    """Extract the numpy dtype from an annotation like
+    'np.ndarray[tuple[int, ...], np.dtype[np.float64]]'."""
+    m = re.search(r"np\.dtype\[np\.(\w+)\]", type_str)
+    return getattr(np, m.group(1)) if m else np.float64
+
+
+def _is_message_type(type_str: str) -> bool:
+    """True if the field annotation refers to a nested ROS message dataclass."""
+    return not (
+        type_str in _PRIMITIVE_DEFAULTS
+        or type_str.startswith("np.ndarray")
+        or type_str.startswith("list[")
+        or type_str.startswith("ClassVar")
+    )
+
+
+def _coerce_value(type_str: str, value: Any, resolve: Callable[[str], Any]) -> Any:
+    """Convert a provided value to what the dataclass/serializer expects."""
+    if type_str.startswith("np.ndarray"):
+        return np.asarray(value, dtype=_np_dtype(type_str))
+    if type_str.startswith("list[") and isinstance(value, list):
+        inner = type_str[5:-1]
+        return [_coerce_value(inner, v, resolve) for v in value]
+    if _is_message_type(type_str) and isinstance(value, dict):
+        return _build_instance(resolve(type_str), value, resolve)
+    return value
+
+
+def _default_value(type_str: str, resolve: Callable[[str], Any]) -> Any:
+    """Build a type-appropriate default for a missing required field."""
+    if type_str in _PRIMITIVE_DEFAULTS:
+        return _PRIMITIVE_DEFAULTS[type_str]
+    if type_str.startswith("np.ndarray"):
+        return np.array([], dtype=_np_dtype(type_str))
+    if type_str.startswith("list["):
+        return []
+    if _is_message_type(type_str):
+        return _build_instance(resolve(type_str), {}, resolve)
+    return None
+
+
+def _complete_kwargs(
+    msg_class: Any, data: Any, resolve: Callable[[str], Any]
+) -> Dict[str, Any]:
+    """Return full constructor kwargs for ``msg_class`` from a partial ``data``
+    dict: provided fields are coerced, missing required fields get defaults, and
+    ClassVar constants / dunder fields are left to the dataclass."""
+    out: Dict[str, Any] = {}
+    for f in dataclasses.fields(msg_class):
+        if f.name.startswith("__"):
+            continue
+        has_default = (
+            f.default is not dataclasses.MISSING
+            or f.default_factory is not dataclasses.MISSING
+        )
+        if isinstance(data, dict) and f.name in data:
+            out[f.name] = _coerce_value(f.type, data[f.name], resolve)
+        elif not has_default:
+            out[f.name] = _default_value(f.type, resolve)
+    return out
+
+
+def _build_instance(msg_class: Any, data: Any, resolve: Callable[[str], Any]) -> Any:
+    return msg_class(**_complete_kwargs(msg_class, data, resolve))
 
 
 class ZenohTransport(ROSTransportInterface[Any]):
@@ -87,6 +174,12 @@ class ZenohTransport(ROSTransportInterface[Any]):
         self._subscribers: Dict[str, ROS2Subscriber] = {}
         self._publishers: Dict[str, ROS2Publisher] = {}
         self._service_clients: Dict[str, ROS2ServiceClient] = {}
+        # Cache resolved nested message classes (for message completion)
+        self._msg_class_cache: Dict[str, Any] = {}
+        # Cache discovered service type-hashes (service_name -> RIHS01 hash | None)
+        self._service_hash_cache: Dict[str, Optional[str]] = {}
+        # Whether the rosbags-store deserialization alias patch is installed
+        self._msgdef_patched = False
 
     @property
     def host(self) -> str:
@@ -109,6 +202,11 @@ class ZenohTransport(ROSTransportInterface[Any]):
             self._session_mgr = ZenohSession.get_instance(
                 router_ip=self._host, router_port=self._port
             )
+            # Point zenoh_ros2_sdk's message registry at our bundled interface
+            # files and preload them, so nested non-clonable types (e.g.
+            # vision_msgs inside walkie_perception services) resolve. Done after
+            # the session exists because preloading registers into it.
+            seed_registry()
             print(
                 f"  ✓ Connected to Zenoh (Session ID: {self._session_mgr.session_id})"
             )
@@ -159,13 +257,25 @@ class ZenohTransport(ROSTransportInterface[Any]):
                 except Exception as e:
                     print(f"[ZenohTransport] Error in callback for {topic}: {e}")
 
-            # Create Subscriber using standard ROS 2 types
+            # Create Subscriber. Standard ROS 2 types resolve automatically;
+            # custom (project-specific) types need their .msg text supplied.
+            #
+            # type_hash="*" wildcards the REP-2011 type hash in the data keyexpr
+            # (<domain>/<topic>/<dds_type>/<type_hash>). The SDK's bundled message
+            # definitions can hash differently from the robot's ROS distro (e.g.
+            # sensor_msgs/PointCloud2), and an exact-hash subscription then matches
+            # nothing even though the topic is publishing. Matching any hash keeps
+            # the SDK distro-agnostic; the CDR wire layout for standard messages is
+            # stable, so deserialization with our definition still works.
             sub = ROS2Subscriber(
                 topic=topic,
                 msg_type=message_type,
                 callback=callback_wrapper,
+                msg_definition=msg_definition(message_type),
+                domain_id=ROS_DOMAIN_ID,
                 router_ip=self._host,
                 router_port=self._port,
+                type_hash="*",
             )
             self._subscribers[topic] = sub
             return sub
@@ -192,15 +302,26 @@ class ZenohTransport(ROSTransportInterface[Any]):
 
         with self._lock:
             if topic not in self._publishers:
-                # Create Publisher
+                # Create Publisher. Custom types need their .msg text supplied.
                 self._publishers[topic] = ROS2Publisher(
                     topic=topic,
                     msg_type=message_type,
+                    msg_definition=msg_definition(message_type),
+                    domain_id=ROS_DOMAIN_ID,
                     router_ip=self._host,
                     router_port=self._port,
                 )
 
             pub = self._publishers[topic]
+
+        # Complete the (often partial) message dict into full constructor kwargs:
+        # fill missing required fields with defaults and turn nested dicts/lists
+        # into proper message instances / numpy arrays. Best-effort — if anything
+        # goes wrong, fall back to the raw message (original behavior).
+        try:
+            message = _complete_kwargs(pub.msg_class, message, self._resolve_msg_class)
+        except Exception as e:
+            print(f"[ZenohTransport] Warning: could not complete message for {topic}: {e}")
 
         # Publish using kwargs
         try:
@@ -208,6 +329,19 @@ class ZenohTransport(ROSTransportInterface[Any]):
         except Exception as e:
             print(f"[ZenohTransport] Error publishing to {topic}: {e}")
             raise
+
+    def _resolve_msg_class(self, type_str: str) -> Any:
+        """Resolve a nested-message annotation (e.g. 'geometry_msgs__msg__Pose')
+        to its rosbags dataclass, caching the result. Tolerates the service
+        namespace mangling ('pkg__srv__msg__X' -> the real 'pkg/msg/X')."""
+        cls = self._msg_class_cache.get(type_str)
+        if cls is None:
+            ros2_type = type_str.replace("__", "/")
+            if "/srv/msg/" in ros2_type:
+                ros2_type = ros2_type.replace("/srv/msg/", "/msg/")
+            cls = self._session_mgr.register_message_type(None, ros2_type)
+            self._msg_class_cache[type_str] = cls
+        return cls
 
     def call_service(
         self,
@@ -220,16 +354,44 @@ class ZenohTransport(ROSTransportInterface[Any]):
         if not self._session_mgr:
             raise ConnectionError("Not connected to Zenoh")
 
+        # Services whose response embeds a nested message (e.g. nav_msgs/srv/GetMap
+        # -> OccupancyGrid) deserialize the nested type under the service namespace
+        # ('nav_msgs/srv/msg/OccupancyGrid'), which doesn't exist. Patch the store
+        # once so those names alias the real 'nav_msgs/msg/OccupancyGrid'.
+        self._install_msgdef_alias_patch()
+
         with self._lock:
             if service_name not in self._service_clients:
+                # Standard service types resolve automatically; custom
+                # (project-specific) types need their .srv text supplied.
+                request_def, response_def = srv_definitions(service_type)
+                # The SDK's bundled message defs can hash differently from the
+                # robot's distro, so the computed service type-hash won't match
+                # and the request never reaches the server. Discover the robot's
+                # actual hash from the liveliness graph (None -> fall back to the
+                # SDK's computed hash, which is correct for our custom services).
+                real_hash = self._discover_service_hash(service_name)
                 self._service_clients[service_name] = ROS2ServiceClient(
                     service_name=service_name,
                     srv_type=service_type,
+                    request_definition=request_def,
+                    response_definition=response_def,
+                    domain_id=ROS_DOMAIN_ID,
                     timeout=timeout,
                     router_ip=self._host,
                     router_port=self._port,
+                    **({"type_hash": real_hash} if real_hash else {}),
                 )
             client = self._service_clients[service_name]
+
+        # Complete the request like publishes: turn nested dicts into proper
+        # message instances (the CDR serializer needs instances, not dicts) and
+        # fill any missing required fields. Best-effort — fall back to the raw
+        # request if completion fails.
+        try:
+            request = _complete_kwargs(client.request_msg_class, request, self._resolve_msg_class)
+        except Exception as e:
+            print(f"[ZenohTransport] Warning: could not complete request for {service_name}: {e}")
 
         try:
             # SDK call returns an object
@@ -244,6 +406,92 @@ class ZenohTransport(ROSTransportInterface[Any]):
         except Exception as e:
             print(f"[ZenohTransport] Error calling service {service_name}: {e}")
             raise
+
+    def _install_msgdef_alias_patch(self) -> None:
+        """Make the rosbags store resilient when (de)serializing service messages.
+
+        Two problems show up only for services whose request/response embed nested
+        messages:
+        1. The nested field is named under the service namespace
+           ('pkg/srv/msg/Other' instead of the real 'pkg/msg/Other').
+        2. A referenced type may not be registered in the store yet (e.g. a
+           standard ``geometry_msgs/msg/PoseArray`` that no topic uses).
+
+        Wrap ``get_msgdef`` so a failed lookup (a) maps the service-namespaced
+        name to the real one and (b) lazily loads the type from the registry
+        (bundled dir, then clone) before retrying. Installed once per session."""
+        if self._msgdef_patched:
+            return
+        store = self._session_mgr.store
+        original = store.get_msgdef
+
+        def get_msgdef(typename):
+            try:
+                return original(typename)
+            except KeyError:
+                real = (
+                    typename.replace("/srv/msg/", "/msg/")
+                    if "/srv/msg/" in typename
+                    else typename
+                )
+                fielddefs = getattr(store, "fielddefs", {})
+                if real not in fielddefs:
+                    try:
+                        from zenoh_ros2_sdk.message_registry import get_registry
+
+                        get_registry().load_message_type(real)
+                    except Exception:
+                        pass
+                if real in fielddefs:
+                    if real != typename:  # alias the service-namespaced name
+                        fielddefs[typename] = fielddefs[real]
+                        types = getattr(store, "types", None)
+                        if types is not None and real in types:
+                            types[typename] = types[real]
+                    return original(typename)
+                raise
+
+        store.get_msgdef = get_msgdef
+        self._msgdef_patched = True
+
+    def _discover_service_hash(self, service_name: str) -> Optional[str]:
+        """Find the robot's actual REP-2011 type hash for a service by reading the
+        Zenoh liveliness graph. rmw_zenoh advertises each service server (``SS``)
+        with a token ending in ``.../<mangled_name>/<dds_type>/<RIHS01_hash>``.
+        Returns the hash or None (cached per service_name)."""
+        if service_name in self._service_hash_cache:
+            return self._service_hash_cache[service_name]
+
+        mangled = "%" + service_name.strip("/").replace("/", "%")
+        found: Dict[str, Optional[str]] = {"hash": None}
+        done = threading.Event()
+
+        def on_token(sample):
+            key = str(sample.key_expr)
+            if "/SS/" in key and mangled in key:
+                after = key.split(mangled, 1)[1]
+                m = re.search(r"RIHS01_[0-9a-f]+", after)
+                if m:
+                    found["hash"] = m.group(0)
+                    done.set()
+
+        sub = None
+        try:
+            sub = self._session_mgr.session.liveliness().declare_subscriber(
+                "@ros2_lv/**", on_token, history=True
+            )
+            done.wait(timeout=2.0)
+        except Exception as e:
+            print(f"[ZenohTransport] service-hash discovery failed for {service_name}: {e}")
+        finally:
+            if sub is not None:
+                try:
+                    sub.undeclare()
+                except Exception:
+                    pass
+
+        self._service_hash_cache[service_name] = found["hash"]
+        return found["hash"]
 
     def call_action(
         self,
