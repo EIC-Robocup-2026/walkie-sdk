@@ -33,6 +33,7 @@ from walkie_sdk.modules.visualization import Visualization
 from walkie_sdk.modules.point_cloud import PointCloud
 from walkie_sdk.modules.tools import Tools
 from walkie_sdk.modules.transform import Transform
+from walkie_sdk.modules.grasp import Grasp
 
 from walkie_sdk.config.ros_topics import load_config
 
@@ -188,6 +189,9 @@ class WalkieRobot:
 
         # Tools module
         self._tools = Tools(self._transport, namespace=namespace)
+
+        # Grasp module (GraspNet service client)
+        self._grasp = Grasp(self._transport, namespace=namespace)
 
         # Transform lookup module
         self._transform = Transform(self._transport, namespace=namespace)
@@ -404,6 +408,31 @@ class WalkieRobot:
         return self._tools
 
     @property
+    def grasp(self) -> Grasp:
+        """
+        Grasp controller (unified GraspNet server).
+
+        Provides:
+        - from_mask(mask, bbox, ...): grasp from a YOLO mask over the live view
+        - from_cloud(cloud, ...): grasp from a segmented PointCloud2 in the request
+        - from_pos(object_cloud, ...): live crop + GraspNet + antipodal validation
+        - set_standby(load): load/unload the GPU model
+        - status(): server state + VRAM
+
+        Each grasp call returns a dict with a best-first ``grasps`` list
+        (position/orientation/score/width) in the planning frame, or None.
+
+        Example:
+            ```python
+            cloud = bot.point_cloud.get_once(timeout=10.0)
+            res = bot.grasp.from_cloud(cloud)
+            if res and res["grasps"]:
+                print(res["grasps"][0]["position"])
+            ```
+        """
+        return self._grasp
+
+    @property
     def transform(self) -> Transform:
         """Transform module for coordinate frame lookups."""
         return self._transform
@@ -579,6 +608,7 @@ class WalkieRobot:
         self._viz.namespace = value
         self._head.namespace = value
         self._transform.namespace = value
+        self._grasp.namespace = value
 
     @property
     def is_connected(self) -> bool:
