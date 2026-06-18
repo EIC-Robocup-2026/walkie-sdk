@@ -88,6 +88,27 @@ class Head:
                 return hub_val
         return self._angle
 
+    def set_auto_tilt(self, enable: bool, timeout: float = 5.0) -> bool:
+        """
+        Enable or disable the head_tilt_near_goal auto-tilt node.
+
+        Args:
+            enable: True to enable auto tilt, False to disable.
+            timeout: Service call timeout in seconds.
+
+        Returns:
+            True if the service reported success, False otherwise.
+        """
+        response = self._transport.call_service(
+            service_name=apply_namespace(
+                HEAD_TOPICS["auto_tilt_enable_service"], self._namespace
+            ),
+            service_type=HEAD_TOPICS["auto_tilt_enable_service_type"],
+            request={"data": bool(enable)},
+            timeout=timeout,
+        )
+        return bool(response.get("success", False))
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------

@@ -153,7 +153,9 @@ LIFT_TOPICS = {
 HEAD_TOPICS = {
     "cmd":         os.getenv("WALKIE_HEAD_CMD",          "head_servo_controller/commands"),
     "cmd_type":    os.getenv("WALKIE_HEAD_CMD_TYPE",     "std_msgs/msg/Float64MultiArray"),
-    "state_joint": os.getenv("WALKIE_HEAD_STATE_JOINT",  "head_servo_joint"),
+    "state_joint":               os.getenv("WALKIE_HEAD_STATE_JOINT",              "head_servo_joint"),
+    "auto_tilt_enable_service":  os.getenv("WALKIE_HEAD_AUTO_TILT_ENABLE_SRV",      "head_tilt_near_goal/enable"),
+    "auto_tilt_enable_service_type": os.getenv("WALKIE_HEAD_AUTO_TILT_ENABLE_SRV_TYPE", "std_srvs/srv/SetBool"),
 }
 
 ROS_DOMAIN_ID = int(os.getenv("WALKIE_ROS_DOMAIN_ID", "23"))

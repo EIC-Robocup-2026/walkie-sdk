@@ -233,6 +233,9 @@ class WalkieRobot:
         # Start point cloud subscriptions
         self._point_cloud._setup_subscription()
 
+        # Always enable auto-tilt on startup
+        self._head.set_auto_tilt(True)
+
         self._connected = True
         print(f"✓ Robot connected!")
 
