@@ -22,6 +22,7 @@ from walkie_sdk.core.interfaces import (
     ROSTransportInterface,
 )
 from walkie_sdk.modules.arm import Arm
+from walkie_sdk.modules.button import Button
 from walkie_sdk.modules.camera import Camera
 from walkie_sdk.modules.head import Head
 from walkie_sdk.modules.joint_state_hub import JointStateHub
@@ -107,6 +108,7 @@ class WalkieRobot:
         timeout: float = 10.0,
         namespace: str = "",
         config_path: str = None,
+        button_key: str = "0x1008ff47",
         # Legacy parameters for backward compatibility
         ws_port: Optional[int] = None,
         enable_camera: bool = True,
@@ -201,6 +203,9 @@ class WalkieRobot:
         # Point cloud module (subscribes via the active ROS transport)
         self._point_cloud = PointCloud(self._transport, namespace=namespace)
 
+        # Button module (Pi Pico USB HID keyboard input — no ROS transport)
+        self._button = Button(key=button_key)
+
         # Auto-connect
         self._connect()
 
@@ -232,6 +237,9 @@ class WalkieRobot:
 
         # Start point cloud subscriptions
         self._point_cloud._setup_subscription()
+
+        # Start button (Pi Pico HID keyboard) listener
+        self._button._start()
 
         self._connected = True
         print(f"✓ Robot connected!")
@@ -424,6 +432,28 @@ class WalkieRobot:
         """
         return self._point_cloud
 
+    @property
+    def button(self) -> Button:
+        """
+        Button state from Pi Pico USB HID keyboard input.
+
+        Provides:
+        - is_pressed: True while the physical button is held, False otherwise
+        - key: The function key name being listened for (e.g. ``"f1"``)
+
+        The Pi Pico must be programmed to send the matching key (default F1)
+        as a USB HID keyboard event when the button is pressed/released.
+
+        Example:
+            ```python
+            while True:
+                if bot.button.is_pressed:
+                    print("Button held!")
+                time.sleep(0.05)
+            ```
+        """
+        return self._button
+
     def draw_marker(
         self,
         position,
@@ -605,6 +635,9 @@ class WalkieRobot:
 
         # Stop telemetry
         self._status.stop()
+
+        # Stop button listener
+        self._button._stop()
 
         if self._camera_transport is not None:
             try:
