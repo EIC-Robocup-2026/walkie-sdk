@@ -233,8 +233,9 @@ class WalkieRobot:
         # Start point cloud subscriptions
         self._point_cloud._setup_subscription()
 
-        # Always enable auto-tilt on startup
-        self._head.set_auto_tilt(True)
+        # Always enable auto-tilt on startup (short timeout: service is rosbridge-only,
+        # so we don't want to stall 5 s waiting for the Zenoh fallback)
+        self._head.set_auto_tilt(True, timeout=1.0)
 
         self._connected = True
         print(f"✓ Robot connected!")
