@@ -34,6 +34,20 @@ def _vec3(v: Optional[Sequence[float]]) -> Dict[str, float]:
     return {"x": float(v[0]), "y": float(v[1]), "z": float(v[2])}
 
 
+def _empty_image() -> Dict[str, Any]:
+    """An empty sensor_msgs/Image (no data) — signals the grasp server to use
+    the bbox region at the depth/camera resolution instead of a mask."""
+    return {
+        "header": {"stamp": {"sec": 0, "nanosec": 0}, "frame_id": ""},
+        "height": 0,
+        "width": 0,
+        "encoding": "mono8",
+        "is_bigendian": 0,
+        "step": 0,
+        "data": [],
+    }
+
+
 class Grasp:
     """
     Controller for the unified GraspNet grasp service.
@@ -189,9 +203,12 @@ class Grasp:
         if mask is None and bbox is None:
             print("[Grasp] from_mask needs either a mask or a bbox")
             return None
+        # bbox-only: send a TRULY EMPTY image (no data). A non-empty dummy mask
+        # would make the node use the mask's tiny dimensions for the region and
+        # build the bbox on that grid → empty region → 0 points. Empty data lets
+        # the node take the real bbox path at the depth/camera resolution.
         request = {
-            "mask": mask if mask is not None else converters.numpy_to_mono8_image(
-                [[0]]),  # empty-ish mask → server uses bbox
+            "mask": mask if mask is not None else _empty_image(),
             "tracker_id": int(tracker_id),
             "bbox": converters.bbox_to_bounding_box2d(bbox) if bbox is not None
             else converters.bbox_to_bounding_box2d([0, 0, 0, 0]),
