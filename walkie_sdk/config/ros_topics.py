@@ -135,6 +135,23 @@ TF_SERVICE = {
     "service_type": os.getenv("WALKIE_TF_SERVICE_TYPE", "walkie_tf_interfaces/srv/GetTransform"),
 }
 
+# ── Grasp Services (unified GraspNet server) ───────────────────
+# One node ("grasp_server") serves all three grasp services + a shared
+# standby/status pair. Names are stored without a leading slash so namespacing
+# resolves them like every other service (empty namespace → "grasp/from_mask").
+GRASP_SERVICES = {
+    "from_mask":       os.getenv("WALKIE_GRASP_FROM_MASK",       "grasp/from_mask"),
+    "from_mask_type":  os.getenv("WALKIE_GRASP_FROM_MASK_TYPE",  "walkie_perception/srv/GraspFromMask"),
+    "from_cloud":      os.getenv("WALKIE_GRASP_FROM_CLOUD",      "grasp/from_cloud"),
+    "from_cloud_type": os.getenv("WALKIE_GRASP_FROM_CLOUD_TYPE", "walkie_perception/srv/GraspFromCloud"),
+    "pos":             os.getenv("WALKIE_GRASP_POS",             "grasp/pos"),
+    "pos_type":        os.getenv("WALKIE_GRASP_POS_TYPE",        "walkie_perception/srv/GraspPos"),
+    "standby":         os.getenv("WALKIE_GRASP_STANDBY",         "grasp/standby"),
+    "standby_type":    os.getenv("WALKIE_GRASP_STANDBY_TYPE",    "std_srvs/srv/SetBool"),
+    "status":          os.getenv("WALKIE_GRASP_STATUS",          "grasp/status"),
+    "status_type":     os.getenv("WALKIE_GRASP_STATUS_TYPE",     "std_srvs/srv/Trigger"),
+}
+
 # ── Joint State Topics (shared hub) ───────────────────────────
 JOINT_STATE_TOPICS = {
     "states":      os.getenv("WALKIE_JOINT_STATES",      "joint_states"),
@@ -190,6 +207,7 @@ def load_config(yaml_path: str):
         if "VIZ_TOPICS" in config: VIZ_TOPICS.update(config["VIZ_TOPICS"])
         if "OB_POSE_SERVICE" in config: OB_POSE_SERVICE.update(config["OB_POSE_SERVICE"])
         if "TF_SERVICE" in config: TF_SERVICE.update(config["TF_SERVICE"])
+        if "GRASP_SERVICES" in config: GRASP_SERVICES.update(config["GRASP_SERVICES"])
         if "LIFT_TOPICS" in config: LIFT_TOPICS.update(config["LIFT_TOPICS"])
         if "HEAD_TOPICS" in config: HEAD_TOPICS.update(config["HEAD_TOPICS"])
         if "JOINT_STATE_TOPICS" in config: JOINT_STATE_TOPICS.update(config["JOINT_STATE_TOPICS"])
