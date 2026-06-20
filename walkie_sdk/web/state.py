@@ -97,7 +97,7 @@ class RobotSession:
             "connected": robot.is_connected,
             "ip": self._params.get("ip"),
             "namespace": self._params.get("namespace", ""),
-            "ros_protocol": self._params.get("ros_protocol", "rosbridge"),
+            "ros_protocol": self._params.get("ros_protocol", "hybrid"),
             "camera_protocol": self._params.get("camera_protocol", "zenoh"),
         }
 

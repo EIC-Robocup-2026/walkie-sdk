@@ -16,7 +16,7 @@ class ConnectRequest(BaseModel):
     """Arguments for ``WalkieRobot(...)`` (see robot.py)."""
 
     ip: str
-    ros_protocol: str = "rosbridge"
+    ros_protocol: str = "hybrid"
     ros_port: int = 9090
     camera_protocol: str = "zenoh"
     camera_port: int = 7447
