@@ -10,9 +10,14 @@ load/unload lifecycle:
   pos        — "best": live crop + GraspNet + antipodal validation vs the
                supplied object cloud
 
-All three return grasp poses in the planning frame (``base_footprint``). The
-``from_cloud`` / ``pos`` clouds are plain PointCloud2 dicts — exactly what
-``bot.point_cloud.get_once()`` returns — so they slot straight in.
+All three return grasp poses in a planning frame. The SDK defaults
+``planning_frame="map"`` so poses come back in the map frame (this requires the
+``map`` TF to be available — e.g. SLAM/localization running — otherwise the
+server returns an empty pose list). Pass ``planning_frame=""`` to fall back to
+the server's own ``planning_frame`` parameter (default ``base_footprint``), or
+any other TF frame name. The ``from_cloud`` / ``pos`` clouds are plain
+PointCloud2 dicts — exactly what ``bot.point_cloud.get_once()`` returns — so
+they slot straight in.
 
 This module works with any transport implementation (rosbridge, zenoh) and
 degrades gracefully: service/validation errors surface as ``None`` (grasp
@@ -180,6 +185,7 @@ class Grasp:
         num_frames: int = 0,
         score_threshold: float = 0.0,
         max_grasps: int = 5,
+        planning_frame: str = "map",
         timeout: float = 10.0,
     ) -> Optional[Dict[str, Any]]:
         """
@@ -195,6 +201,9 @@ class Grasp:
             num_frames: frames to accumulate (0 = adaptive 1→3→5).
             score_threshold: minimum grasp score (0 = no filter).
             max_grasps: cap on returned poses.
+            planning_frame: output TF frame for the returned poses. Defaults to
+                  "map"; pass "" to use the server's own default
+                  (base_footprint). The frame must exist in TF at request time.
             timeout: service timeout (seconds).
 
         Returns:
@@ -215,6 +224,7 @@ class Grasp:
             "num_frames": int(num_frames),
             "score_threshold": float(score_threshold),
             "max_grasps": int(max_grasps),
+            "planning_frame": str(planning_frame),
         }
         return self._call("from_mask", "from_mask_type", request, timeout)
 
@@ -233,14 +243,16 @@ class Grasp:
         region_frac: float = 0.0,
         region_weight: float = 0.0,
         quality_weight: float = 0.0,
+        planning_frame: str = "map",
         timeout: float = 15.0,
     ) -> Optional[Dict[str, Any]]:
         """
         Grasp from a segmented object PointCloud2 supplied in the request.
 
         ``cloud`` is a PointCloud2 dict (e.g. from bot.point_cloud.get_once()).
-        Its header.frame_id is the source frame; grasps come back in the
-        planning frame. All ``*_weight`` default to 0 → poses are ranked purely
+        Its header.frame_id is the source frame; grasps come back in
+        ``planning_frame`` (default "map"; pass "" for the server default
+        base_footprint). All ``*_weight`` default to 0 → poses are ranked purely
         by GraspNet quality (the soft preferences are an opt-in re-rank).
 
         Returns the parsed result dict, or None on failure.
@@ -249,6 +261,7 @@ class Grasp:
             "cloud": cloud,
             "score_threshold": float(score_threshold),
             "max_grasps": int(max_grasps),
+            "planning_frame": str(planning_frame),
             "preferred_approach": _vec3(preferred_approach),
             "approach_weight": float(approach_weight),
             "preferred_position": _vec3(preferred_position),
@@ -279,6 +292,7 @@ class Grasp:
         region_weight: float = 0.0,
         quality_weight: float = 0.0,
         antipodal_weight: float = 0.0,
+        planning_frame: str = "map",
         timeout: float = 15.0,
     ) -> Optional[Dict[str, Any]]:
         """
@@ -287,9 +301,11 @@ class Grasp:
         antipodal quality against the object cloud's surface normals.
 
         ``object_cloud`` is a segmented, near-complete PointCloud2 dict (its
-        header.frame_id may be map/odom/camera…). With all weights 0 the server
-        ranks by GraspNet quality + antipodal quality. Each returned grasp also
-        carries an ``antipodal_score``.
+        header.frame_id may be map/odom/camera…). Grasps come back in
+        ``planning_frame`` (default "map"; pass "" for the server default
+        base_footprint). With all weights 0 the server ranks by GraspNet
+        quality + antipodal quality. Each returned grasp also carries an
+        ``antipodal_score``.
 
         Returns the parsed result dict, or None on failure.
         """
@@ -298,6 +314,7 @@ class Grasp:
             "crop_margin_m": float(crop_margin_m),
             "score_threshold": float(score_threshold),
             "max_grasps": int(max_grasps),
+            "planning_frame": str(planning_frame),
             "preferred_approach": _vec3(preferred_approach),
             "approach_weight": float(approach_weight),
             "preferred_position": _vec3(preferred_position),
