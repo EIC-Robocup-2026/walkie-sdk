@@ -122,24 +122,65 @@ document.querySelectorAll("[data-head]").forEach((btn) => {
 });
 
 // ── Arm + Gripper ──────────────────────────────────────────────────────
-function armPoseBody() {
+let orientMode = "rpy"; // "rpy" | "quat"
+
+function setOrientMode(mode) {
+  orientMode = mode;
+  $("arm-orient-rpy").style.display  = mode === "rpy"  ? "" : "none";
+  $("arm-orient-quat").style.display = mode === "quat" ? "" : "none";
+  $("btn-orient-rpy").className  = mode === "rpy"  ? "primary" : "ghost";
+  $("btn-orient-quat").className = mode === "quat" ? "primary" : "ghost";
+  // Relative move is RPY-only
+  $("btn-arm-relative").disabled = mode === "quat";
+  $("btn-arm-relative").title = mode === "quat" ? "Relative move uses Euler RPY only" : "";
+}
+
+$("btn-orient-rpy").onclick  = () => setOrientMode("rpy");
+$("btn-orient-quat").onclick = () => setOrientMode("quat");
+
+function armBase() {
   return {
     x: +$("arm_x").value, y: +$("arm_y").value, z: +$("arm_z").value,
-    roll: +$("arm_roll").value, pitch: +$("arm_pitch").value, yaw: +$("arm_yaw").value,
     group_name: $("arm_group").value,
     frame_id: $("arm_frame").value.trim() || "base_footprint",
     cartesian_path: $("arm_cartesian").checked,
     blocking: false,
   };
 }
-$("btn-arm-pose").onclick = action(
-  () => api("/api/arm/pose", { method: "POST", body: armPoseBody() }),
-  "Arm pose sent"
-);
+
+function armPoseBody() {
+  const base = armBase();
+  if (orientMode === "quat") {
+    return { ...base, qx: +$("arm_qx").value, qy: +$("arm_qy").value, qz: +$("arm_qz").value, qw: +$("arm_qw").value };
+  }
+  return { ...base, roll: +$("arm_roll").value, pitch: +$("arm_pitch").value, yaw: +$("arm_yaw").value };
+}
+
+$("btn-arm-draw-pose").onclick = action(async () => {
+  const b = armBase();
+  const drawBody = { x: b.x, y: b.y, z: b.z, frame_id: b.frame_id };
+  if (orientMode === "quat") {
+    drawBody.qx = +$("arm_qx").value; drawBody.qy = +$("arm_qy").value;
+    drawBody.qz = +$("arm_qz").value; drawBody.qw = +$("arm_qw").value;
+  } else {
+    drawBody.roll = +$("arm_roll").value; drawBody.pitch = +$("arm_pitch").value; drawBody.yaw = +$("arm_yaw").value;
+  }
+  return api("/api/arm/draw_pose", { method: "POST", body: drawBody });
+}, "Pose drawn in RViz");
+
+$("btn-arm-pose").onclick = action(() => {
+  const endpoint = orientMode === "quat" ? "/api/arm/pose_quat" : "/api/arm/pose";
+  return api(endpoint, { method: "POST", body: armPoseBody() });
+}, "Arm pose sent");
+
 $("btn-arm-relative").onclick = action(
   () => api("/api/arm/pose_relative", {
     method: "POST",
-    body: { ...armPoseBody(), ee_frame: $("arm_ee_frame").checked },
+    body: {
+      ...armBase(),
+      roll: +$("arm_roll").value, pitch: +$("arm_pitch").value, yaw: +$("arm_yaw").value,
+      ee_frame: $("arm_ee_frame").checked,
+    },
   }),
   "Relative move sent"
 );
@@ -192,17 +233,24 @@ function quatToRpy(qx, qy, qz, qw) {
   return { roll, pitch, yaw };
 }
 
-// Fill the X/Y/Z/R/P/Y pose inputs from the last read EE pose.
+// Fill the X/Y/Z and orientation inputs from the last read EE pose.
 $("btn-arm-fill-pose").onclick = action(() => {
   if (!lastEePose) throw new Error("Read EE pose first");
   const p = lastEePose;
   $("arm_x").value = (+p.x).toFixed(4);
   $("arm_y").value = (+p.y).toFixed(4);
   $("arm_z").value = (+p.z).toFixed(4);
-  const { roll, pitch, yaw } = quatToRpy(p.qx, p.qy, p.qz, p.qw);
-  $("arm_roll").value = roll.toFixed(4);
-  $("arm_pitch").value = pitch.toFixed(4);
-  $("arm_yaw").value = yaw.toFixed(4);
+  if (orientMode === "quat") {
+    $("arm_qx").value = (+p.qx).toFixed(6);
+    $("arm_qy").value = (+p.qy).toFixed(6);
+    $("arm_qz").value = (+p.qz).toFixed(6);
+    $("arm_qw").value = (+p.qw).toFixed(6);
+  } else {
+    const { roll, pitch, yaw } = quatToRpy(p.qx, p.qy, p.qz, p.qw);
+    $("arm_roll").value = roll.toFixed(4);
+    $("arm_pitch").value = pitch.toFixed(4);
+    $("arm_yaw").value = yaw.toFixed(4);
+  }
   if ($("arm_frame") && p.frame_id) $("arm_frame").value = p.frame_id;
 }, "Pose fields filled");
 

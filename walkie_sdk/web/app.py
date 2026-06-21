@@ -268,6 +268,26 @@ def create_app(session: RobotSession | None = None) -> FastAPI:
         robot = session.require()
         return {"ok": True, "states": robot.arm.get_joint_states()}
 
+    @app.post("/api/arm/draw_pose")
+    def arm_draw_pose(req: models.DrawPoseRequest) -> Dict[str, Any]:
+        robot = session.require()
+        if req.qw is not None:
+            quaternion = [req.qx or 0.0, req.qy or 0.0, req.qz or 0.0, req.qw]
+        else:
+            from walkie_sdk.utils.converters import euler_to_quaternion
+            qx, qy, qz, qw = euler_to_quaternion(req.roll, req.pitch, req.yaw)
+            quaternion = [qx, qy, qz, qw]
+        try:
+            topic = robot.viz.draw_pose(
+                position=[req.x, req.y, req.z],
+                quaternion=quaternion,
+                frame_id=req.frame_id,
+                topic=req.topic,
+            )
+        except ConnectionError as e:
+            return JSONResponse({"ok": False, "error": str(e)}, status_code=503)
+        return {"ok": True, "topic": topic}
+
     @app.post("/api/arm/ee_pose")
     def arm_ee_pose(req: models.EePoseRequest) -> Dict[str, Any]:
         robot = session.require()

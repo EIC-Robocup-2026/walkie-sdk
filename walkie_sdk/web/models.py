@@ -169,6 +169,27 @@ class HeadTiltRequest(BaseModel):
     angle_rad: float
 
 
+class DrawPoseRequest(BaseModel):
+    """Arguments for ``viz.draw_pose(...)`` — preview an arm target pose in RViz.
+
+    Supply either ``roll/pitch/yaw`` (Euler RPY) **or** ``qx/qy/qz/qw`` (quaternion).
+    When ``qw`` is provided the quaternion fields take priority.
+    """
+
+    x: float
+    y: float
+    z: float
+    roll: float = 0.0
+    pitch: float = 0.0
+    yaw: float = 0.0
+    qx: Optional[float] = None
+    qy: Optional[float] = None
+    qz: Optional[float] = None
+    qw: Optional[float] = None
+    frame_id: str = "base_footprint"
+    topic: str = "walkie/arm_target_pose"
+
+
 class NamespaceRequest(BaseModel):
     """Set the active ROS namespace."""
 

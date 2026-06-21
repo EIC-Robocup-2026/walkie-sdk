@@ -159,10 +159,21 @@
         <div><label>Y</label><input id="arm_y" type="number" step="0.01" value="0.0" /></div>
         <div><label>Z</label><input id="arm_z" type="number" step="0.01" value="0.2" /></div>
       </div>
-      <div class="row three">
+      <div class="btn-row" style="margin-bottom:4px">
+        <span class="btn-group-label">Orient</span>
+        <button class="primary" id="btn-orient-rpy">Euler RPY</button>
+        <button class="ghost" id="btn-orient-quat">Quaternion</button>
+      </div>
+      <div class="row three" id="arm-orient-rpy">
         <div><label>Roll</label><input id="arm_roll" type="number" step="0.05" value="0.0" /></div>
         <div><label>Pitch</label><input id="arm_pitch" type="number" step="0.05" value="0.0" /></div>
         <div><label>Yaw</label><input id="arm_yaw" type="number" step="0.05" value="0.0" /></div>
+      </div>
+      <div class="row four" id="arm-orient-quat" style="display:none">
+        <div><label>Qx</label><input id="arm_qx" type="number" step="0.001" value="0.0" /></div>
+        <div><label>Qy</label><input id="arm_qy" type="number" step="0.001" value="0.0" /></div>
+        <div><label>Qz</label><input id="arm_qz" type="number" step="0.001" value="0.0" /></div>
+        <div><label>Qw</label><input id="arm_qw" type="number" step="0.001" value="1.0" /></div>
       </div>
       <div class="row two">
         <div><label><input id="arm_cartesian" type="checkbox" /> Cartesian path</label></div>
@@ -170,6 +181,7 @@
       </div>
       <div class="btn-row">
         <span class="btn-group-label">Move</span>
+        <button class="ghost" id="btn-arm-draw-pose">Draw Pose</button>
         <button class="primary" id="btn-arm-pose">Go To Pose</button>
         <button class="ghost" id="btn-arm-relative">Relative Move</button>
       </div>
