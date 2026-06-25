@@ -9,6 +9,7 @@ implementation (rosbridge, zenoh) via abstract interfaces.
 """
 
 from walkie_sdk.modules.arm import Arm
+from walkie_sdk.modules.button import Button
 from walkie_sdk.modules.camera import Camera
 from walkie_sdk.modules.head import Head
 from walkie_sdk.modules.joint_state_hub import JointStateHub
@@ -30,6 +31,7 @@ __all__ = [
     "Tools",
     "Transform",
     "Arm",
+    "Button",
     "Visualization",
     "Grasp",
 ]
