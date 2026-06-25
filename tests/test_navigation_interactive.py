@@ -15,6 +15,7 @@ At the prompt type:
     go <x> <y> <standoff>       → navigate_to_object with standoff override (m)
     go <x> <y> face_target      → navigate_to_object, skip edge fit
     pose <x> <y> <heading>      → navigate_to_pose (Nav2, heading in radians)
+    autotilt on|off             → enable/disable head_tilt_near_goal auto-tilt node
     cancel                      → cancel current navigation goal
     stop                        → emergency stop (zero cmd_vel + cancel)
     status                      → print current navigation status
@@ -105,6 +106,12 @@ def _parse_command(raw: str):
                     return None
         return ("go_obj", x, y, standoff, align_method)
 
+    if cmd == "autotilt":
+        if len(parts) < 2 or parts[1].lower() not in ("on", "off"):
+            print("  Usage: autotilt on|off")
+            return None
+        return ("autotilt", parts[1].lower() == "on")
+
     if cmd == "pose":
         if len(parts) < 4:
             print("  Usage: pose <x> <y> <heading_rad>")
@@ -133,6 +140,7 @@ def run_interactive_session(bot: WalkieRobot, timeout: float) -> tuple[int, int]
     print("    go <x> <y> <standoff>      navigate_to_object  with standoff override (m)")
     print("    go <x> <y> face_target     navigate_to_object  skip edge alignment")
     print("    pose <x> <y> <heading>     navigate_to_pose    (Nav2, heading in rad)")
+    print("    autotilt on|off            enable/disable head_tilt_near_goal node")
     print("    cancel                     cancel current goal")
     print("    stop                       emergency stop (zero cmd_vel + cancel)")
     print("    status                     print current nav status")
@@ -175,9 +183,16 @@ def run_interactive_session(bot: WalkieRobot, timeout: float) -> tuple[int, int]
             _print_status(bot)
             continue
 
+        if kind == "autotilt":
+            enable = parsed[1]
+            ok = bot.head.set_auto_tilt(enable)
+            state = "enabled" if enable else "disabled"
+            print(f"  set_auto_tilt({enable}) -> {ok}  ({state})")
+            continue
+
         if kind == "unknown":
             print(f"  Unknown command: {parsed[1]!r}")
-            print("  Commands: go | pose | cancel | stop | status | q")
+            print("  Commands: go | pose | autotilt | cancel | stop | status | q")
             continue
 
         if kind == "go_obj":

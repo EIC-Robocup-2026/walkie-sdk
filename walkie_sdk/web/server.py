@@ -100,7 +100,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Optional auto-connect on startup (otherwise connect from the browser).
     parser.add_argument("--ip", default=None, help="Robot IP to auto-connect on startup")
-    parser.add_argument("--ros-protocol", default="rosbridge")
+    parser.add_argument("--ros-protocol", default="hybrid")
     parser.add_argument("--ros-port", type=int, default=9090)
     parser.add_argument("--camera-protocol", default="zenoh")
     parser.add_argument("--camera-port", type=int, default=7447)

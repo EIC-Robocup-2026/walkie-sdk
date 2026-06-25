@@ -10,7 +10,7 @@ to work with any transport implementation (rosbridge, zenoh).
 
 import threading
 import time
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Tuple
 
 import numpy as np
 
@@ -18,6 +18,12 @@ from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.converters import euler_to_quaternion
 from walkie_sdk.utils.namespace import apply_namespace
 from walkie_sdk.config.ros_topics import NAV_TOPICS, NAV_ACTIONS, MAP_TOPICS, MAP_SERVICES
+
+if TYPE_CHECKING:
+    from walkie_sdk.modules.head import Head
+
+HEAD_DEFAULT_TILT_MIN: float = -0.1
+HEAD_DEFAULT_TILT_MAX: float = 0.3
 
 
 class Navigation:
@@ -35,9 +41,15 @@ class Navigation:
         namespace: ROS namespace prefix for topics/actions (default: "" = no namespace)
     """
 
-    def __init__(self, transport: ROSTransportInterface, namespace: str = ""):
+    def __init__(
+        self,
+        transport: ROSTransportInterface,
+        namespace: str = "",
+        head: "Optional[Head]" = None,
+    ):
         self._transport = transport
         self._namespace = namespace
+        self._head = head
         self._current_goal_id: Optional[str] = None
         self._goal_lock = threading.Lock()
         self._navigation_status: Optional[str] = None
@@ -198,6 +210,17 @@ class Navigation:
                 user_callback(feedback)
         return handler
 
+    def _wait_for_camera_default(self, wait_timeout: float = 5.0) -> None:
+        """Block until head tilt is back in the default forward range, or timeout."""
+        if self._head is None:
+            return
+        deadline = time.monotonic() + wait_timeout
+        while time.monotonic() < deadline:
+            angle = self._head.get_angle()
+            if angle is not None and HEAD_DEFAULT_TILT_MIN <= angle <= HEAD_DEFAULT_TILT_MAX:
+                return
+            time.sleep(0.05)
+
     def _send_goal_blocking(
         self,
         action_name: str,
@@ -224,6 +247,7 @@ class Navigation:
 
             status = result.get("status")
             if status == "SUCCEEDED":
+                self._wait_for_camera_default()
                 self._navigation_status = "SUCCEEDED"
                 return "SUCCEEDED"
             elif status == "CANCELED":

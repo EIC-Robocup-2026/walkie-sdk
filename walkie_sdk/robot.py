@@ -34,6 +34,7 @@ from walkie_sdk.modules.visualization import Visualization
 from walkie_sdk.modules.point_cloud import PointCloud
 from walkie_sdk.modules.tools import Tools
 from walkie_sdk.modules.transform import Transform
+from walkie_sdk.modules.grasp import Grasp
 
 from walkie_sdk.config.ros_topics import load_config
 
@@ -170,8 +171,11 @@ class WalkieRobot:
         # Shared joint state hub — one subscription for all modules
         self._joints = JointStateHub(self._transport, namespace=namespace)
 
+        # Head tilt module (created early so Navigation can reference it)
+        self._head = Head(self._transport, namespace=namespace, joint_state_hub=self._joints)
+
         # Initialize modules with transport interface (not specific implementation)
-        self._nav = Navigation(self._transport, namespace=namespace)
+        self._nav = Navigation(self._transport, namespace=namespace, head=self._head)
         self._status = Telemetry(self._transport, namespace=namespace)
         self._arm = Arm(self._transport, namespace=namespace, joint_state_hub=self._joints)
         self._camera: Optional[Camera] = (
@@ -188,6 +192,9 @@ class WalkieRobot:
         # Tools module
         self._tools = Tools(self._transport, namespace=namespace)
 
+        # Grasp module (GraspNet service client)
+        self._grasp = Grasp(self._transport, namespace=namespace)
+
         # Transform lookup module
         self._transform = Transform(self._transport, namespace=namespace)
 
@@ -196,9 +203,6 @@ class WalkieRobot:
 
         # Lift module
         self._lift = Lift(self._transport, namespace=namespace, joint_state_hub=self._joints)
-
-        # Head tilt module
-        self._head = Head(self._transport, namespace=namespace, joint_state_hub=self._joints)
 
         # Point cloud module (subscribes via the active ROS transport)
         self._point_cloud = PointCloud(self._transport, namespace=namespace)
@@ -240,6 +244,9 @@ class WalkieRobot:
 
         # Start button (Pi Pico HID keyboard) listener
         self._button._start()
+        # Always enable auto-tilt on startup (short timeout: service is rosbridge-only,
+        # so we don't want to stall 5 s waiting for the Zenoh fallback)
+        self._head.set_auto_tilt(True, timeout=1.0)
 
         self._connected = True
         print(f"✓ Robot connected!")
@@ -406,6 +413,31 @@ class WalkieRobot:
     def tools(self) -> Tools:
         """Tools module for utility functions."""
         return self._tools
+
+    @property
+    def grasp(self) -> Grasp:
+        """
+        Grasp controller (unified GraspNet server).
+
+        Provides:
+        - from_mask(mask, bbox, ...): grasp from a YOLO mask over the live view
+        - from_cloud(cloud, ...): grasp from a segmented PointCloud2 in the request
+        - from_pos(object_cloud, ...): live crop + GraspNet + antipodal validation
+        - set_standby(load): load/unload the GPU model
+        - status(): server state + VRAM
+
+        Each grasp call returns a dict with a best-first ``grasps`` list
+        (position/orientation/score/width) in the planning frame, or None.
+
+        Example:
+            ```python
+            cloud = bot.point_cloud.get_once(timeout=10.0)
+            res = bot.grasp.from_cloud(cloud)
+            if res and res["grasps"]:
+                print(res["grasps"][0]["position"])
+            ```
+        """
+        return self._grasp
 
     @property
     def transform(self) -> Transform:
@@ -605,6 +637,7 @@ class WalkieRobot:
         self._viz.namespace = value
         self._head.namespace = value
         self._transform.namespace = value
+        self._grasp.namespace = value
 
     @property
     def is_connected(self) -> bool:

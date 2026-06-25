@@ -19,6 +19,7 @@ from walkie_sdk.modules.telemetry import Telemetry
 from walkie_sdk.modules.tools import Tools
 from walkie_sdk.modules.transform import Transform
 from walkie_sdk.modules.visualization import Visualization
+from walkie_sdk.modules.grasp import Grasp
 
 __all__ = [
     "Navigation",
@@ -32,4 +33,5 @@ __all__ = [
     "Arm",
     "Button",
     "Visualization",
+    "Grasp",
 ]

@@ -229,6 +229,71 @@ def convert_poses_to_array(data):
     return [[p['position']['x'], p['position']['y'], p['position']['z']] for p in data.get('poses', [])]
 
 
+def bbox_to_bounding_box2d(bbox: List[float]) -> dict:
+    """
+    Convert a 2D bounding box [cx, cy, w, h] to a vision_msgs/BoundingBox2D dict.
+
+    Used as the fallback region for the grasp services when no mask is supplied.
+    Matches the bbox sub-structure produced by convert_bboxes_to_detection_array.
+
+    Args:
+        bbox: [cx, cy, w, h] — centre x/y and width/height, in pixels.
+
+    Returns:
+        Dictionary representing vision_msgs/msg/BoundingBox2D.
+    """
+    cx, cy, w, h = bbox
+    return {
+        "center": {
+            "position": {"x": float(cx), "y": float(cy)},
+            "theta": 0.0,
+        },
+        "size_x": float(w),
+        "size_y": float(h),
+    }
+
+
+def numpy_to_mono8_image(mask, frame_id: str = "") -> dict:
+    """
+    Convert a 2D numpy mask into a sensor_msgs/Image dict (mono8 encoding).
+
+    Any non-zero pixel marks the object. Use the pixel value as the tracker id
+    for multi-object masks (then pass that id to Grasp.from_mask); a plain
+    boolean/0-255 mask works for the single-object case.
+
+    ``data`` is emitted as a list of ints so it serializes over both rosbridge
+    (JSON) and zenoh transports.
+
+    Args:
+        mask: 2D array-like (H, W). Cast to uint8; values are kept as-is so
+              label masks (pixel value = tracker id) survive.
+        frame_id: optional header frame id.
+
+    Returns:
+        Dictionary representing sensor_msgs/msg/Image (encoding "mono8").
+    """
+    arr = np.asarray(mask)
+    if arr.ndim != 2:
+        raise ValueError(f"mask must be 2D (H, W), got shape {arr.shape}")
+    arr = arr.astype(np.uint8)
+    h, w = arr.shape
+    now = time.time()
+    sec = int(now)
+    nanosec = int((now - sec) * 1e9)
+    return {
+        "header": {
+            "stamp": {"sec": sec, "nanosec": nanosec},
+            "frame_id": frame_id,
+        },
+        "height": int(h),
+        "width": int(w),
+        "encoding": "mono8",
+        "is_bigendian": 0,
+        "step": int(w),
+        "data": arr.reshape(-1).tolist(),
+    }
+
+
 def parse_point_cloud_xyz(
     cloud: Dict[str, Any],
     remove_nan: bool = True,
