@@ -283,6 +283,14 @@ class ArmGroup:
         meters = float(value) * _GRIPPER_MAX_M if norm else float(value)
         return self._arm.control_gripper(self._gripper_name, meters, **kwargs)
 
+    def plan_only(self, enable: bool, **kwargs) -> bool:
+        """Enable or disable plan-only mode for this group's arm. See ``Arm.set_plan_only``."""
+        return self._arm.set_plan_only(enable, **kwargs)
+
+    def execute_stored_plan(self, **kwargs) -> bool:
+        """Execute the plan stored by the last plan-only action for this group. See ``Arm.execute_stored_plan``."""
+        return self._arm.execute_stored_plan(self._group_name, **kwargs)
+
     def grasp(self, position: float = 0.0, **kwargs) -> Dict[str, Any]:
         """Close this group's gripper and report grasp success. See ``Arm.grasp``.
         Returns a dict with ``grasped`` (the answer), ``gripper_gap``, ``success``,
@@ -1129,6 +1137,72 @@ class Arm:
         except Exception as e:
             print(f"[Arm] list_params error: {e}")
             return None
+
+    def set_plan_only(self, enable: bool, timeout: float = 5.0) -> bool:
+        """
+        Enable or disable plan-only mode on the commander.
+
+        When enabled, all arm motion actions (go_to_pose, go_to_home,
+        set_joint_position, etc.) plan but do NOT execute — the robot stays
+        still. The computed plan is stored per group and can be executed later
+        with :meth:`execute_stored_plan`.
+
+        Args:
+            enable: True = plan only (no motion); False = plan + execute (normal).
+            timeout: Parameter service call timeout in seconds.
+
+        Returns:
+            True if the commander accepted the change.
+        """
+        return self.set_param("plan_only", bool(enable), timeout=timeout)
+
+    def execute_stored_plan(self, group_name: str, timeout: float = 30.0) -> bool:
+        """
+        Execute the plan stored by the last plan-only action for ``group_name``.
+
+        Sets the commander's ``execute_plan_group`` param then calls the
+        ``execute_stored_plan`` service. The stored plan is consumed on success;
+        on failure it is kept so you can retry.
+
+        Args:
+            group_name: MoveIt group whose stored plan to execute
+                        (e.g. "left_arm", "right_arm", "left_arm_lift").
+            timeout: Service call timeout in seconds.
+
+        Returns:
+            True if the robot executed the plan successfully.
+
+        Example::
+
+            arm.set_plan_only(True)
+            arm.go_to_pose(0.4, 0.2, 0.8, 0, 0, 0, group_name="left_arm")
+            # robot did NOT move — plan is stored
+
+            arm.set_plan_only(False)          # back to normal for future goals
+            arm.execute_stored_plan("left_arm")  # NOW the robot moves
+        """
+        if not self.set_param("execute_plan_group", group_name, timeout=timeout):
+            print(f"[Arm] execute_stored_plan: failed to set execute_plan_group='{group_name}'")
+            return False
+        try:
+            response = self._transport.call_service(
+                service_name=apply_namespace(
+                    ARM_SERVICES["execute_stored_plan"], self._namespace
+                ),
+                service_type=ARM_SERVICES["execute_stored_plan_type"],
+                request={},
+                timeout=timeout,
+            )
+            ok = bool(response.get("success", False))
+            msg = response.get("message", "")
+            if ok:
+                print(f"[Arm] execute_stored_plan: {msg}")
+            else:
+                print(f"[Arm] execute_stored_plan failed: {msg}")
+            return ok
+        except Exception as e:
+            print(f"[Arm] execute_stored_plan error: {e}")
+            return False
 
     # ── Topic-based state read (continuous subscription) ──────────────────
 
