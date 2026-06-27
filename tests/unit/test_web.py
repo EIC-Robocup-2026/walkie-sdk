@@ -81,6 +81,14 @@ class FakeArm:
     def get_joint_states(self):
         return {"left_gripper": 0.0}
 
+    def set_plan_only(self, enable):
+        self.calls.append(("plan_only", enable))
+        return True
+
+    def execute_stored_plan(self, group_name):
+        self.calls.append(("execute_stored_plan", group_name))
+        return True
+
 
 class FakeCameras:
     camera_names = ["head", "left"]
@@ -237,6 +245,40 @@ def test_gripper_raw_meters(connected_client):
     )
     assert r.json()["result"] == "SUCCEEDED"
     assert session._robot.arm.calls[-1][1]["position"] == 0.03
+
+
+# ── Plan-only & execute_stored_plan ─────────────────────────────────────
+def test_arm_plan_only_enable(connected_client):
+    client, session = connected_client
+    r = client.post("/api/arm/plan_only", json={"enable": True})
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+    assert r.json()["plan_only"] is True
+    assert ("plan_only", True) in session._robot.arm.calls
+
+
+def test_arm_plan_only_disable(connected_client):
+    client, session = connected_client
+    r = client.post("/api/arm/plan_only", json={"enable": False})
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+    assert r.json()["plan_only"] is False
+
+
+def test_arm_execute_stored_plan(connected_client):
+    client, session = connected_client
+    r = client.post("/api/arm/execute_stored_plan", json={"group_name": "left_arm_lift"})
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+    assert r.json()["group_name"] == "left_arm_lift"
+    assert ("execute_stored_plan", "left_arm_lift") in session._robot.arm.calls
+
+
+def test_arm_execute_stored_plan_default_group(connected_client):
+    client, session = connected_client
+    r = client.post("/api/arm/execute_stored_plan", json={})
+    assert r.status_code == 200
+    assert r.json()["group_name"] == "left_arm_lift"
 
 
 # ── Camera ──────────────────────────────────────────────────────────────

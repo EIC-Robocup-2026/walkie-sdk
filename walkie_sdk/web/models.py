@@ -173,3 +173,15 @@ class NamespaceRequest(BaseModel):
     """Set the active ROS namespace."""
 
     namespace: str = Field(default="")
+
+
+class PlanOnlyRequest(BaseModel):
+    """Enable or disable plan-only mode on the commander."""
+
+    enable: bool
+
+
+class ExecuteStoredPlanRequest(BaseModel):
+    """Execute the plan stored by the last plan-only action for a group."""
+
+    group_name: str = "left_arm_lift"

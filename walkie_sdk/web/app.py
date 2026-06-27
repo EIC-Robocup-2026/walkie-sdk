@@ -173,6 +173,27 @@ def create_app(session: RobotSession | None = None) -> FastAPI:
             ),
         }
 
+    @app.post("/api/arm/plan_only")
+    def arm_plan_only(req: models.PlanOnlyRequest) -> Dict[str, Any]:
+        robot = session.require()
+        ok = robot.arm.set_plan_only(req.enable)
+        out: Dict[str, Any] = {"ok": ok, "plan_only": req.enable}
+        if not ok:
+            out["error"] = "Commander rejected plan_only change (is move_group up?)"
+        return out
+
+    @app.post("/api/arm/execute_stored_plan")
+    def arm_execute_stored_plan(req: models.ExecuteStoredPlanRequest) -> Dict[str, Any]:
+        robot = session.require()
+        ok = robot.arm.execute_stored_plan(req.group_name)
+        out: Dict[str, Any] = {"ok": ok, "group_name": req.group_name}
+        if not ok:
+            out["error"] = (
+                f"Failed to execute stored plan for '{req.group_name}' "
+                "(plan plan_only=true first, or check if move_group is up)"
+            )
+        return out
+
     @app.post("/api/arm/clear_objects")
     def arm_clear_objects() -> Dict[str, Any]:
         robot = session.require()

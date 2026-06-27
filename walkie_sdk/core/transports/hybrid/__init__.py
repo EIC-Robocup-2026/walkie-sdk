@@ -28,6 +28,18 @@ from walkie_sdk.core.transports.rosbridge import ROSBridgeTransport
 from walkie_sdk.core.transports.zenoh import ZenohTransport
 
 
+# rcl_interfaces parameter services consistently time out on zenoh_ros2_sdk because
+# their nested message types are mis-resolved by the type hash. Route them directly
+# to rosbridge (the rosbridge path always worked for these).
+_ROSBRIDGE_ONLY_SERVICE_TYPES = frozenset({
+    "rcl_interfaces/srv/SetParameters",
+    "rcl_interfaces/srv/SetParametersAtomically",
+    "rcl_interfaces/srv/GetParameters",
+    "rcl_interfaces/srv/ListParameters",
+    "rcl_interfaces/srv/DescribeParameters",
+})
+
+
 class HybridTransport(ROSTransportInterface[Any]):
     """Zenoh for topics/services, rosbridge for actions.
 
@@ -131,6 +143,12 @@ class HybridTransport(ROSTransportInterface[Any]):
         these — it's the same path that worked before the zenoh migration — so we
         fall back to it rather than failing the call.
         """
+        # Route services that are known to fail on zenoh directly to rosbridge.
+        if service_type in _ROSBRIDGE_ONLY_SERVICE_TYPES:
+            if self._rosbridge.is_connected:
+                return self._rosbridge.call_service(
+                    service_name, service_type, request, timeout=timeout
+                )
         try:
             return self._zenoh.call_service(service_name, service_type, request, timeout=timeout)
         except Exception as e:

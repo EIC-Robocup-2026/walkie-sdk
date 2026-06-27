@@ -153,6 +153,38 @@ document.querySelectorAll(".arm-preset").forEach((btn) => {
     `Arm preset "${pose}" sent`
   );
 });
+// ── Plan Only / Execute Stored Plan ───────────────────────────────────
+let planOnlyEnabled = false;
+function syncPlanOnlyBtn() {
+  const btn = $("btn-plan-only");
+  if (planOnlyEnabled) {
+    btn.textContent = "Plan Only: ON";
+    btn.className = "primary";
+  } else {
+    btn.textContent = "Plan Only: OFF";
+    btn.className = "ghost";
+  }
+}
+$("btn-plan-only").onclick = async () => {
+  const next = !planOnlyEnabled;
+  try {
+    await api("/api/arm/plan_only", { method: "POST", body: { enable: next } });
+    planOnlyEnabled = next;
+    syncPlanOnlyBtn();
+    toast(next ? "Plan Only ON — robot won't move" : "Plan Only OFF — normal execution",
+          next ? "" : "ok");
+  } catch (e) {
+    toast(e.message, "err");
+  }
+};
+$("btn-execute-plan").onclick = action(
+  () => api("/api/arm/execute_stored_plan", {
+    method: "POST",
+    body: { group_name: $("arm_group").value },
+  }),
+  "Executing stored plan"
+);
+
 $("btn-arm-clear").onclick = action(
   () => api("/api/arm/clear_objects", { method: "POST", body: {} }),
   "Cleared collision objects"

@@ -244,9 +244,12 @@ class WalkieRobot:
 
         # Start button (Pi Pico HID keyboard) listener
         self._button._start()
-        # Always enable auto-tilt on startup (short timeout: service is rosbridge-only,
-        # so we don't want to stall 5 s waiting for the Zenoh fallback)
-        self._head.set_auto_tilt(True, timeout=1.0)
+        try:
+            # Enable auto-tilt on startup. Service may not exist (e.g. moveit_demo,
+            # simulation without head node) — swallow the error so connect still succeeds.
+            self._head.set_auto_tilt(True, timeout=1.0)
+        except Exception as e:
+            print(f"  ⚠ Head auto-tilt setup skipped: {e}")
 
         self._connected = True
         print(f"✓ Robot connected!")

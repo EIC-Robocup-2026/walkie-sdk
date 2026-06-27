@@ -138,3 +138,116 @@ class TestArmGroupServices:
         arm.right.get_joint_states_service()
         req = arm._transport.call_service.call_args[1]["request"]
         assert req["group_name"] == "right_arm_lift"
+
+
+# ── Plan-only & execute_stored_plan ───────────────────────────────────────
+
+def _param_side_effect(**kwargs):
+    """Return realistic responses for get/set_parameters and execute_stored_plan."""
+    stype = kwargs.get("service_type", "")
+    if "GetParameters" in stype:
+        # Declare all params as PARAMETER_NOT_SET so _to_param_value infers type.
+        empty_pv = {
+            "type": 0, "bool_value": False, "integer_value": 0,
+            "double_value": 0.0, "string_value": "", "byte_array_value": [],
+            "bool_array_value": [], "integer_array_value": [],
+            "double_array_value": [], "string_array_value": [],
+        }
+        names = kwargs.get("request", {}).get("names", [])
+        return {"values": [empty_pv for _ in names]}
+    if "SetParameters" in stype:
+        return {"results": [{"successful": True, "reason": ""}]}
+    # execute_stored_plan service
+    return {"success": True, "message": "Executed stored plan for left_arm_lift"}
+
+
+@pytest.fixture
+def arm_param():
+    """Arm with a transport that handles param services and execute_stored_plan."""
+    t = MagicMock()
+    t.call_action.return_value = {"status": "SUCCEEDED"}
+    t.call_service.side_effect = lambda **kw: _param_side_effect(**kw)
+    return Arm(t)
+
+
+class TestSetPlanOnly:
+    def test_set_plan_only_true_calls_set_parameters(self, arm_param):
+        ok = arm_param.set_plan_only(True)
+        assert ok is True
+        calls = arm_param._transport.call_service.call_args_list
+        set_calls = [c for c in calls if "SetParameters" in c[1].get("service_type", "")]
+        assert len(set_calls) == 1
+        params = set_calls[0][1]["request"]["parameters"]
+        assert params[0]["name"] == "plan_only"
+        assert params[0]["value"]["bool_value"] is True
+
+    def test_set_plan_only_false(self, arm_param):
+        ok = arm_param.set_plan_only(False)
+        assert ok is True
+        calls = arm_param._transport.call_service.call_args_list
+        set_calls = [c for c in calls if "SetParameters" in c[1].get("service_type", "")]
+        params = set_calls[0][1]["request"]["parameters"]
+        assert params[0]["value"]["bool_value"] is False
+
+    def test_arm_group_plan_only_delegates(self, arm_param):
+        ok = arm_param.left.plan_only(True)
+        assert ok is True
+        calls = arm_param._transport.call_service.call_args_list
+        set_calls = [c for c in calls if "SetParameters" in c[1].get("service_type", "")]
+        params = set_calls[0][1]["request"]["parameters"]
+        assert params[0]["name"] == "plan_only"
+
+
+class TestExecuteStoredPlan:
+    def test_execute_stored_plan_sets_group_param(self, arm_param):
+        arm_param.execute_stored_plan("left_arm")
+        calls = arm_param._transport.call_service.call_args_list
+        set_calls = [c for c in calls if "SetParameters" in c[1].get("service_type", "")]
+        assert any(
+            p["name"] == "execute_plan_group" and p["value"]["string_value"] == "left_arm"
+            for call in set_calls
+            for p in call[1]["request"]["parameters"]
+        )
+
+    def test_execute_stored_plan_calls_trigger_service(self, arm_param):
+        ok = arm_param.execute_stored_plan("left_arm")
+        assert ok is True
+        calls = arm_param._transport.call_service.call_args_list
+        trigger_calls = [
+            c for c in calls
+            if "execute_stored_plan" in c[1].get("service_name", "")
+            and "Trigger" in c[1].get("service_type", "")
+        ]
+        assert len(trigger_calls) == 1
+        assert trigger_calls[0][1]["request"] == {}
+
+    def test_arm_group_execute_stored_plan_passes_group(self, arm_param):
+        arm_param.left.execute_stored_plan()
+        calls = arm_param._transport.call_service.call_args_list
+        set_calls = [c for c in calls if "SetParameters" in c[1].get("service_type", "")]
+        assert any(
+            p["name"] == "execute_plan_group"
+            and p["value"]["string_value"] == arm_param.left.group_name
+            for call in set_calls
+            for p in call[1]["request"]["parameters"]
+        )
+
+    def test_execute_stored_plan_returns_false_on_service_failure(self, arm_param):
+        def fail_trigger(**kwargs):
+            if "execute_stored_plan" in kwargs.get("service_name", "") and "Trigger" in kwargs.get("service_type", ""):
+                return {"success": False, "message": "No stored plan"}
+            return _param_side_effect(**kwargs)
+
+        arm_param._transport.call_service.side_effect = lambda **kw: fail_trigger(**kw)
+        ok = arm_param.execute_stored_plan("left_arm")
+        assert ok is False
+
+    def test_execute_stored_plan_returns_false_when_param_set_fails(self, arm_param):
+        def fail_set(**kwargs):
+            if "SetParameters" in kwargs.get("service_type", ""):
+                return {"results": [{"successful": False, "reason": "rejected"}]}
+            return _param_side_effect(**kwargs)
+
+        arm_param._transport.call_service.side_effect = lambda **kw: fail_set(**kw)
+        ok = arm_param.execute_stored_plan("left_arm")
+        assert ok is False
