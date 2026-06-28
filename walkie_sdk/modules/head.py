@@ -97,16 +97,24 @@ class Head:
             timeout: Service call timeout in seconds.
 
         Returns:
-            True if the service reported success, False otherwise.
+            True if the service reported success, False otherwise (including
+            when the service is unavailable or the call times out).
         """
-        response = self._transport.call_service(
-            service_name=apply_namespace(
-                HEAD_TOPICS["auto_tilt_enable_service"], self._namespace
-            ),
-            service_type=HEAD_TOPICS["auto_tilt_enable_service_type"],
-            request={"data": bool(enable)},
-            timeout=timeout,
-        )
+        # Best-effort: the auto-tilt service is rosbridge-only, so over Zenoh
+        # the call_service raises on timeout. Swallow it and report False — a
+        # missing auto-tilt node must never abort the caller (notably
+        # WalkieRobot._connect, which enables auto-tilt on startup).
+        try:
+            response = self._transport.call_service(
+                service_name=apply_namespace(
+                    HEAD_TOPICS["auto_tilt_enable_service"], self._namespace
+                ),
+                service_type=HEAD_TOPICS["auto_tilt_enable_service_type"],
+                request={"data": bool(enable)},
+                timeout=timeout,
+            )
+        except Exception:
+            return False
         return bool(response.get("success", False))
 
     # ------------------------------------------------------------------

@@ -20,7 +20,7 @@ ARM_ACTIONS:
 
 NAV_TOPICS:
   cmd_vel: "cmd_vel"
-  cmd_vel_type: "geometry_msgs/msg/Twist"
+  cmd_vel_type: "geometry_msgs/msg/TwistStamped"
 
 NAV_ACTIONS:
   navigate_to_pose: "navigate_to_pose"

@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, call
 import pytest
 
 from walkie_sdk.modules.navigation import Navigation
-from walkie_sdk.config.ros_topics import NAV_ACTIONS
+from walkie_sdk.config.ros_topics import NAV_ACTIONS, NAV_TOPICS
 
 
 def _make_nav(namespace: str = "") -> tuple[Navigation, MagicMock]:
@@ -171,3 +171,63 @@ class TestConnectionGuard:
         transport.is_connected = False
         with pytest.raises(ConnectionError):
             nav.go_to(1.0, 2.0)
+
+
+# ---------------------------------------------------------------------------
+# set_velocity / stop — direct cmd_vel publish (TwistStamped)
+# ---------------------------------------------------------------------------
+
+
+def _published(transport) -> tuple[str, str, dict]:
+    """Return (topic, message_type, message) of the last transport.publish call."""
+    args = transport.publish.call_args
+    # publish(topic, message_type, message) — positional in Navigation
+    return args[0][0], args[0][1], args[0][2]
+
+
+class TestSetVelocity:
+    def test_publishes_twiststamped(self):
+        nav, transport = _make_nav()
+        result = nav.set_velocity(0.5, -0.2, 0.3)
+        assert result is True
+
+        topic, msg_type, msg = _published(transport)
+        assert topic == "cmd_vel"
+        assert msg_type == NAV_TOPICS["cmd_vel_type"] == "geometry_msgs/msg/TwistStamped"
+        assert msg["header"]["frame_id"] == "base_link"
+        twist = msg["twist"]
+        assert twist["linear"]["x"] == pytest.approx(0.5)
+        assert twist["linear"]["y"] == pytest.approx(-0.2)
+        assert twist["linear"]["z"] == pytest.approx(0.0)
+        assert twist["angular"]["x"] == pytest.approx(0.0)
+        assert twist["angular"]["y"] == pytest.approx(0.0)
+        assert twist["angular"]["z"] == pytest.approx(0.3)
+
+    def test_respects_namespace(self):
+        nav, transport = _make_nav(namespace="robot1")
+        nav.set_velocity(0.1, 0.0, 0.0)
+        topic, _, _ = _published(transport)
+        assert topic == "robot1/cmd_vel"
+
+    def test_not_connected_returns_false(self):
+        nav, transport = _make_nav()
+        transport.is_connected = False
+        result = nav.set_velocity(0.5, 0.0, 0.0)
+        assert result is False
+        transport.publish.assert_not_called()
+
+
+class TestStop:
+    def test_publishes_zero_twiststamped(self):
+        nav, transport = _make_nav()
+        result = nav.stop()
+        assert result is True
+
+        topic, msg_type, msg = _published(transport)
+        assert topic == "cmd_vel"
+        assert msg_type == "geometry_msgs/msg/TwistStamped"
+        assert msg["header"]["frame_id"] == "base_link"
+        twist = msg["twist"]
+        assert twist["linear"] == {"x": 0.0, "y": 0.0, "z": 0.0}
+        assert twist["angular"] == {"x": 0.0, "y": 0.0, "z": 0.0}
+        transport.cancel_action.assert_called_once()
