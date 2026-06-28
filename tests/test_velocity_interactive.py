@@ -5,39 +5,44 @@ Interactive hardware test for Navigation.set_velocity() — direct cmd_vel publi
 WARNING: these commands MOVE THE ROBOT. Keep the area clear, start with small
 speeds, and be ready to Ctrl-C — interrupting (or quitting) sends stop().
 
-set_velocity() publishes a SINGLE TwistStamped per call. Most base controllers
-run a cmd_vel watchdog (~0.5 s), so one publish only produces a brief twitch; to
-keep moving you must publish continuously. This script offers both:
+Two control modes:
 
-    vel   — one raw set_velocity() publish (tests the call itself)
-    drive — publish at <rate> Hz for <secs>, then stop() (sustained motion)
+  1. Keyboard "game" mode (default on launch) — real-time WASD + Q/E:
+         W / S   forward / backward        A / D   strafe left / right
+         Q / E   turn left / right         SPACE   stop
+         X / ESC exit to the typed prompt  Ctrl-C  quit
+     Hold a key to keep driving; release and the robot auto-stops after a
+     short timeout (terminals send no key-up event, so this relies on the OS
+     key-repeat keeping the key "down"). Fixed speed: 0.1 m/s, 0.1 rad/s.
+
+  2. Typed-command prompt (X/ESC drops into it; 'wasd' re-enters game mode) —
+     precise one-shot / timed velocities, see the prompt help.
+
+set_velocity() publishes a SINGLE TwistStamped per call. Most base controllers
+run a cmd_vel watchdog (~0.5 s), so one publish only produces a brief twitch;
+sustained motion requires continuous publishing, which both modes do.
 
 Requires: rosbridge + a base controller subscribing to cmd_vel (TwistStamped).
 
 Usage:
     python tests/test_velocity_interactive.py --ip 192.168.1.100
     python tests/test_velocity_interactive.py --ip 192.168.1.100 --namespace robot1
-    python tests/test_velocity_interactive.py --ip 192.168.1.100 --speed 0.15 --rate 20
-
-At the prompt type (linear m/s, angular rad/s; +x forward, +y left, +z yaw CCW):
-    vel <vx> <vy> <wz>            → single set_velocity() publish (one TwistStamped)
-    drive <vx> <vy> <wz> [secs]   → publish at <rate> Hz for <secs>, then stop
-    f [secs] / b [secs]           → drive forward / backward at --speed
-    l [secs] / r [secs]           → strafe left / right at --speed
-    ccw [secs] / cw [secs]        → rotate left / right at --turn
-    stop                          → emergency stop (zero cmd_vel + cancel)
-    speed <mps>                   → set default linear speed for shortcuts
-    turn <rps>                    → set default angular speed for shortcuts
-    rate <hz>                     → set continuous publish rate for drive
-    status                        → print nav.status
-    q / quit                      → stop and exit
+    python tests/test_velocity_interactive.py --ip 192.168.1.100 --speed 0.1 --turn 0.1
 """
 
 import argparse
+import select
 import sys
+import termios
 import time
+import tty
 
 from walkie_sdk import WalkieRobot
+
+
+# Real-time keyboard teleop tuning.
+KEY_TIMEOUT = 0.4   # zero velocity if no key seen within this window (release-to-stop)
+PUB_PERIOD = 0.05   # publish / poll period in seconds (20 Hz)
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -55,6 +60,89 @@ def _pass(msg: str) -> None:
 
 def _fail(msg: str) -> None:
     print(f"  [FAIL] {msg}")
+
+
+# ── Keyboard "game" mode ────────────────────────────────────────────────────
+
+
+def run_keyboard_teleop(bot: WalkieRobot, speed: float, turn: float) -> int:
+    """
+    Real-time WASD + Q/E teleop. Returns the number of set_velocity publishes.
+
+    Drives the robot at a fixed ``speed`` (m/s) / ``turn`` (rad/s) for whichever
+    key is currently held. Publishes at ``1 / PUB_PERIOD`` Hz; if no key arrives
+    within ``KEY_TIMEOUT`` the velocity is zeroed (release-to-stop). Restores the
+    terminal and sends stop() on every exit path (X/ESC, Ctrl-C, error).
+    """
+    if not sys.stdin.isatty():
+        print("  stdin is not a TTY — keyboard mode needs an interactive terminal.")
+        return 0
+
+    key_vel = {
+        "w": (speed, 0.0, 0.0),
+        "s": (-speed, 0.0, 0.0),
+        "a": (0.0, speed, 0.0),    # strafe left  (+y)
+        "d": (0.0, -speed, 0.0),   # strafe right (-y)
+        "q": (0.0, 0.0, turn),     # turn left    (CCW, +z)
+        "e": (0.0, 0.0, -turn),    # turn right   (CW,  -z)
+    }
+
+    _section("Keyboard Teleop  (hold to drive)")
+    print()
+    print("    W / S   forward / backward       A / D   strafe left / right")
+    print("    Q / E   turn left / right        SPACE   stop")
+    print("    X / ESC exit to typed prompt     Ctrl-C  quit")
+    print()
+    print(f"  fixed speed = {speed} m/s   turn = {turn} rad/s   "
+          f"(release ~{KEY_TIMEOUT}s -> auto-stop)")
+    print()
+
+    fd = sys.stdin.fileno()
+    old_attrs = termios.tcgetattr(fd)
+    vx = vy = wz = 0.0
+    last_key = time.monotonic()
+    n = 0
+    try:
+        tty.setcbreak(fd)  # cbreak keeps ISIG so Ctrl-C still interrupts
+        while True:
+            ready, _, _ = select.select([sys.stdin], [], [], PUB_PERIOD)
+            if ready:
+                ch = sys.stdin.read(1)
+                if ch == "\x03":               # Ctrl-C
+                    raise KeyboardInterrupt
+                if ch == "\x1b":               # ESC, or start of an arrow-key sequence
+                    more, _, _ = select.select([sys.stdin], [], [], 0.0)
+                    if more:
+                        sys.stdin.read(2)       # drain & ignore arrow keys
+                        continue
+                    break                       # bare ESC -> exit
+                if ch in ("x", "X"):
+                    break
+                if ch == " ":
+                    vx = vy = wz = 0.0
+                    last_key = time.monotonic()
+                else:
+                    mapped = key_vel.get(ch.lower())
+                    if mapped is not None:
+                        vx, vy, wz = mapped
+                        last_key = time.monotonic()
+
+            if time.monotonic() - last_key > KEY_TIMEOUT:
+                vx = vy = wz = 0.0
+
+            bot.nav.set_velocity(vx, vy, wz)
+            n += 1
+            print(f"\r  vx={vx:+.2f}  vy={vy:+.2f}  wz={wz:+.2f}    "
+                  f"[WASD move | Q/E turn | SPACE stop | X/ESC exit]   ",
+                  end="", flush=True)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_attrs)
+        bot.nav.stop()
+        print("\n  (keyboard mode stopped)")
+    return n
+
+
+# ── Typed-command mode ──────────────────────────────────────────────────────
 
 
 def _drive_for(bot: WalkieRobot, vx: float, vy: float, wz: float,
@@ -83,13 +171,12 @@ def _drive_for(bot: WalkieRobot, vx: float, vy: float, wz: float,
 
 def _parse_command(raw: str):
     """
-    Parse a user input string. Returns one of:
+    Parse a typed-mode input string. Returns one of:
+      ("game",)
       ("vel",   vx, vy, wz)
       ("drive", vx, vy, wz, secs)
       ("stop",)
-      ("speed", mps)
-      ("turn",  rps)
-      ("rate",  hz)
+      ("speed", mps) / ("turn", rps) / ("rate", hz)
       ("status",)
       ("quit",)
       ("unknown", original_text)
@@ -103,6 +190,9 @@ def _parse_command(raw: str):
 
     if cmd in ("q", "quit", "exit"):
         return ("quit",)
+
+    if cmd in ("wasd", "game", "teleop", "key", "keys"):
+        return ("game",)
 
     if cmd in ("stop", "s"):
         return ("stop",)
@@ -135,18 +225,6 @@ def _parse_command(raw: str):
         secs = vals[3] if len(vals) == 4 else None  # None → caller's default
         return ("drive", vx, vy, wz, secs)
 
-    # Direction shortcuts: <dir> [secs]
-    shortcuts = {"f": "fwd", "b": "back", "l": "left", "r": "right",
-                 "ccw": "ccw", "cw": "cw"}
-    if cmd in shortcuts:
-        secs = None
-        if len(parts) >= 2:
-            got = _floats([parts[1]], "duration")
-            if not got:
-                return None
-            secs = got[0]
-        return ("shortcut", shortcuts[cmd], secs)
-
     if cmd in ("speed", "turn", "rate"):
         if len(parts) != 2:
             print(f"  Usage: {cmd} <value>")
@@ -159,22 +237,15 @@ def _parse_command(raw: str):
     return ("unknown", raw)
 
 
-# ── Interactive session ────────────────────────────────────────────────────
-
-
 def run_interactive_session(bot: WalkieRobot, speed: float, turn: float,
                             rate: float, duration: float) -> tuple[int, int]:
-    """Drive the robot with velocity commands until the user quits. Returns (passed, attempted)."""
-    _section("Interactive Velocity Control (set_velocity / cmd_vel)")
-    print()
-    print("  WARNING: these commands move the robot. Keep clear; Ctrl-C stops.")
+    """Typed-command velocity prompt. Returns (passed, attempted)."""
+    _section("Typed Velocity Commands")
     print()
     print("  Commands (linear m/s, angular rad/s; +x fwd, +y left, +z yaw CCW):")
+    print("    wasd                        enter real-time keyboard game mode")
     print("    vel <vx> <vy> <wz>          single set_velocity() publish")
     print("    drive <vx> <vy> <wz> [secs] publish at rate Hz for secs, then stop")
-    print("    f|b [secs]                  forward / backward at speed")
-    print("    l|r [secs]                  strafe left / right at speed")
-    print("    ccw|cw [secs]               rotate left / right at turn")
     print("    stop                        emergency stop")
     print("    speed|turn|rate <v>         change defaults")
     print("    status                      print nav.status")
@@ -206,6 +277,10 @@ def run_interactive_session(bot: WalkieRobot, speed: float, turn: float,
         if kind == "quit":
             break
 
+        if kind == "game":
+            run_keyboard_teleop(bot, speed, turn)
+            continue
+
         if kind == "stop":
             ok = bot.nav.stop()
             print(f"  stop() -> {ok}  |  status: {bot.nav.status}")
@@ -232,8 +307,7 @@ def run_interactive_session(bot: WalkieRobot, speed: float, turn: float,
 
         if kind == "unknown":
             print(f"  Unknown command: {parsed[1]!r}")
-            print("  Commands: vel | drive | f/b/l/r/ccw/cw | stop | "
-                  "speed/turn/rate | status | q")
+            print("  Commands: wasd | vel | drive | stop | speed/turn/rate | status | q")
             continue
 
         if kind == "vel":
@@ -249,37 +323,19 @@ def run_interactive_session(bot: WalkieRobot, speed: float, turn: float,
                 _fail("set_velocity returned False (connected?)")
             continue
 
-        # Resolve drive / shortcut into (vx, vy, wz, secs)
         if kind == "drive":
             _, vx, vy, wz, secs = parsed
-        else:  # shortcut
-            _, direction, secs = parsed
-            vx = vy = wz = 0.0
-            if direction == "fwd":
-                vx = speed
-            elif direction == "back":
-                vx = -speed
-            elif direction == "left":
-                vy = speed
-            elif direction == "right":
-                vy = -speed
-            elif direction == "ccw":
-                wz = turn
-            elif direction == "cw":
-                wz = -turn
-
-        if secs is None:
-            secs = duration
-
-        attempted += 1
-        print(f"  → drive vx={vx} vy={vy} wz={wz} for {secs}s @ {rate}Hz, then stop ...")
-        ok, n = _drive_for(bot, vx, vy, wz, secs, rate)
-        print(f"  done: {n} publishes, stopped  |  ok={ok}  status={bot.nav.status}")
-        if ok and n > 0:
-            _pass(f"{n} set_velocity publishes succeeded")
-            passed += 1
-        else:
-            _fail("a set_velocity publish failed during drive")
+            if secs is None:
+                secs = duration
+            attempted += 1
+            print(f"  → drive vx={vx} vy={vy} wz={wz} for {secs}s @ {rate}Hz, then stop ...")
+            ok, n = _drive_for(bot, vx, vy, wz, secs, rate)
+            print(f"  done: {n} publishes, stopped  |  ok={ok}  status={bot.nav.status}")
+            if ok and n > 0:
+                _pass(f"{n} set_velocity publishes succeeded")
+                passed += 1
+            else:
+                _fail("a set_velocity publish failed during drive")
 
     return passed, attempted
 
@@ -289,15 +345,16 @@ def run_interactive_session(bot: WalkieRobot, speed: float, turn: float,
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Interactive hardware test for Navigation.set_velocity() (direct cmd_vel)"
+        description="Interactive hardware test for Navigation.set_velocity() (WASD keyboard teleop + typed commands)"
     )
     parser.add_argument("--ip",        default="127.0.0.1", help="Robot IP (default: 127.0.0.1)")
     parser.add_argument("--port",      type=int,   default=9090, help="Rosbridge port (default: 9090)")
     parser.add_argument("--namespace", default="", help="ROS namespace (default: none)")
-    parser.add_argument("--speed",     type=float, default=0.15, help="Default linear speed for shortcuts, m/s (default: 0.15)")
-    parser.add_argument("--turn",      type=float, default=0.5,  help="Default angular speed for shortcuts, rad/s (default: 0.5)")
-    parser.add_argument("--rate",      type=float, default=20.0, help="Continuous publish rate for drive, Hz (default: 20)")
-    parser.add_argument("--duration",  type=float, default=2.0,  help="Default drive duration when secs omitted (default: 2.0)")
+    parser.add_argument("--speed",     type=float, default=0.1, help="Linear speed, m/s (default: 0.1)")
+    parser.add_argument("--turn",      type=float, default=0.1, help="Angular speed, rad/s (default: 0.1)")
+    parser.add_argument("--rate",      type=float, default=20.0, help="Continuous publish rate, Hz (default: 20)")
+    parser.add_argument("--duration",  type=float, default=2.0,  help="Default 'drive' duration when secs omitted (default: 2.0)")
+    parser.add_argument("--no-game",   action="store_true", help="Skip keyboard mode; start at the typed prompt")
     args = parser.parse_args()
 
     print(f"\nConnecting to rosbridge at {args.ip}:{args.port} ...")
@@ -309,8 +366,12 @@ def main():
     )
     print("Connected.")
 
+    kb_pubs = 0
     passed = attempted = 0
     try:
+        # Start in the keyboard "game" by default; X/ESC drops into the typed prompt.
+        if not args.no_game:
+            kb_pubs = run_keyboard_teleop(bot, args.speed, args.turn)
         passed, attempted = run_interactive_session(
             bot, args.speed, args.turn, args.rate, args.duration
         )
@@ -325,10 +386,11 @@ def main():
         print("\nDisconnected.")
 
     print(f"\n{'=' * 60}")
+    print(f"  keyboard publishes: {kb_pubs}")
     if attempted == 0:
-        print("  No velocity commands attempted.")
+        print("  typed commands: none attempted.")
     else:
-        print(f"  Commands: {passed}/{attempted} OK")
+        print(f"  typed commands: {passed}/{attempted} OK")
     print("=" * 60)
     sys.exit(0 if (attempted == 0 or passed == attempted) else 1)
 
