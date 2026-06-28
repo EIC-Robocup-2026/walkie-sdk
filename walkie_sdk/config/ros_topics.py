@@ -85,7 +85,7 @@ ARM_PARAMS = {
 
 # ── Navigation Topics & Actions ────────────────────────────────
 NAV_TOPICS = {
-    "cmd_vel": os.getenv("WALKIE_NAV_CMD_VEL", "cmd_vel"),
+    "cmd_vel": os.getenv("WALKIE_NAV_CMD_VEL", "cmd_vel_controller"),
     "cmd_vel_type": os.getenv("WALKIE_NAV_CMD_VEL_TYPE", "geometry_msgs/msg/TwistStamped"),
 }
 

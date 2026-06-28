@@ -43,7 +43,7 @@ ARM_SERVICES:
   get_joint_states_type: "my_robot_interfaces/srv/GetJointStates"
 
 NAV_TOPICS:
-  cmd_vel: "cmd_vel"
+  cmd_vel: "cmd_vel_controller"
   cmd_vel_type: "geometry_msgs/msg/TwistStamped"
 
 NAV_ACTIONS:
