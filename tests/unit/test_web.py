@@ -82,9 +82,17 @@ class FakeArm:
         return {"left_gripper": 0.0}
 
 
+class FakeHead:
+    def get_angle(self):
+        return 0.0
+
+
 class FakeCameras:
     camera_names = ["head", "left"]
+    is_streaming = True
 
+    # Constant frame: this *is* the frozen signature, so any health check that
+    # polls this more than `freeze_threshold` times will (correctly) go RED.
     def get_frame(self, name="head"):
         return np.zeros((4, 4, 3), dtype=np.uint8)
 
@@ -100,6 +108,7 @@ class FakeRobot:
         self.status = FakeStatus()
         self.lift = FakeLift()
         self.arm = FakeArm()
+        self.head = FakeHead()
         self.cameras = FakeCameras()
         self.camera = object()
 
@@ -112,6 +121,10 @@ class FakeSession:
 
     def __init__(self, robot=None):
         self._robot = robot
+
+    @property
+    def robot(self):
+        return self._robot
 
     @property
     def is_connected(self):
@@ -177,6 +190,42 @@ def test_action_when_disconnected_returns_409(offline_client):
     r = client.post("/api/nav/goto", json={"x": 1, "y": 2, "heading": 0})
     assert r.status_code == 409
     assert r.json()["error"] == "not_connected"
+
+
+# ── Health ──────────────────────────────────────────────────────────────
+# The route returns the monitor's *cached* report; the background poll thread
+# isn't started in these tests (no lifespan), so we drive poll_once() directly.
+def test_health_disconnected(offline_client):
+    client, _ = offline_client
+    client.app.state.health_monitor.poll_once()
+    body = client.get("/api/health").json()
+    assert all(c["status"] == "unknown" for c in body["checks"])
+    assert body["any_failed"] is False
+
+
+def test_health_connected_single_poll_ok(connected_client):
+    client, _ = connected_client
+    client.app.state.health_monitor.poll_once()  # one poll can't detect freeze
+    body = client.get("/api/health").json()
+    st = {c["key"]: c["status"] for c in body["checks"]}
+    assert st["nav"] == "ok"
+    assert st["lift"] == "ok"
+    assert st["head"] == "ok"
+    assert st["arm"] == "ok"
+    assert st["camera"] == "ok"
+    assert body["any_failed"] is False
+
+
+def test_health_camera_freeze(connected_client):
+    client, _ = connected_client
+    monitor = client.app.state.health_monitor
+    for _ in range(5):  # constant FakeCameras frame -> frozen
+        monitor.poll_once()
+    body = client.get("/api/health").json()
+    cam = next(c for c in body["checks"] if c["key"] == "camera")
+    assert cam["status"] == "fail"
+    assert "frozen" in cam["detail"]
+    assert body["any_failed"] is True
 
 
 # ── Navigation ──────────────────────────────────────────────────────────

@@ -53,6 +53,22 @@ body {
 .dot.on { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
 .dot.off { background: var(--danger); }
 
+/* System Health panel */
+.health-list { display: flex; flex-direction: column; gap: 10px; }
+.health-row { display: flex; align-items: center; gap: 12px; }
+.health-row .dot { width: 13px; height: 13px; flex: 0 0 auto; }
+.health-label { font-weight: 600; min-width: 120px; }
+.health-detail { color: var(--danger); font-size: 13px; }
+.health-alarm {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 14px;
+  color: var(--danger);
+  font-weight: 600;
+}
+.health-alarm[hidden] { display: none; }
+
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));

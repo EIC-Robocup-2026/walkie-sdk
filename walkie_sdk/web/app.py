@@ -12,6 +12,7 @@ instead of a bare 500 so the dashboard can show it.
 from __future__ import annotations
 
 import time
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Dict
 
@@ -20,10 +21,12 @@ from fastapi.responses import FileResponse, JSONResponse, Response, StreamingRes
 from fastapi.staticfiles import StaticFiles
 
 from walkie_sdk.web import models
+from walkie_sdk.web.health import HealthMonitor
 from walkie_sdk.web.state import RobotNotConnected, RobotSession
 from walkie_sdk.web.state import session as default_session
 
 STATIC_DIR = Path(__file__).parent / "static"
+SOUNDS_DIR = Path(__file__).parent / "sounds"
 
 _GRIPPER_MAX_M = 0.04  # mirror walkie_sdk.modules.arm._GRIPPER_MAX_M
 
@@ -37,7 +40,22 @@ def create_app(session: RobotSession | None = None) -> FastAPI:
             tests inject a fake here.
     """
     session = session or default_session
-    app = FastAPI(title="Walkie SDK Web Interface", version="0.3.0")
+
+    # Background subsystem-health monitor; cached report served at /api/health.
+    monitor = HealthMonitor(session)
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        monitor.start()
+        try:
+            yield
+        finally:
+            monitor.stop()
+
+    app = FastAPI(
+        title="Walkie SDK Web Interface", version="0.3.0", lifespan=lifespan
+    )
+    app.state.health_monitor = monitor
 
     # ── Connection lifecycle ────────────────────────────────────────────
     @app.post("/api/connect")
@@ -58,6 +76,10 @@ def create_app(session: RobotSession | None = None) -> FastAPI:
     @app.get("/api/status")
     def status() -> Dict[str, Any]:
         return session.snapshot()
+
+    @app.get("/api/health")
+    def health() -> Dict[str, Any]:
+        return monitor.latest()
 
     @app.post("/api/namespace")
     def set_namespace(req: models.NamespaceRequest) -> Dict[str, Any]:
@@ -350,6 +372,9 @@ def create_app(session: RobotSession | None = None) -> FastAPI:
 
     if STATIC_DIR.is_dir():
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+    if SOUNDS_DIR.is_dir():
+        app.mount("/sounds", StaticFiles(directory=str(SOUNDS_DIR)), name="sounds")
 
     return app
 

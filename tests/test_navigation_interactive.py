@@ -19,6 +19,7 @@ At the prompt type:
     cancel                      → cancel current navigation goal
     stop                        → emergency stop (zero cmd_vel + cancel)
     status                      → print current navigation status
+    where                       → print latest robot pose (nav.current_pose)
     q / quit                    → exit
 """
 
@@ -53,6 +54,21 @@ def _print_status(bot: WalkieRobot) -> None:
         print(f"  last_message={bot.nav.nav_error_msg!r}")
 
 
+def _print_pose(bot: WalkieRobot) -> None:
+    pose = bot.nav.current_pose
+    if not pose:
+        print("  current_pose=None  (no Nav2 feedback received yet)")
+        return
+    p = pose.get("pose", pose)
+    pos = p.get("position", {})
+    ori = p.get("orientation", {})
+    frame = pose.get("header", {}).get("frame_id", "?")
+    print(f"  frame={frame}")
+    print(f"  position=(x={pos.get('x')}, y={pos.get('y')}, z={pos.get('z')})")
+    print(f"  orientation=(x={ori.get('x')}, y={ori.get('y')}, "
+          f"z={ori.get('z')}, w={ori.get('w')})")
+
+
 def _parse_command(raw: str):
     """
     Parse a user input string. Returns one of:
@@ -61,6 +77,7 @@ def _parse_command(raw: str):
       ("cancel",)
       ("stop",)
       ("status",)
+      ("where",)
       ("quit",)
       ("unknown", original_text)
     """
@@ -81,6 +98,9 @@ def _parse_command(raw: str):
 
     if cmd in ("status", "st"):
         return ("status",)
+
+    if cmd in ("where", "pose?", "w"):
+        return ("where",)
 
     if cmd == "go":
         if len(parts) < 3:
@@ -144,6 +164,7 @@ def run_interactive_session(bot: WalkieRobot, timeout: float) -> tuple[int, int]
     print("    cancel                     cancel current goal")
     print("    stop                       emergency stop (zero cmd_vel + cancel)")
     print("    status                     print current nav status")
+    print("    where                      print latest robot pose (nav.current_pose)")
     print("    q / quit                   exit")
     print()
 
@@ -183,6 +204,10 @@ def run_interactive_session(bot: WalkieRobot, timeout: float) -> tuple[int, int]
             _print_status(bot)
             continue
 
+        if kind == "where":
+            _print_pose(bot)
+            continue
+
         if kind == "autotilt":
             enable = parsed[1]
             ok = bot.head.set_auto_tilt(enable)
@@ -192,7 +217,7 @@ def run_interactive_session(bot: WalkieRobot, timeout: float) -> tuple[int, int]
 
         if kind == "unknown":
             print(f"  Unknown command: {parsed[1]!r}")
-            print("  Commands: go | pose | autotilt | cancel | stop | status | q")
+            print("  Commands: go | pose | autotilt | cancel | stop | status | where | q")
             continue
 
         if kind == "go_obj":
@@ -238,6 +263,7 @@ def main():
     print(f"\nConnecting to rosbridge at {args.ip}:{args.port} ...")
     bot = WalkieRobot(
         ip=args.ip,
+        ros_protocol="rosbridge",
         camera_protocol="none",
         namespace=args.namespace,
     )

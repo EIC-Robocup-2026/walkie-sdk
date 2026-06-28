@@ -395,3 +395,83 @@ async function refreshStatus() {
 
 refreshStatus();
 setInterval(refreshStatus, 1000);
+
+// ── System health ──────────────────────────────────────────────────────
+const DOT_CLASS = { ok: "dot on", fail: "dot off", unknown: "dot" };
+let failedKeys = new Set();   // subsystem keys currently failing
+let ackKeys = new Set();      // failing keys the user has muted
+let audioUnlocked = false;    // browsers block audio until a user gesture
+
+function renderHealth(h) {
+  const list = $("health-list");
+  list.innerHTML = "";
+  for (const c of h.checks || []) {
+    const row = document.createElement("div");
+    row.className = "health-row";
+    const dot = document.createElement("span");
+    dot.className = DOT_CLASS[c.status] || "dot";
+    const label = document.createElement("span");
+    label.className = "health-label";
+    label.textContent = c.label;
+    const detail = document.createElement("span");
+    detail.className = "health-detail";
+    detail.textContent = c.detail || "";
+    row.append(dot, label, detail);
+    list.appendChild(row);
+  }
+  updateAlarm(h);
+}
+
+// Loop the alarm while any system is failing; auto-stop the instant all
+// recover; re-arm when a new (unacknowledged) failure appears.
+function updateAlarm(h) {
+  const audio = $("health-audio");
+  const failed = new Set((h.checks || []).filter((c) => c.status === "fail").map((c) => c.key));
+  // Forget acks for systems that recovered, so they re-alarm if they fail again.
+  ackKeys = new Set([...ackKeys].filter((k) => failed.has(k)));
+  failedKeys = failed;
+
+  if (failed.size === 0) {            // auto-stop on full recovery
+    $("health-alarm").hidden = true;
+    audio.pause();
+    audio.currentTime = 0;
+    return;
+  }
+  const unacked = [...failed].some((k) => !ackKeys.has(k));
+  if (!unacked) {                     // every current failure acknowledged
+    $("health-alarm").hidden = true;
+    audio.pause();
+    return;
+  }
+  $("health-alarm").hidden = false;   // a new/unacknowledged failure
+  if (audioUnlocked && audio.paused) audio.play().catch(() => {});
+}
+
+$("btn-health-mute").onclick = () => {
+  ackKeys = new Set(failedKeys);
+  const audio = $("health-audio");
+  audio.pause();
+  audio.currentTime = 0;
+  $("health-alarm").hidden = true;
+};
+
+function unlockAudio() {
+  audioUnlocked = true;
+  if ([...failedKeys].some((k) => !ackKeys.has(k))) {
+    $("health-audio").play().catch(() => {});
+  }
+  window.removeEventListener("click", unlockAudio);
+  window.removeEventListener("keydown", unlockAudio);
+}
+window.addEventListener("click", unlockAudio);
+window.addEventListener("keydown", unlockAudio);
+
+async function refreshHealth() {
+  try {
+    renderHealth(await api("/api/health"));
+  } catch (_) {
+    renderHealth({ connected: false, checks: [], any_failed: false });
+  }
+}
+refreshHealth();
+setInterval(refreshHealth, 1000);

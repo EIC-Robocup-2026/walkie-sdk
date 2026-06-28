@@ -25,6 +25,8 @@ if TYPE_CHECKING:
 HEAD_DEFAULT_TILT_MIN: float = -0.1
 HEAD_DEFAULT_TILT_MAX: float = 0.3
 
+CMD_VEL_FRAME_ID: str = "base_link"
+
 
 class Navigation:
     """
@@ -337,6 +339,53 @@ class Navigation:
         except Exception:
             return False
 
+    @staticmethod
+    def _twist_stamped(vx: float, vy: float, wz: float) -> Dict[str, Any]:
+        """Build a geometry_msgs/msg/TwistStamped dict for cmd_vel."""
+        return {
+            "header": {
+                "frame_id": CMD_VEL_FRAME_ID,
+                "stamp": {"sec": 0, "nanosec": 0},
+            },
+            "twist": {
+                "linear": {"x": float(vx), "y": float(vy), "z": 0.0},
+                "angular": {"x": 0.0, "y": 0.0, "z": float(wz)},
+            },
+        }
+
+    def set_velocity(self, vel_x: float, vel_y: float, rot_x: float) -> bool:
+        """
+        Publish a direct velocity command to cmd_vel (open-loop, teleop-style drive).
+
+        Sends a geometry_msgs/msg/TwistStamped. Unlike go_to(), this does not use Nav2 —
+        it is a one-shot velocity publish. Call repeatedly to keep the robot moving; call
+        stop() (or set_velocity(0, 0, 0)) to halt.
+
+        Args:
+            vel_x: Forward linear velocity in m/s (linear.x).
+            vel_y: Sideways/strafe linear velocity in m/s (linear.y).
+            rot_x: Yaw angular velocity in rad/s (angular.z).
+
+        Returns:
+            True if the command was published, False otherwise (e.g. not connected).
+
+        Example:
+            ```python
+            bot.nav.set_velocity(0.2, 0.0, 0.0)  # creep forward at 0.2 m/s
+            ```
+        """
+        if not self._transport.is_connected:
+            return False
+        try:
+            self._transport.publish(
+                self.cmd_vel_topic,
+                NAV_TOPICS["cmd_vel_type"],
+                self._twist_stamped(vel_x, vel_y, rot_x),
+            )
+            return True
+        except Exception:
+            return False
+
     def stop(self) -> bool:
         """
         Emergency stop - immediately halt robot motion.
@@ -355,14 +404,12 @@ class Navigation:
         if not self._transport.is_connected:
             return False
 
-        # Zero velocity Twist message
-        zero_twist = {
-            "linear": {"x": 0.0, "y": 0.0, "z": 0.0},
-            "angular": {"x": 0.0, "y": 0.0, "z": 0.0},
-        }
-
         try:
-            self._transport.publish(self.cmd_vel_topic, NAV_TOPICS["cmd_vel_type"], zero_twist)
+            self._transport.publish(
+                self.cmd_vel_topic,
+                NAV_TOPICS["cmd_vel_type"],
+                self._twist_stamped(0.0, 0.0, 0.0),
+            )
             # Also cancel any ongoing navigation
             self._transport.cancel_action()
             self._navigation_status = "STOPPED"
