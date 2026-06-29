@@ -561,8 +561,10 @@ class Arm:
 
         Args:
             group_name: MoveIt group (arm groups only, not gripper).
-            pose_name: SRDF named state, e.g. "home", "standby", "hands_up".
-                Empty defaults to "home" on the commander side.
+            pose_name: SRDF named state: "home", "standby", "hands_up" (all arm
+                groups), "pre-place" (left_arm / *_lift / both_arms*), "tray"
+                (both_arms / both_arms_lift). Empty defaults to "home" on the
+                commander side; a state a group does not define aborts.
             blocking: Wait for action to complete.
             feedback_callback: Optional callback for action feedback.
 

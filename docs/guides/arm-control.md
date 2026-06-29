@@ -117,14 +117,20 @@ result = bot.arm.go_to_pose_relative(
 )
 ```
 
-## Home Position
+## Named Presets
 
-Move an arm to its predefined home position:
+Move an arm to a predefined SRDF named state via `go_to_home`:
 
 ```python
-bot.arm.go_to_home("left_arm")
-bot.arm.go_to_home("right_arm")
+bot.arm.go_to_home("left_arm")                              # defaults to "home"
+bot.arm.go_to_home("both_arms", pose_name="standby")
+bot.arm.go_to_home("both_arms_lift", pose_name="tray")
 ```
+
+Available presets: `home`, `standby`, `hands_up` (all arm groups),
+`pre-place` (`left_arm` / `*_lift` / `both_arms*`), and `tray`
+(`both_arms` / `both_arms_lift`). Requesting a preset a group does not
+define aborts cleanly.
 
 ## Gripper Control
 
