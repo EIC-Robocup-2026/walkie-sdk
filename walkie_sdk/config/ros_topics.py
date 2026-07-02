@@ -38,6 +38,13 @@ POINT_CLOUD_TOPICS = {
     ),
 }
 
+# ── Lidar Topics ───────────────────────────────────────────────
+# 2D laser scanner. Message type is sensor_msgs/msg/LaserScan.
+LIDAR_TOPICS = {
+    "scan":      os.getenv("WALKIE_LIDAR_SCAN",      "scan"),
+    "scan_type": os.getenv("WALKIE_LIDAR_SCAN_TYPE", "sensor_msgs/msg/LaserScan"),
+}
+
 # ── Arm Topics ─────────────────────────────────────────────────
 ARM_TOPICS = {
     "states": os.getenv("WALKIE_ARM_STATES", "joint_states"),
@@ -215,6 +222,7 @@ def load_config(yaml_path: str):
         if "LIFT_TOPICS" in config: LIFT_TOPICS.update(config["LIFT_TOPICS"])
         if "HEAD_TOPICS" in config: HEAD_TOPICS.update(config["HEAD_TOPICS"])
         if "JOINT_STATE_TOPICS" in config: JOINT_STATE_TOPICS.update(config["JOINT_STATE_TOPICS"])
+        if "LIDAR_TOPICS" in config: LIDAR_TOPICS.update(config["LIDAR_TOPICS"])
         
         print(f"[Walkie SDK] Loaded custom topics from '{yaml_path}'")
 
