@@ -3,15 +3,21 @@
 Walkie SDK - Button Example (Pi Pico USB HID)
 
 Monitors the physical button connected to a Pi Pico (acting as a USB HID
-keyboard). The Pico sends F1 on press and releases it on release.
+keyboard). The Pico sends a keypress on press and releases it on release.
+
+The listener reads the Pico keyboard device directly via evdev, so it works
+on the headless robot over SSH. Reading /dev/input/event* requires the 'input'
+group:
+
+    sudo usermod -aG input $USER   # then log out and back in
 
 Usage:
     python examples/example_button.py --ip 192.168.1.100
 
 Requirements:
-    - Pi Pico programmed with code.py (sends F1 via USB HID)
+    - Pi Pico programmed with code.py (sends a keypress via USB HID)
     - Button wired between GP21 and GND on the Pico
-    - pynput installed (uv sync)
+    - user in the 'input' group (see above)
 """
 
 import argparse
@@ -19,14 +25,14 @@ import time
 
 from walkie_sdk import WalkieRobot
 
-ROBOT_IP = "192.168.1.100"
-BUTTON_KEY = "0x1008ff47"  # keysym from xev (XF86Launch7)
+ROBOT_IP = "10.0.0.201"
+BUTTON_KEY = "any"  # any key from the Pico keyboard counts as the button
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--ip", default=ROBOT_IP)
-    parser.add_argument("--key", default=BUTTON_KEY, help="Key the Pico sends (e.g. f1, f2)")
+    parser.add_argument("--key", default=BUTTON_KEY, help="Key to match: 'any', an evdev name (f16/KEY_F16), or a keycode")
     args = parser.parse_args()
 
     print(f"Connecting to {args.ip} (button key: {args.key})...")

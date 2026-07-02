@@ -109,7 +109,7 @@ class WalkieRobot:
         timeout: float = 10.0,
         namespace: str = "",
         config_path: str = None,
-        button_key: str = "0x1008ff47",
+        button_key: str = "any",
         # Legacy parameters for backward compatibility
         ws_port: Optional[int] = None,
         enable_camera: bool = True,

@@ -1,149 +1,152 @@
-"""Unit tests for walkie_sdk.modules.button.Button."""
+"""Unit tests for walkie_sdk.modules.button.Button (evdev backend)."""
 
 import threading
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from walkie_sdk.modules.button import Button, _key_matches
+from walkie_sdk.modules.button import Button, _resolve_keycode
+
+try:
+    from evdev import ecodes
+
+    _HAVE_EVDEV = True
+except ImportError:  # pragma: no cover - evdev is a Linux dep
+    _HAVE_EVDEV = False
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# _resolve_keycode helper
 # ---------------------------------------------------------------------------
 
 
-def _make_f1_key():
-    """Return a mock pynput Key object that looks like F1."""
-    try:
-        from pynput import keyboard as _kb
-        return _kb.Key.f1
-    except Exception:
-        key = MagicMock()
-        key.char = None
-        return key
+class TestResolveKeycode:
+    def test_none_is_any(self):
+        assert _resolve_keycode(None) is None
 
+    def test_empty_is_any(self):
+        assert _resolve_keycode("") is None
 
-def _make_other_key():
-    """Return a mock pynput Key object that is NOT F1."""
-    try:
-        from pynput import keyboard as _kb
-        return _kb.Key.f2
-    except Exception:
-        key = MagicMock()
-        key.char = "x"
-        return key
+    def test_any_string_is_any(self):
+        assert _resolve_keycode("any") is None
+        assert _resolve_keycode("ANY") is None
 
+    def test_int_passes_through(self):
+        assert _resolve_keycode(186) == 186
 
-# ---------------------------------------------------------------------------
-# _key_matches helper
-# ---------------------------------------------------------------------------
+    def test_decimal_string(self):
+        assert _resolve_keycode("186") == 186
 
+    def test_leftover_x11_keysym_falls_back_to_any(self):
+        # Old config value; not a valid evdev name → match any key.
+        assert _resolve_keycode("0x1008ff47") is None
 
-class TestKeyMatches:
-    def test_f1_matches_f1(self):
-        try:
-            from pynput import keyboard as _kb
-            assert _key_matches(_kb.Key.f1, "f1") is True
-        except ImportError:
-            pytest.skip("pynput not installed")
+    @pytest.mark.skipif(not _HAVE_EVDEV, reason="evdev not installed")
+    def test_evdev_name(self):
+        assert _resolve_keycode("KEY_F16") == ecodes.KEY_F16
 
-    def test_f2_does_not_match_f1(self):
-        try:
-            from pynput import keyboard as _kb
-            assert _key_matches(_kb.Key.f2, "f1") is False
-        except ImportError:
-            pytest.skip("pynput not installed")
+    @pytest.mark.skipif(not _HAVE_EVDEV, reason="evdev not installed")
+    def test_bare_name_gets_key_prefix(self):
+        assert _resolve_keycode("f16") == ecodes.KEY_F16
+        assert _resolve_keycode("F16") == ecodes.KEY_F16
 
-    def test_uppercase_key_name_works(self):
-        try:
-            from pynput import keyboard as _kb
-            assert _key_matches(_kb.Key.f1, "F1") is True
-        except ImportError:
-            pytest.skip("pynput not installed")
-
-    def test_char_key_matches_by_char(self):
-        key = MagicMock()
-        key.char = "b"
-        assert _key_matches(key, "b") is True
-
-    def test_char_key_no_match_wrong_char(self):
-        key = MagicMock()
-        key.char = "b"
-        assert _key_matches(key, "a") is False
+    @pytest.mark.skipif(not _HAVE_EVDEV, reason="evdev not installed")
+    def test_unknown_name_falls_back_to_any(self):
+        assert _resolve_keycode("not_a_real_key") is None
 
 
 # ---------------------------------------------------------------------------
-# is_pressed state transitions via _on_press / _on_release
+# is_pressed state transitions via _handle_event
 # ---------------------------------------------------------------------------
 
 
 class TestButtonState:
     def test_initially_not_pressed(self):
-        btn = Button(key="f1")
-        assert btn.is_pressed is False
+        assert Button().is_pressed is False
 
-    def test_press_sets_true(self):
-        btn = Button(key="f1")
-        try:
-            from pynput import keyboard as _kb
-            btn._on_press(_kb.Key.f1)
-        except ImportError:
-            pytest.skip("pynput not installed")
+    def test_key_down_sets_true(self):
+        btn = Button(key="any")
+        btn._handle_event(code=100, value=1)
         assert btn.is_pressed is True
 
-    def test_release_sets_false(self):
-        btn = Button(key="f1")
-        try:
-            from pynput import keyboard as _kb
-            btn._on_press(_kb.Key.f1)
-            btn._on_release(_kb.Key.f1)
-        except ImportError:
-            pytest.skip("pynput not installed")
+    def test_key_up_sets_false(self):
+        btn = Button(key="any")
+        btn._handle_event(code=100, value=1)
+        btn._handle_event(code=100, value=0)
         assert btn.is_pressed is False
 
-    def test_wrong_key_press_ignored(self):
-        btn = Button(key="f1")
-        try:
-            from pynput import keyboard as _kb
-            btn._on_press(_kb.Key.f2)
-        except ImportError:
-            pytest.skip("pynput not installed")
-        assert btn.is_pressed is False
-
-    def test_wrong_key_release_ignored(self):
-        btn = Button(key="f1")
-        try:
-            from pynput import keyboard as _kb
-            btn._on_press(_kb.Key.f1)
-            btn._on_release(_kb.Key.f2)  # wrong key
-        except ImportError:
-            pytest.skip("pynput not installed")
+    def test_autorepeat_keeps_pressed(self):
+        btn = Button(key="any")
+        btn._handle_event(code=100, value=1)
+        btn._handle_event(code=100, value=2)  # autorepeat
         assert btn.is_pressed is True
 
-    def test_double_press_stays_true(self):
-        btn = Button(key="f1")
-        try:
-            from pynput import keyboard as _kb
-            btn._on_press(_kb.Key.f1)
-            btn._on_press(_kb.Key.f1)
-        except ImportError:
-            pytest.skip("pynput not installed")
+    def test_double_down_stays_true(self):
+        btn = Button(key="any")
+        btn._handle_event(code=100, value=1)
+        btn._handle_event(code=100, value=1)
         assert btn.is_pressed is True
 
-    def test_double_release_stays_false(self):
-        btn = Button(key="f1")
-        try:
-            from pynput import keyboard as _kb
-            btn._on_release(_kb.Key.f1)
-            btn._on_release(_kb.Key.f1)
-        except ImportError:
-            pytest.skip("pynput not installed")
+    def test_double_up_stays_false(self):
+        btn = Button(key="any")
+        btn._handle_event(code=100, value=0)
+        btn._handle_event(code=100, value=0)
         assert btn.is_pressed is False
+
+    def test_specific_key_matches(self):
+        btn = Button(key=186)
+        btn._handle_event(code=186, value=1)
+        assert btn.is_pressed is True
+
+    def test_specific_key_ignores_other_keys(self):
+        btn = Button(key=186)
+        btn._handle_event(code=100, value=1)  # different key
+        assert btn.is_pressed is False
+
+    def test_specific_key_release_of_other_key_ignored(self):
+        btn = Button(key=186)
+        btn._handle_event(code=186, value=1)
+        btn._handle_event(code=100, value=0)  # release of a different key
+        assert btn.is_pressed is True
 
     def test_key_property(self):
-        btn = Button(key="f3")
-        assert btn.key == "f3"
+        assert Button(key="f3").key == "f3"
+
+
+# ---------------------------------------------------------------------------
+# Device discovery
+# ---------------------------------------------------------------------------
+
+
+class TestFindDevice:
+    def test_explicit_existing_device(self, tmp_path):
+        dev = tmp_path / "event0"
+        dev.write_text("")
+        btn = Button(device=str(dev))
+        assert btn._find_device() == str(dev)
+
+    def test_explicit_missing_device_returns_none(self):
+        btn = Button(device="/dev/input/does-not-exist")
+        assert btn._find_device() is None
+
+    def test_by_id_symlink_match(self):
+        link = (
+            "/dev/input/by-id/"
+            "usb-Raspberry_Pi_Pico_5303284720A83B1C-if03-event-kbd"
+        )
+        with patch(
+            "walkie_sdk.modules.button.glob.glob", return_value=[link]
+        ), patch(
+            "walkie_sdk.modules.button.os.path.realpath",
+            return_value="/dev/input/event11",
+        ):
+            assert Button()._find_device() == "/dev/input/event11"
+
+    def test_no_matching_by_id_returns_none_when_no_evdev_devices(self):
+        with patch("walkie_sdk.modules.button.glob.glob", return_value=[]), patch(
+            "evdev.list_devices", return_value=[]
+        ):
+            assert Button()._find_device() is None
 
 
 # ---------------------------------------------------------------------------
@@ -152,31 +155,25 @@ class TestButtonState:
 
 
 class TestButtonThreadSafety:
-    def test_concurrent_press_release(self):
-        try:
-            from pynput import keyboard as _kb
-        except ImportError:
-            pytest.skip("pynput not installed")
-
-        btn = Button(key="f1")
+    def test_concurrent_handle_event(self):
+        btn = Button(key="any")
         errors = []
 
-        def _press_release():
+        def _hammer():
             try:
-                for _ in range(100):
-                    btn._on_press(_kb.Key.f1)
-                    btn._on_release(_kb.Key.f1)
-            except Exception as e:
+                for _ in range(200):
+                    btn._handle_event(code=100, value=1)
+                    btn._handle_event(code=100, value=0)
+            except Exception as e:  # pragma: no cover
                 errors.append(e)
 
-        threads = [threading.Thread(target=_press_release) for _ in range(4)]
+        threads = [threading.Thread(target=_hammer) for _ in range(4)]
         for t in threads:
             t.start()
         for t in threads:
             t.join()
 
         assert errors == []
-        # Final state is deterministic only in single-thread; here just verify no crash
         assert isinstance(btn.is_pressed, bool)
 
 
@@ -186,43 +183,49 @@ class TestButtonThreadSafety:
 
 
 class TestButtonLifecycle:
-    def test_start_sets_listener(self):
-        btn = Button(key="f1")
-        mock_listener = MagicMock()
-        mock_listener.is_alive.return_value = True
-        mock_kb = MagicMock()
-        mock_kb.Listener.return_value = mock_listener
-
-        with patch.dict("sys.modules", {"pynput": MagicMock(), "pynput.keyboard": mock_kb}):
-            with patch("walkie_sdk.modules.button._key_matches", return_value=False):
-                btn._start()
-
-        assert btn._listener is not None
+    def test_start_spawns_thread(self):
+        btn = Button()
+        # Keep the reader loop from touching real hardware.
+        with patch.object(btn, "_run", return_value=None):
+            btn._start()
+            assert btn._thread is not None
+            btn._stop()
+        assert btn._thread is None
 
     def test_start_is_idempotent(self):
-        btn = Button(key="f1")
-        mock_listener = MagicMock()
-        mock_listener.is_alive.return_value = True
-        btn._listener = mock_listener
+        btn = Button()
+        alive_thread = MagicMock()
+        alive_thread.is_alive.return_value = True
+        btn._thread = alive_thread
 
-        call_count_before = mock_listener.start.call_count
-        btn._start()
-        # A second _start() with an alive listener should not start another
-        assert mock_listener.start.call_count == call_count_before
+        with patch("walkie_sdk.modules.button.threading.Thread") as mk_thread:
+            btn._start()
+            mk_thread.assert_not_called()
 
-    def test_stop_clears_listener_and_resets_state(self):
-        btn = Button(key="f1")
-        mock_listener = MagicMock()
-        btn._listener = mock_listener
+    def test_start_without_evdev_is_safe(self):
+        btn = Button()
+        # Simulate evdev missing: the import inside _start raises ImportError.
+        import builtins
+
+        real_import = builtins.__import__
+
+        def fake_import(name, *args, **kwargs):
+            if name == "evdev":
+                raise ImportError("no evdev")
+            return real_import(name, *args, **kwargs)
+
+        with patch("builtins.__import__", side_effect=fake_import):
+            btn._start()  # should not raise
+        assert btn._thread is None
+
+    def test_stop_resets_state_and_thread(self):
+        btn = Button()
         btn._pressed = True
-
-        btn._stop()
-
-        mock_listener.stop.assert_called_once()
-        assert btn._listener is None
+        btn._stop()  # no thread running
         assert btn.is_pressed is False
+        assert btn._thread is None
 
-    def test_stop_with_no_listener_is_safe(self):
-        btn = Button(key="f1")
+    def test_stop_with_no_thread_is_safe(self):
+        btn = Button()
         btn._stop()  # should not raise
         assert btn.is_pressed is False
