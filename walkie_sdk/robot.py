@@ -26,6 +26,7 @@ from walkie_sdk.modules.button import Button
 from walkie_sdk.modules.camera import Camera
 from walkie_sdk.modules.head import Head
 from walkie_sdk.modules.joint_state_hub import JointStateHub
+from walkie_sdk.modules.lidar import Lidar
 from walkie_sdk.modules.lift import Lift
 from walkie_sdk.modules.multi_camera import MultiCamera
 from walkie_sdk.modules.navigation import Navigation
@@ -207,6 +208,9 @@ class WalkieRobot:
         # Point cloud module (subscribes via the active ROS transport)
         self._point_cloud = PointCloud(self._transport, namespace=namespace)
 
+        # 2D lidar module (subscribes to the scan topic via the active ROS transport)
+        self._lidar = Lidar(self._transport, namespace=namespace)
+
         # Button module (Pi Pico USB HID keyboard input — no ROS transport)
         self._button = Button(key=button_key)
 
@@ -241,6 +245,9 @@ class WalkieRobot:
 
         # Start point cloud subscriptions
         self._point_cloud._setup_subscription()
+
+        # Start lidar scan subscription
+        self._lidar._setup_subscription()
 
         # Start button (Pi Pico HID keyboard) listener
         self._button._start()
@@ -465,6 +472,26 @@ class WalkieRobot:
         return self._point_cloud
 
     @property
+    def lidar(self) -> Lidar:
+        """
+        2D lidar interface.
+
+        Provides:
+        - get_scan(): Latest cached LaserScan dict (non-blocking)
+        - get_ranges(): Just the ranges array from the latest scan (non-blocking)
+        - get_once(timeout=10.0): Block until first message (--once)
+
+        Example:
+            ```python
+            scan = bot.lidar.get_once(timeout=5.0)
+            if scan:
+                print(scan["range_min"], scan["range_max"])
+                print(len(scan["ranges"]))   # number of beams
+            ```
+        """
+        return self._lidar
+
+    @property
     def button(self) -> Button:
         """
         Button state from Pi Pico USB HID keyboard input.
@@ -638,6 +665,7 @@ class WalkieRobot:
         self._head.namespace = value
         self._transform.namespace = value
         self._grasp.namespace = value
+        self._lidar.namespace = value
 
     @property
     def is_connected(self) -> bool:
