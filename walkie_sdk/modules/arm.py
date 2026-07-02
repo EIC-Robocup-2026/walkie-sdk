@@ -563,8 +563,10 @@ class Arm:
             group_name: MoveIt group (arm groups only, not gripper).
             pose_name: SRDF named state: "home", "standby", "hands_up" (all arm
                 groups), "pre-place" (left_arm / *_lift / both_arms*), "tray"
-                (both_arms / both_arms_lift). Empty defaults to "home" on the
-                commander side; a state a group does not define aborts.
+                (both_arms / both_arms_lift), "basket" / "basket_hold"
+                (left_arm, right_arm, both_arms, and their *_lift variants).
+                Empty defaults to "home" on the commander side; a state a
+                group does not define aborts.
             blocking: Wait for action to complete.
             feedback_callback: Optional callback for action feedback.
 
@@ -785,6 +787,37 @@ class Arm:
             return ok
         except Exception as e:
             print(f"[Arm] toggle_gripper_collision error: {e}")
+            return False
+
+    def toggle_all_collision_checking(self, enable: bool, timeout: float = 5.0) -> bool:
+        """
+        Blanket enable/disable of ALL collision checking during planning
+        (self-collision between every robot link, vs world objects, vs
+        octomap). This is a blunt debugging/demo switch — leave it enabled
+        for normal operation.
+
+        Args:
+            enable: True  = restore normal collision checking;
+                    False = plan straight through everything.
+            timeout: Service call timeout in seconds.
+
+        Returns True if the commander accepted the change.
+        """
+        try:
+            response = self._transport.call_service(
+                service_name=apply_namespace(
+                    ARM_SERVICES["toggle_all_collision"], self._namespace
+                ),
+                service_type=ARM_SERVICES["toggle_all_collision_type"],
+                request={"data": bool(enable)},
+                timeout=timeout,
+            )
+            ok = bool(response.get("success", False))
+            msg = response.get("message", "")
+            print(f"[Arm] toggle_all_collision_checking: {msg}")
+            return ok
+        except Exception as e:
+            print(f"[Arm] toggle_all_collision_checking error: {e}")
             return False
 
     def get_ee_pose(

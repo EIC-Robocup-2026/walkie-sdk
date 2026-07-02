@@ -68,6 +68,8 @@ ARM_SERVICES = {
     "toggle_collision_type": os.getenv("WALKIE_ARM_SVC_TOGGLE_COLLISION_TYPE", "my_robot_interfaces/srv/ToggleGripperCollision"),
     "clear_octomap":         os.getenv("WALKIE_ARM_SVC_CLEAR_OCTOMAP", "clear_octomap"),
     "clear_octomap_type":    os.getenv("WALKIE_ARM_SVC_CLEAR_OCTOMAP_TYPE", "std_srvs/srv/Empty"),
+    "toggle_all_collision":      os.getenv("WALKIE_ARM_SVC_TOGGLE_ALL_COLLISION", "toggle_all_collision_checking"),
+    "toggle_all_collision_type": os.getenv("WALKIE_ARM_SVC_TOGGLE_ALL_COLLISION_TYPE", "std_srvs/srv/SetBool"),
 }
 
 # Standard ROS 2 parameter services exposed by the commander node, used to

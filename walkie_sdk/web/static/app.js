@@ -238,6 +238,14 @@ function toggleCollision(enable) {
 }
 $("btn-collision-enable").onclick = action(() => toggleCollision(true), "Collision enabled");
 $("btn-collision-disable").onclick = action(() => toggleCollision(false), "Collision disabled");
+function toggleAllCollision(enable) {
+  return api("/api/arm/toggle_all_collision", {
+    method: "POST",
+    body: { enable },
+  });
+}
+$("btn-all-collision-enable").onclick = action(() => toggleAllCollision(true), "All collision checking enabled");
+$("btn-all-collision-disable").onclick = action(() => toggleAllCollision(false), "All collision checking disabled");
 
 // ── Commander params ───────────────────────────────────────────────────
 // Coerce the free-text input into a JSON-typed value the way set_param

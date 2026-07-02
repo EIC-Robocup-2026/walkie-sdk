@@ -128,9 +128,10 @@ bot.arm.go_to_home("both_arms_lift", pose_name="tray")
 ```
 
 Available presets: `home`, `standby`, `hands_up` (all arm groups),
-`pre-place` (`left_arm` / `*_lift` / `both_arms*`), and `tray`
-(`both_arms` / `both_arms_lift`). Requesting a preset a group does not
-define aborts cleanly.
+`pre-place` (`left_arm` / `*_lift` / `both_arms*`), `tray`
+(`both_arms` / `both_arms_lift`), and `basket` / `basket_hold`
+(`left_arm`, `right_arm`, `both_arms`, and their `*_lift` variants).
+Requesting a preset a group does not define aborts cleanly.
 
 ## Gripper Control
 
