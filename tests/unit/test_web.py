@@ -89,6 +89,10 @@ class FakeArm:
         self.calls.append(("execute_stored_plan", group_name))
         return True
 
+    def toggle_all_collision_checking(self, enable):
+        self.calls.append(("toggle_all_collision", enable))
+        return True
+
 
 class FakeCameras:
     camera_names = ["head", "left"]
@@ -279,6 +283,23 @@ def test_arm_execute_stored_plan_default_group(connected_client):
     r = client.post("/api/arm/execute_stored_plan", json={})
     assert r.status_code == 200
     assert r.json()["group_name"] == "left_arm_lift"
+
+
+def test_arm_toggle_all_collision_disable(connected_client):
+    client, session = connected_client
+    r = client.post("/api/arm/toggle_all_collision", json={"enable": False})
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+    assert r.json()["enable"] is False
+    assert ("toggle_all_collision", False) in session._robot.arm.calls
+
+
+def test_arm_toggle_all_collision_enable(connected_client):
+    client, session = connected_client
+    r = client.post("/api/arm/toggle_all_collision", json={"enable": True})
+    assert r.status_code == 200
+    assert r.json()["ok"] is True
+    assert r.json()["enable"] is True
 
 
 # ── Camera ──────────────────────────────────────────────────────────────

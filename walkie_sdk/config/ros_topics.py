@@ -66,6 +66,8 @@ ARM_SERVICES = {
     "clear_objects_type":    os.getenv("WALKIE_ARM_SVC_CLEAR_OBJECTS_TYPE", "std_srvs/srv/Trigger"),
     "toggle_collision":      os.getenv("WALKIE_ARM_SVC_TOGGLE_COLLISION", "toggle_gripper_collision"),
     "toggle_collision_type": os.getenv("WALKIE_ARM_SVC_TOGGLE_COLLISION_TYPE", "my_robot_interfaces/srv/ToggleGripperCollision"),
+    "toggle_all_collision":      os.getenv("WALKIE_ARM_SVC_TOGGLE_ALL_COLLISION", "toggle_all_collision_checking"),
+    "toggle_all_collision_type": os.getenv("WALKIE_ARM_SVC_TOGGLE_ALL_COLLISION_TYPE", "std_srvs/srv/SetBool"),
     "clear_octomap":              os.getenv("WALKIE_ARM_SVC_CLEAR_OCTOMAP", "clear_octomap"),
     "clear_octomap_type":         os.getenv("WALKIE_ARM_SVC_CLEAR_OCTOMAP_TYPE", "std_srvs/srv/Empty"),
     "execute_stored_plan":        os.getenv("WALKIE_ARM_SVC_EXECUTE_STORED_PLAN", "execute_stored_plan"),

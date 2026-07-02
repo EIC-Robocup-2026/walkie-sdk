@@ -793,6 +793,35 @@ class Arm:
             print(f"[Arm] toggle_gripper_collision error: {e}")
             return False
 
+    def toggle_all_collision_checking(self, enable: bool, timeout: float = 5.0) -> bool:
+        """
+        Blanket enable/disable of ALL collision checking during planning
+        (self-collision between every robot link, vs world objects, vs
+        octomap) — not just a gripper's. A blunt debugging/demo switch.
+
+        Args:
+            enable: True  = normal collision-checked planning;
+                    False = plan straight through everything.
+            timeout: Service call timeout in seconds.
+
+        Returns True if the commander accepted the change.
+        """
+        try:
+            response = self._transport.call_service(
+                service_name=apply_namespace(
+                    ARM_SERVICES["toggle_all_collision"], self._namespace
+                ),
+                service_type=ARM_SERVICES["toggle_all_collision_type"],
+                request={"data": bool(enable)},
+                timeout=timeout,
+            )
+            ok = bool(response.get("success", False))
+            print(f"[Arm] toggle_all_collision_checking: {response.get('message', '')}")
+            return ok
+        except Exception as e:
+            print(f"[Arm] toggle_all_collision_checking error: {e}")
+            return False
+
     def get_ee_pose(
         self,
         group_name: str,

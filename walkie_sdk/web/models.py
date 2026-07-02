@@ -141,6 +141,12 @@ class ToggleCollisionRequest(BaseModel):
     enable: bool
 
 
+class ToggleAllCollisionRequest(BaseModel):
+    """Arguments for ``arm.toggle_all_collision_checking(...)``."""
+
+    enable: bool
+
+
 class ArmJointPositionRequest(BaseModel):
     """Arguments for ``arm.set_joint_position(...)``."""
 

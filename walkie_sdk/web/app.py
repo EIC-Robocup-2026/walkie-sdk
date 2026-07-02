@@ -224,6 +224,18 @@ def create_app(session: RobotSession | None = None) -> FastAPI:
             )
         return out
 
+    @app.post("/api/arm/toggle_all_collision")
+    def arm_toggle_all_collision(req: models.ToggleAllCollisionRequest) -> Dict[str, Any]:
+        robot = session.require()
+        ok = robot.arm.toggle_all_collision_checking(req.enable)
+        out: Dict[str, Any] = {"ok": ok, "enable": req.enable}
+        if not ok:
+            out["error"] = (
+                f"Failed to {'enable' if req.enable else 'disable'} all collision "
+                "checking (is move_group up?)"
+            )
+        return out
+
     @app.post("/api/arm/param/set")
     def arm_param_set(req: models.ParamSetRequest) -> Dict[str, Any]:
         robot = session.require()
