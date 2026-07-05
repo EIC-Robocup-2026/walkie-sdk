@@ -17,7 +17,7 @@ import numpy as np
 from walkie_sdk.core.interfaces import ROSTransportInterface
 from walkie_sdk.utils.converters import euler_to_quaternion
 from walkie_sdk.utils.namespace import apply_namespace
-from walkie_sdk.config.ros_topics import NAV_TOPICS, NAV_ACTIONS, MAP_TOPICS, MAP_SERVICES
+from walkie_sdk.config.ros_topics import NAV_TOPICS, NAV_ACTIONS, MAP_TOPICS, MAP_SERVICES, GOAL_CHECKERS
 
 if TYPE_CHECKING:
     from walkie_sdk.modules.head import Head
@@ -89,6 +89,11 @@ class Navigation:
         return apply_namespace(NAV_TOPICS["cmd_vel"], self._namespace)
 
     @property
+    def goal_checker_selector_topic(self) -> str:
+        """Get the full Nav2 goal_checker_selector topic name with namespace."""
+        return apply_namespace(NAV_TOPICS["goal_checker_selector"], self._namespace)
+
+    @property
     def map_topic(self) -> str:
         """Get the full map topic name with namespace."""
         return apply_namespace(MAP_TOPICS["map"], self._namespace)
@@ -109,6 +114,7 @@ class Navigation:
         goal_tolerance: Optional[float] = None,
         standoff: float = 0.0,
         align_method: str = "",
+        precise: bool = False,
     ) -> str:
         """
         Navigate to a target pose or object position.
@@ -128,11 +134,16 @@ class Navigation:
             feedback_callback: Optional callback for navigation feedback
             goal_tolerance: If set (metres), a FAILED result is promoted to
                 "CLOSE_ENOUGH" when final distance_remaining ≤ this value.
+                Client-side only — unrelated to ``precise``.
             standoff: Per-goal standoff override in metres (NavigateToObject
                       only; 0.0 = use nav_commander's configured default).
             align_method: Alignment method for NavigateToObject (``""`` =
                           default ``nearest_edge``, ``"face_target"`` skips
                           edge alignment). Ignored when heading is provided.
+            precise: If True, select Nav2's tighter ``precise_goal_checker``
+                     (server-side goal tolerance) for this goal; if False, the
+                     normal ``general_goal_checker``. Applies to both the
+                     NavigateToPose and NavigateToObject paths.
 
         Returns:
             Status string: "SUCCEEDED", "FAILED", "CANCELED", "CLOSE_ENOUGH", or "IN_PROGRESS"
@@ -146,6 +157,9 @@ class Navigation:
             # With heading — Nav2 navigate_to_pose
             result = bot.nav.go_to(x=2.0, y=1.0, heading=0.0)
 
+            # Precision mode — tighter Nav2 goal tolerance
+            result = bot.nav.go_to(x=2.0, y=1.0, heading=0.0, precise=True)
+
             # Without heading — nav_commander navigate_to_object
             result = bot.nav.go_to(x=2.0, y=1.0)
             result = bot.nav.go_to(x=2.0, y=1.0, standoff=0.5)
@@ -153,6 +167,8 @@ class Navigation:
         """
         if not self._transport.is_connected:
             raise ConnectionError("Not connected to robot")
+
+        self._select_goal_checker(precise)
 
         # Reset feedback state for new goal
         self._distance_remaining = None
@@ -197,6 +213,27 @@ class Navigation:
             return "IN_PROGRESS"
 
         return self._send_goal_blocking(action_name, action_type, goal_msg, timeout, self._make_feedback_handler(feedback_callback), goal_tolerance)
+
+    def _select_goal_checker(self, precise: bool) -> None:
+        """
+        Latch the Nav2 goal checker for this goal via the goal_checker_selector
+        topic. The selector state is sticky across goals, so this is published
+        on every go_to() call to keep the mode stateless per call.
+
+        Best-effort: a failure here must never block the goal — Nav2 falls back
+        to the last selected (or default) checker.
+        """
+        checker = GOAL_CHECKERS["precise"] if precise else GOAL_CHECKERS["normal"]
+        try:
+            self._transport.publish(
+                self.goal_checker_selector_topic,
+                NAV_TOPICS["goal_checker_selector_type"],
+                {"data": checker},
+                latch=True,
+            )
+        except Exception as e:
+            print(f"[Navigation] goal checker selection failed ({e}); "
+                  f"Nav2 will use the last selected/default checker")
 
     def _make_feedback_handler(
         self,

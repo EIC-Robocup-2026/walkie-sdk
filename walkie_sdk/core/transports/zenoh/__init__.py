@@ -172,7 +172,8 @@ class ZenohTransport(ROSTransportInterface[Any]):
 
         # Cache SDK entities
         self._subscribers: Dict[str, ROS2Subscriber] = {}
-        self._publishers: Dict[str, ROS2Publisher] = {}
+        # Keyed by (topic, latch) — latched publishers use different QoS
+        self._publishers: Dict[Tuple[str, bool], ROS2Publisher] = {}
         self._service_clients: Dict[str, ROS2ServiceClient] = {}
         # Cache resolved nested message classes (for message completion)
         self._msg_class_cache: Dict[str, Any] = {}
@@ -295,24 +296,45 @@ class ZenohTransport(ROSTransportInterface[Any]):
         topic: str,
         message_type: str,
         message: Dict[str, Any],
+        latch: bool = False,
     ) -> None:
-        """Publish using ROS2Publisher."""
+        """Publish using ROS2Publisher.
+
+        latch=True creates the publisher with reliable + transient_local QoS so
+        it matches transient_local subscribers (e.g. Nav2 selector topics) and
+        late joiners receive the last message.
+        """
         if not self._session_mgr:
             raise ConnectionError("Not connected to Zenoh")
 
+        # Latched and volatile publishers on the same topic must not share a
+        # cache slot — their QoS differs.
+        cache_key = (topic, latch)
         with self._lock:
-            if topic not in self._publishers:
+            if cache_key not in self._publishers:
+                qos = None
+                if latch:
+                    from zenoh_ros2_sdk.qos import (
+                        QosDurability,
+                        QosProfile,
+                        QosReliability,
+                    )
+                    qos = QosProfile(
+                        reliability=QosReliability.RELIABLE,
+                        durability=QosDurability.TRANSIENT_LOCAL,
+                    )
                 # Create Publisher. Custom types need their .msg text supplied.
-                self._publishers[topic] = ROS2Publisher(
+                self._publishers[cache_key] = ROS2Publisher(
                     topic=topic,
                     msg_type=message_type,
                     msg_definition=msg_definition(message_type),
                     domain_id=ROS_DOMAIN_ID,
                     router_ip=self._host,
                     router_port=self._port,
+                    qos=qos,
                 )
 
-            pub = self._publishers[topic]
+            pub = self._publishers[cache_key]
 
         # Complete the (often partial) message dict into full constructor kwargs:
         # fill missing required fields with defaults and turn nested dicts/lists

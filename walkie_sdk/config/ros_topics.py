@@ -96,6 +96,18 @@ ARM_PARAMS = {
 NAV_TOPICS = {
     "cmd_vel": os.getenv("WALKIE_NAV_CMD_VEL", "cmd_vel_controller"),
     "cmd_vel_type": os.getenv("WALKIE_NAV_CMD_VEL_TYPE", "geometry_msgs/msg/TwistStamped"),
+    # Nav2 GoalCheckerSelector BT node input. The subscription on the Nav2 side
+    # is reliable + transient_local, so publishes to it must be latched.
+    "goal_checker_selector":      os.getenv("WALKIE_NAV_GOAL_CHECKER_SELECTOR",      "goal_checker_selector"),
+    "goal_checker_selector_type": os.getenv("WALKIE_NAV_GOAL_CHECKER_SELECTOR_TYPE", "std_msgs/msg/String"),
+}
+
+# Goal checker plugin names configured in Nav2's controller_server
+# (goal_checker_plugins). "normal" is the default tolerance, "precise" the
+# tighter one selected by Navigation.go_to(precise=True).
+GOAL_CHECKERS = {
+    "normal":  os.getenv("WALKIE_NAV_GOAL_CHECKER_NORMAL",  "general_goal_checker"),
+    "precise": os.getenv("WALKIE_NAV_GOAL_CHECKER_PRECISE", "precise_goal_checker"),
 }
 
 NAV_ACTIONS = {
@@ -212,6 +224,7 @@ def load_config(yaml_path: str):
         if "ARM_PARAMS" in config: ARM_PARAMS.update(config["ARM_PARAMS"])
         if "NAV_TOPICS" in config: NAV_TOPICS.update(config["NAV_TOPICS"])
         if "NAV_ACTIONS" in config: NAV_ACTIONS.update(config["NAV_ACTIONS"])
+        if "GOAL_CHECKERS" in config: GOAL_CHECKERS.update(config["GOAL_CHECKERS"])
         if "MAP_TOPICS" in config: MAP_TOPICS.update(config["MAP_TOPICS"])
         if "MAP_SERVICES" in config: MAP_SERVICES.update(config["MAP_SERVICES"])
         if "TELEMETRY_TOPICS" in config: TELEMETRY_TOPICS.update(config["TELEMETRY_TOPICS"])

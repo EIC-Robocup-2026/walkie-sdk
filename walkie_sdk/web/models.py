@@ -31,6 +31,7 @@ class GotoRequest(BaseModel):
     y: float
     heading: float = 0.0
     blocking: bool = False
+    precise: bool = False
 
 
 class LiftRequest(BaseModel):

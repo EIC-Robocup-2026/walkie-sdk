@@ -111,8 +111,8 @@ class HybridTransport(ROSTransportInterface[Any]):
     def unsubscribe(self, handle: Any) -> None:
         self._zenoh.unsubscribe(handle)
 
-    def publish(self, topic: str, message_type: str, message: Dict[str, Any]) -> None:
-        self._zenoh.publish(topic, message_type, message)
+    def publish(self, topic: str, message_type: str, message: Dict[str, Any], latch: bool = False) -> None:
+        self._zenoh.publish(topic, message_type, message, latch=latch)
 
     def call_service(
         self,

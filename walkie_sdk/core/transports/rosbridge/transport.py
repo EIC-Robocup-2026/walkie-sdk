@@ -60,6 +60,10 @@ class ROSBridgeTransport(ROSTransportInterface[roslibpy.Topic]):
         self._current_goal: Optional[Any] = None
         self._current_action_client: Optional[Any] = None
 
+        # Latched publishers kept advertised so the rosbridge server retains
+        # the TRANSIENT_LOCAL durability (and last message) between publishes.
+        self._latched_topics: Dict[str, roslibpy.Topic] = {}
+
     @property
     def host(self) -> str:
         """Robot IP address or hostname."""
@@ -152,6 +156,12 @@ class ROSBridgeTransport(ROSTransportInterface[roslibpy.Topic]):
         The reactor runs on a daemon thread, so it never blocks process exit.
         """
         if self._ros is not None:
+            for topic_obj in self._latched_topics.values():
+                try:
+                    topic_obj.unadvertise()
+                except Exception:
+                    pass
+            self._latched_topics.clear()
             try:
                 self._ros.close()
             except Exception:
@@ -218,6 +228,7 @@ class ROSBridgeTransport(ROSTransportInterface[roslibpy.Topic]):
         topic: str,
         message_type: str,
         message: Dict[str, Any],
+        latch: bool = False,
     ) -> None:
         """
         Publish a message to a ROS topic.
@@ -226,13 +237,22 @@ class ROSBridgeTransport(ROSTransportInterface[roslibpy.Topic]):
             topic: Topic name (e.g., "/cmd_vel")
             message_type: ROS message type (e.g., "geometry_msgs/msg/Twist")
             message: Message data as dictionary
+            latch: If True, advertise with latch=true so rosbridge creates the
+                   publisher with TRANSIENT_LOCAL durability (needed to match
+                   transient_local subscribers such as Nav2 selector topics)
 
         Raises:
             ConnectionError: If not connected
         """
         ros = self._ensure_connected()
 
-        topic_obj = roslibpy.Topic(ros, topic, message_type)
+        if latch:
+            topic_obj = self._latched_topics.get(topic)
+            if topic_obj is None or topic_obj.ros is not ros:
+                topic_obj = roslibpy.Topic(ros, topic, message_type, latch=True)
+                self._latched_topics[topic] = topic_obj
+        else:
+            topic_obj = roslibpy.Topic(ros, topic, message_type)
         topic_obj.publish(roslibpy.Message(message))
 
     def call_action(
