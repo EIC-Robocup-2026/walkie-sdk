@@ -15,6 +15,8 @@ At the prompt type:
     go <x> <y> <standoff>       → navigate_to_object with standoff override (m)
     go <x> <y> face_target      → navigate_to_object, skip edge fit
     pose <x> <y> <heading>      → navigate_to_pose (Nav2, heading in radians)
+    precise on|off              → select Nav2 goal checker for next goals
+                                  (on = precise_goal_checker, off = general)
     autotilt on|off             → enable/disable head_tilt_near_goal auto-tilt node
     cancel                      → cancel current navigation goal
     stop                        → emergency stop (zero cmd_vel + cancel)
@@ -74,6 +76,7 @@ def _parse_command(raw: str):
     Parse a user input string. Returns one of:
       ("go_obj",  x, y, standoff, align_method)
       ("go_pose", x, y, heading)
+      ("precise", enabled)
       ("cancel",)
       ("stop",)
       ("status",)
@@ -132,6 +135,12 @@ def _parse_command(raw: str):
             return None
         return ("autotilt", parts[1].lower() == "on")
 
+    if cmd == "precise":
+        if len(parts) < 2 or parts[1].lower() not in ("on", "off"):
+            print("  Usage: precise on|off")
+            return None
+        return ("precise", parts[1].lower() == "on")
+
     if cmd == "pose":
         if len(parts) < 4:
             print("  Usage: pose <x> <y> <heading_rad>")
@@ -160,6 +169,7 @@ def run_interactive_session(bot: WalkieRobot, timeout: float) -> tuple[int, int]
     print("    go <x> <y> <standoff>      navigate_to_object  with standoff override (m)")
     print("    go <x> <y> face_target     navigate_to_object  skip edge alignment")
     print("    pose <x> <y> <heading>     navigate_to_pose    (Nav2, heading in rad)")
+    print("    precise on|off             goal checker for next goals (on = precise_goal_checker)")
     print("    autotilt on|off            enable/disable head_tilt_near_goal node")
     print("    cancel                     cancel current goal")
     print("    stop                       emergency stop (zero cmd_vel + cancel)")
@@ -170,6 +180,7 @@ def run_interactive_session(bot: WalkieRobot, timeout: float) -> tuple[int, int]
 
     passed = 0
     attempted = 0
+    precise = False
 
     while True:
         try:
@@ -202,6 +213,7 @@ def run_interactive_session(bot: WalkieRobot, timeout: float) -> tuple[int, int]
 
         if kind == "status":
             _print_status(bot)
+            print(f"  precise={'on' if precise else 'off'}")
             continue
 
         if kind == "where":
@@ -215,27 +227,35 @@ def run_interactive_session(bot: WalkieRobot, timeout: float) -> tuple[int, int]
             print(f"  set_auto_tilt({enable}) -> {ok}  ({state})")
             continue
 
+        if kind == "precise":
+            precise = parsed[1]
+            checker = "precise_goal_checker" if precise else "general_goal_checker"
+            print(f"  precise={'on' if precise else 'off'}  (next goals use {checker})")
+            continue
+
         if kind == "unknown":
             print(f"  Unknown command: {parsed[1]!r}")
-            print("  Commands: go | pose | autotilt | cancel | stop | status | where | q")
+            print("  Commands: go | pose | precise | autotilt | cancel | stop | status | where | q")
             continue
 
         if kind == "go_obj":
             _, x, y, standoff, align_method = parsed
             label = f"navigate_to_object  x={x}  y={y}  standoff={standoff}  align={align_method or 'nearest_edge'}"
-            print(f"  → {label}  (blocking, timeout={timeout}s) ...")
+            print(f"  → {label}  precise={'on' if precise else 'off'}  (blocking, timeout={timeout}s) ...")
             attempted += 1
 
             result = bot.nav.go_to(x=x, y=y, standoff=standoff, align_method=align_method,
-                                   blocking=True, timeout=timeout)
+                                   precise=precise, blocking=True, timeout=timeout)
             print(f"  Result: {result}  |  method: {bot.nav.nav_error_msg}")
 
         elif kind == "go_pose":
             _, x, y, h = parsed
-            print(f"  → navigate_to_pose  x={x}  y={y}  heading={h:.3f} rad  (blocking, timeout={timeout}s) ...")
+            print(f"  → navigate_to_pose  x={x}  y={y}  heading={h:.3f} rad  "
+                  f"precise={'on' if precise else 'off'}  (blocking, timeout={timeout}s) ...")
             attempted += 1
 
-            result = bot.nav.go_to(x=x, y=y, heading=h, blocking=True, timeout=timeout)
+            result = bot.nav.go_to(x=x, y=y, heading=h, precise=precise,
+                                   blocking=True, timeout=timeout)
             print(f"  Result: {result}  |  status: {bot.nav.status}")
 
         if result in ("SUCCEEDED", "CLOSE_ENOUGH"):
