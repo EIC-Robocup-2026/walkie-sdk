@@ -92,7 +92,8 @@ def create_app(session: RobotSession | None = None) -> FastAPI:
     def nav_goto(req: models.GotoRequest) -> Dict[str, Any]:
         robot = session.require()
         result = robot.nav.go_to(
-            x=req.x, y=req.y, heading=req.heading, blocking=req.blocking
+            x=req.x, y=req.y, heading=req.heading, blocking=req.blocking,
+            precise=req.precise,
         )
         return {"ok": True, "result": result}
 

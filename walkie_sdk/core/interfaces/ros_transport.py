@@ -102,6 +102,7 @@ class ROSTransportInterface(ABC, Generic[SubscriptionHandle]):
         topic: str,
         message_type: str,
         message: Dict[str, Any],
+        latch: bool = False,
     ) -> None:
         """
         Publish a message to a ROS topic.
@@ -110,6 +111,10 @@ class ROSTransportInterface(ABC, Generic[SubscriptionHandle]):
             topic: Full topic name (e.g., "/cmd_vel")
             message_type: ROS message type (e.g., "geometry_msgs/msg/Twist")
             message: Message data as dictionary matching the ROS message structure
+            latch: If True, publish with transient_local durability (latched) so
+                   late-joining subscribers receive the last message. Required for
+                   topics whose subscribers request transient_local QoS (e.g. Nav2
+                   selector topics) — a volatile publisher will not match them.
 
         Raises:
             ConnectionError: If not connected
